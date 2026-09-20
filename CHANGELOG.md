@@ -14,3 +14,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `tools/refgen`: golden-vector generator using glam-rs 0.33.8 (f64) as the oracle, CI `golden` job (#3).
 - `fixed`: tier A scalar (`FixedTrait`, operators, rounding, `sqrt`, `FloatExt` helpers) and `wide` fused kernels with typed accumulators (#6).
 - `fixed`: exact-integer golden vectors for tier A and `wide` (117 generated tests, tolerance 0) (#7).
+- `glam`: `IVec2/3/4`, `UVec2/3/4` generated from one template (`tools/codegen/intvec.py`) (#5).
