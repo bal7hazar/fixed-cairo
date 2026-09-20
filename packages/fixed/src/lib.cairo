@@ -14,3 +14,4 @@ pub use fixed::{
     LN_10, LN_2, MAX, MIN, NEG_ONE, ONE, ONE_RAW, PI, PI_RAW, RAD_TO_DEG, SQRT_2, TAU, TAU_RAW, TWO,
     ZERO,
 };
+pub use trig::{TrigImpl, TrigTrait};
