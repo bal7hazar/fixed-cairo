@@ -11,9 +11,9 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | F3 | `fixed::trig` tier B | done | #8 |
 | T1 | `tools/refgen` golden vector generator | done | #3 |
 | V0 | `bvec2`, `bvec3`, `bvec4` | done | #2 |
-| V2 | `vec2` | inprogress | |
-| V3 | `vec3` | inprogress | |
-| V4 | `vec4` | inprogress | |
+| V2 | `vec2` | done | #9 |
+| V3 | `vec3` | done | #9 |
+| V4 | `vec4` | done | #9 |
 | VI | `ivec2/3/4`, `uvec2/3/4` | done | #5 |
 | M2 | `mat2` | todo | |
 | M3 | `mat3` | todo | |

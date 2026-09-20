@@ -16,3 +16,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `fixed`: exact-integer golden vectors for tier A and `wide` (117 generated tests, tolerance 0) (#7).
 - `glam`: `IVec2/3/4`, `UVec2/3/4` generated from one template (`tools/codegen/intvec.py`) (#5).
 - `fixed::trig`: loop-free `sin`, `cos`, `sin_cos`, `tan`, `asin`, `acos`, `atan`, `atan2` (about +-1 ULP, generator + bit-exact mirror in `scripts/gen_trig.py`) (#8).
+- `glam`: `Vec2`, `Vec3`, `Vec4` on the fused kernels, generated from `tools/codegen/fvec.py`, with glam-rs golden vectors (#9).

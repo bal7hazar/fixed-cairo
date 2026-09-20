@@ -33,3 +33,6 @@ pub use ivec4::{IVec4, IVec4Trait};
 pub use uvec2::{UVec2, UVec2Trait};
 pub use uvec3::{UVec3, UVec3Trait};
 pub use uvec4::{UVec4, UVec4Trait};
+pub use vec2::{Vec2, Vec2Trait};
+pub use vec3::{Vec3, Vec3Trait};
+pub use vec4::{Vec4, Vec4Trait};
