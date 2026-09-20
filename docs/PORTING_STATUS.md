@@ -21,7 +21,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | Q1 | `quat` | done | #12 |
 | S1 | swizzles (Vec2, Vec3) | done | #10 |
 | X1 | cross-type methods | todo | |
-| A2 | `affine2` | todo | |
+| A2 | `affine2` | done | #14 |
 | A3 | `affine3` | todo | |
 | E1 | `euler` | todo | |
 | C1 | `camera` | todo | |
