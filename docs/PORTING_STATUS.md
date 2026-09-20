@@ -18,7 +18,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | M2 | `mat2` | inprogress | |
 | M3 | `mat3` | inprogress | |
 | M4 | `mat4` | inprogress | |
-| Q1 | `quat` | inprogress | |
+| Q1 | `quat` | done | #12 |
 | S1 | swizzles (Vec2, Vec3) | done | #10 |
 | X1 | cross-type methods | todo | |
 | A2 | `affine2` | todo | |
