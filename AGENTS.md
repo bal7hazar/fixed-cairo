@@ -18,6 +18,7 @@ Read `docs/DESIGN.md` before writing any code. It is short and every rule in it 
 | `gas/<module>.snap` | committed gas/step snapshots, one file per bench module |
 | `scripts/check.sh` | the full gate; `scripts/bench.py` the bench runner |
 | `docs/DESIGN.md`, `docs/PLAN.md`, `docs/PORTING_STATUS.md` | decisions, sequencing, progress |
+| `docs/ORCHESTRATOR.md` | how the orchestrator session spawns and briefs sub-agents (CLIs, model choice, brief format) |
 | `docs/research/` | the five research reports and the benchmark prototype (`bench/`) they are based on |
 
 ## Commands
