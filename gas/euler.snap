@@ -1,0 +1,19 @@
+# bench: l2_gas steps range_check bitwise other_builtins
+bench_euler::alt_mat3_from_euler_glam: 120050 941 242 0 0
+bench_euler::alt_quat_from_euler_compose: 116910 918 230 0 0
+bench_euler::alt_quat_from_euler_glam: 123690 972 254 0 0
+bench_euler::mat3_from_euler: 114170 897 218 0 0
+bench_euler::mat3_from_euler__const: 111170 869 218 0 0
+bench_euler::mat3_from_euler__gimbal: 114170 902 218 0 0
+bench_euler::mat3_from_euler__repeated: 114170 904 218 0 0
+bench_euler::mat3_to_euler: 94160 689 139 0 0
+bench_euler::mat3_to_euler__const: 89150 649 139 0 0
+bench_euler::mat3_to_euler__gimbal: 94160 495 97 0 0
+bench_euler::mat3_to_euler__repeated: 94160 718 147 0 0
+bench_euler::mat4_from_euler: 114870 904 218 0 0
+bench_euler::mat4_to_euler: 94160 689 139 0 0
+bench_euler::quat_from_euler: 110800 874 214 0 0
+bench_euler::quat_from_euler__const: 108390 844 214 0 0
+bench_euler::quat_from_euler__repeated: 110800 873 214 0 0
+bench_euler::quat_from_euler__zero: 110800 874 214 0 0
+bench_euler::quat_to_euler: 117530 883 181 0 0
