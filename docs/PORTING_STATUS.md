@@ -20,12 +20,27 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | M4 | `mat4` | done | #13 |
 | Q1 | `quat` | done | #12 |
 | S1 | swizzles (Vec2, Vec3) | done | #10 |
-| X1 | cross-type methods | todo | |
+| X1 | cross-type methods | inprogress | worktree `cli-x1`, branch `feat/x1`, uncommitted |
 | A2 | `affine2` | done | #14 |
 | A3 | `affine3` | todo | |
-| E1 | `euler` | todo | |
-| C1 | `camera` | todo | |
+| E1 | `euler` | inreview | #15 |
+| C1 | `camera` | inprogress | worktree `cli-camera`, branch `feat/camera`, uncommitted |
 | S2 | swizzles (Vec4, integer) | done | #10 |
 | F4 | `fixed` tier C (`exp`, `ln`, `powf`) | todo | |
 | P1 | physics extensions (`Rot2`, `Pose2`, `Pose3`) | todo | |
 | R1 | audit, optimizer pass, `v0.1.0` | todo | |
+
+## Resume notes (2026-09-20 19:40, graceful shutdown)
+
+- #15 (`feat/euler`) was green on fmt/lint/fixed/golden/docs with `Test glam` and the bench job
+  still running: merge it when `all-checks` is green, then add
+  `pub use euler::{EulerRot, QuatEulerTrait, Mat3EulerTrait, Mat4EulerTrait};` (check the exact
+  names in `packages/glam/src/euler.cairo`) to `packages/glam/src/lib.cairo`.
+- X1 and C1 agents were still working when the machine was shut down: their files are on disk in
+  `.claude/worktrees/cli-x1` and `cli-camera`; resume with `claude --continue -p "<finish: run
+  scripts/check.sh in the foreground, commit, push, open the PR, write REPORT.md>"` from the
+  worktree, or restart from `docs/ORCHESTRATOR.md` briefs (`scratchpad/prompts/*.md` are
+  session-local and may be gone).
+- Not started: A3 `affine3` (depends on X1 for `Mat3::from_quat`), F4 tier C, P1 physics
+  extensions, R1 audit / v0.1.0. After A3 + X1 land, `Quat::from_affine3` closes the last cycle.
+- Re-exports so far: BVec*, IVec*, UVec*, Vec2/3/4, swizzles, Quat, Mat2/3/4, Affine2.
