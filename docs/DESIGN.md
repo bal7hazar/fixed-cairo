@@ -51,9 +51,13 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
   documented alternative (report 05 section 3.4) should profiling of the physics step justify it.
 - **Rounding**: **floor** (toward negative infinity) for every rescale: `mul`, fused kernels,
   polynomial evaluation. It is what the branch-free bias trick `((p + 2^k) div 2^32) - 2^(k-32)`
-  yields for free. `div` truncates toward zero like the corelib signed division, unless a cheaper
-  floor formulation is found (then this line is updated). Rounding is part of the API: results
-  are bit-exact and any change is a MINOR version bump.
+  yields for free. `div`, `rem`, `recip` and `from_ratio` truncate toward zero like the corelib
+  signed division (measured cheaper than floor: 3 740 vs 3 940 gas). One deliberate exception:
+  `wide::RecipTrait::mul` (the shared-division kernel behind `normalize*` and `inverse`) rounds
+  to nearest, ties toward +infinity, at no extra cost, so that `x / d` is exact whenever the
+  quotient is representable (`normalize` of an axis-aligned vector is exactly `+-1`). `sqrt` and
+  `norm*` return the floor of the exact root. Rounding is part of the API: results are bit-exact
+  and any change is a MINOR version bump.
 - **Overflow**: panics (native `i64` checks and the final `downcast` of each kernel). Never wraps,
   never saturates. Panic messages are short strings, e.g. `'Fixed: overflow'`.
 - **Arithmetic internals**: `core::internal::bounded_int` behind
@@ -71,9 +75,15 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
 The single largest win (7x on `Mat4 * Mat4` vs cubit): multiply raw values into Q64.64 products
 (1 step, no range check), **sum the raw products, rescale once per output scalar**.
 
-- `dot2/3/4`, `mul_sub` (`a*b - c*d`, the cross-product/determinant building block), `mul_add`,
-  and the wide accumulator types they are built from are public API of `fixed`: `glam`,
-  `nalgebra` and `rapier` kernels must be written against them, never as chains of `Fixed * Fixed`.
+- `dot2/3/4`, `dot2/3_add`, `mul_sub` (`a*b - c*d`, the cross-product/determinant building
+  block), `mul_add`, `det3`, `norm*`, `distance*`, `normalize*`, the shared square root `Norm`
+  (one `sqrt` for `length` + `normalize` + `try_normalize`), the shared division `Recip` (divide
+  an adjugate once) and the typed accumulators `W1..W16` (sums of raw products, Q64.64) /
+  `T1..T16` (sums of triple products, Q96.96) with `add/sub/neg/mul/lift/narrow` are public API
+  of `fixed`: `glam`, `nalgebra` and `rapier` kernels must be written against them, never as
+  chains of `Fixed * Fixed` (measured: `dot3` 2 080 fused vs 7 540 unfused gas). Bounds are
+  tracked by the type system; `narrow` is the only range check; 16 terms is the ceiling
+  (narrow a partial sum and re-lift beyond that); quadruple products do not fit a felt.
 - `length = u128_sqrt(x^2 + y^2 + z^2)` on the **raw** sum: no rescale, no precision loss, and
   `length_squared` underflow for tiny vectors disappears from `length`/`normalize`.
 - Rule of thumb: one rescale (`div_rem` by `2^32`) per output component, zero per intermediate.
