@@ -1,1 +1,159 @@
-//! Alternative implementations benchmarked against `quat`.
+//! Alternative implementations benchmarked against `glam::quat` (the `alt_*` rows of
+//! `gas/quat.snap`). The library ships the formulation it documents; the others stay here so
+//! that the comparison is reproducible across compiler upgrades.
+
+use fixed::fixed::{Fixed, FixedTrait};
+use fixed::trig::TrigTrait;
+use fixed::wide::{NormTrait, RecipTrait, mul_add, norm3_wide};
+use glam::quat::{Quat, QuatTrait};
+use glam::vec3::{Vec3, Vec3Trait};
+
+/// Alternative to `Quat::mul_quat`. The literal glam-rs `w0 x1 + x0 w1 + y0 z1 - z0 y1`, ...:
+/// four rounded products per component instead of one exact sum rescaled once: 37 080 gas
+/// against the 10 040 of the fused form.
+#[inline(always)]
+pub fn mul_quat_unfused(lhs: Quat, rhs: Quat) -> Quat {
+    Quat {
+        x: lhs.w * rhs.x + lhs.x * rhs.w + lhs.y * rhs.z - lhs.z * rhs.y,
+        y: lhs.w * rhs.y - lhs.x * rhs.z + lhs.y * rhs.w + lhs.z * rhs.x,
+        z: lhs.w * rhs.z + lhs.x * rhs.y - lhs.y * rhs.x + lhs.z * rhs.w,
+        w: lhs.w * rhs.w - lhs.x * rhs.x - lhs.y * rhs.y - lhs.z * rhs.z,
+    }
+}
+
+/// Alternative to `Quat::mul_vec3`. The `t = 2 b x v; v + w t + b x t` formulation (b = the
+/// vector part): 15 multiplications become 12, but the two cross products and the sum each
+/// rescale, so the result rounds three times instead of once and costs 22 580 gas against the
+/// 9 360 of the triple-product form.
+#[inline(always)]
+pub fn mul_vec3_two_cross(lhs: Quat, rhs: Vec3) -> Vec3 {
+    let b = Vec3 { x: lhs.x, y: lhs.y, z: lhs.z };
+    let c = b.cross(rhs);
+    let t = Vec3 { x: c.x + c.x, y: c.y + c.y, z: c.z + c.z };
+    let ct = b.cross(t);
+    Vec3 {
+        x: mul_add(lhs.w, t.x, rhs.x) + ct.x,
+        y: mul_add(lhs.w, t.y, rhs.y) + ct.y,
+        z: mul_add(lhs.w, t.z, rhs.z) + ct.z,
+    }
+}
+
+/// Alternative to `Quat::from_scaled_axis`. The sine folded into the shared division
+/// (`v * (sin(angle / 2) / length)`): one `Recip` multiplication instead of three. 4 470 gas
+/// cheaper (44 350 vs 48 820), at the price of the exactness of the axis-aligned inputs, which
+/// is why the library keeps the literal form.
+#[inline(always)]
+pub fn from_scaled_axis_fused(v: Vec3) -> Quat {
+    let n = norm3_wide(v.x, v.y, v.z);
+    match n.try_recip() {
+        Some(r) => {
+            let (s, c) = (n.to_fixed() * F_HALF).sin_cos();
+            let k = r.mul(s);
+            Quat { x: v.x * k, y: v.y * k, z: v.z * k, w: c }
+        },
+        None => QuatTrait::IDENTITY,
+    }
+}
+
+/// Alternative to `Quat::to_scaled_axis`. The angle folded into the shared division
+/// (`xyz * (angle / length)`), same trade-off as [`from_scaled_axis_fused`]: 6 670 gas cheaper
+/// (40 500 vs 47 170), not exact on the axis-aligned inputs.
+#[inline(always)]
+pub fn to_scaled_axis_fused(lhs: Quat) -> Vec3 {
+    let n = norm3_wide(lhs.x, lhs.y, lhs.z);
+    let len = n.to_fixed();
+    if len >= AXIS_EPS {
+        let a = len.atan2(lhs.w);
+        let k = n.recip().mul(a + a);
+        Vec3 { x: lhs.x * k, y: lhs.y * k, z: lhs.z * k }
+    } else {
+        Vec3Trait::ZERO
+    }
+}
+
+/// Alternative to `Quat::from_axis_angle`. Two reductions (`sin` then `cos`) instead of the
+/// shared one of `sin_cos`: 52 300 gas against 40 350.
+#[inline(always)]
+pub fn from_axis_angle_two_calls(axis: Vec3, angle: Fixed) -> Quat {
+    let h = angle * F_HALF;
+    let s = h.sin();
+    Quat { x: axis.x * s, y: axis.y * s, z: axis.z * s, w: h.cos() }
+}
+
+/// Alternative to the `s / sin(theta)` of `Quat::slerp`. A truncated `Fixed` reciprocal followed
+/// by four multiplications, as glam-rs spells it, instead of the shared wide `Recip`:
+/// 130 750 gas against 122 180, and up to 1 ULP further from the exact quotient.
+#[inline(always)]
+pub fn slerp_fixed_recip(lhs: Quat, end: Quat, s: Fixed) -> Quat {
+    let d0 = QuatTrait::dot(lhs, end);
+    let neg = d0.is_negative();
+    let d = if neg {
+        -d0
+    } else {
+        d0
+    };
+    if d > NEAR_ONE {
+        QuatTrait::lerp(lhs, end, s)
+    } else {
+        let theta = d.acos();
+        let scale1 = (theta * (F_ONE - s)).sin();
+        let sin2 = (theta * s).sin();
+        let scale2 = if neg {
+            -sin2
+        } else {
+            sin2
+        };
+        let r = theta.sin().recip();
+        Quat {
+            x: (lhs.x * scale1 + end.x * scale2) * r,
+            y: (lhs.y * scale1 + end.y * scale2) * r,
+            z: (lhs.z * scale1 + end.z * scale2) * r,
+            w: (lhs.w * scale1 + end.w * scale2) * r,
+        }
+    }
+}
+
+/// Alternative to `Quat::lerp`. The literal glam-rs `self * (1 - s) + end * s` (two rounded
+/// products per component) before the shared normalization, with `end` negated on the long
+/// path: 31 140 gas against 24 120.
+#[inline(always)]
+pub fn lerp_glam(lhs: Quat, end: Quat, s: Fixed) -> Quat {
+    let b = if QuatTrait::dot(lhs, end).is_negative() {
+        Quat { x: -end.x, y: -end.y, z: -end.z, w: -end.w }
+    } else {
+        end
+    };
+    let u = F_ONE - s;
+    QuatTrait::normalize(
+        Quat {
+            x: lhs.x * u + b.x * s,
+            y: lhs.y * u + b.y * s,
+            z: lhs.z * u + b.z * s,
+            w: lhs.w * u + b.w * s,
+        },
+    )
+}
+
+/// Alternative to `Quat::is_near_identity`. The literal angle test
+/// `2 acos(|w|) < 2 acos(1 - 1e-6)`, i.e. one `acos` (32 070 gas) instead of one comparison
+/// (1 770).
+#[inline(always)]
+pub fn is_near_identity_angle(lhs: Quat) -> bool {
+    let a = lhs.w.abs().acos_clamped();
+    a + a < NEAR_IDENTITY_ANGLE
+}
+
+/// `1`.
+const F_ONE: Fixed = Fixed { raw: 0x100000000 };
+
+/// `1 / 2`.
+const F_HALF: Fixed = Fixed { raw: 0x80000000 };
+
+/// `1 - 2^-20`: `glam::quat::NEAR_ONE`.
+const NEAR_ONE: Fixed = Fixed { raw: 0xfffff000 };
+
+/// `2^-16`: `glam::quat::AXIS_EPS`.
+const AXIS_EPS: Fixed = Fixed { raw: 0x10000 };
+
+/// `2 acos(1 - 1e-6) = 2.83e-3` rad, as `fixed::trig::acos` computes it.
+const NEAR_IDENTITY_ANGLE: Fixed = Fixed { raw: 12148048 };
