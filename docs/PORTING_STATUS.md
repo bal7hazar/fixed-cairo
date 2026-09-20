@@ -6,11 +6,11 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | id | module(s) | status | PR |
 |---|---|---|---|
 | W0 | research, workspace, CI, bench harness, docs | done | bootstrap |
-| F1 | `fixed::fixed` tier A | todo | |
-| F2 | `fixed::wide` fused kernels | todo | |
+| F1 | `fixed::fixed` tier A | inprogress | |
+| F2 | `fixed::wide` fused kernels | inprogress | |
 | F3 | `fixed::trig` tier B | todo | |
-| T1 | `tools/refgen` golden vector generator | todo | |
-| V0 | `bvec2`, `bvec3`, `bvec4` | todo | |
+| T1 | `tools/refgen` golden vector generator | inprogress | |
+| V0 | `bvec2`, `bvec3`, `bvec4` | done | #2 |
 | V2 | `vec2` | todo | |
 | V3 | `vec3` | todo | |
 | V4 | `vec4` | todo | |

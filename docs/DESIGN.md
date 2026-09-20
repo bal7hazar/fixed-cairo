@@ -139,6 +139,14 @@ Hard rules (each one is backed by a measurement in report 05 section 6 / report 
    their benches, so the comparison stays reproducible across compiler upgrades.
 10. No stubbed success: an unported function does not exist.
 
+Re-exports: `glam/src/lib.cairo` re-exports types and traits only (`pub use vec3::{Vec3, Vec3Trait};`).
+The glam-rs constructor functions (`vec3(x, y, z)`, `bvec3(..)`) share their module's name, and
+in Cairo a root re-export of the function shadows the module (`glam::vec3::Vec3` stops resolving):
+import them from their module (`use glam::vec3::vec3;`).
+
+Gas accounting note: for branching code snforge's l2_gas depends on the branch taken, so benches
+of branching functions carry several inputs (`_first` / `_last` ...).
+
 Doc template (every public item):
 
 ```cairo

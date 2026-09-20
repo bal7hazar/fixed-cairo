@@ -10,3 +10,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
   execution plan (`docs/PLAN.md`).
 - Workspace with the `fixed`, `glam` and `benches` packages; seed of the `Fixed` Q32.32 scalar.
 - Gas/step benchmark harness (`scripts/bench.py`, `gas/*.snap`) and CI.
+- `glam`: `BVec2`, `BVec3`, `BVec4` (#2).

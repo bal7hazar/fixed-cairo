@@ -23,3 +23,7 @@ pub mod uvec4;
 pub mod vec2;
 pub mod vec3;
 pub mod vec4;
+
+pub use bvec2::{BVec2, BVec2Trait};
+pub use bvec3::{BVec3, BVec3Trait};
+pub use bvec4::{BVec4, BVec4Trait};
