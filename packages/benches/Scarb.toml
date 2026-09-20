@@ -1,0 +1,25 @@
+[package]
+name = "benches"
+description = "Gas and step benchmarks for the fixed and glam packages (not published)"
+version.workspace = true
+edition.workspace = true
+cairo-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[dependencies]
+fixed.workspace = true
+glam.workspace = true
+
+[dev-dependencies]
+snforge_std.workspace = true
+assert_macros.workspace = true
+
+[tool]
+fmt.workspace = true
+scarb.workspace = true
+
+[scripts]
+test = "snforge test"

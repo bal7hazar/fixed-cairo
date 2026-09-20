@@ -1,0 +1,2 @@
+# bench: l2_gas steps range_check bitwise other_builtins
+bench_fixed::add: 740 6 2 0 0
