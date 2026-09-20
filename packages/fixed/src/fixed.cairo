@@ -278,7 +278,8 @@ pub trait FixedTrait {
     /// Mirrors `f32::recip`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `self` is zero.
-    /// * `'Fixed: overflow'` if `|self| <= 2^-31` (raw magnitude <= 2).
+    /// * `'Fixed: overflow'` if `self` is `1` or `2` raw (`2^64 / raw` does not fit; `-2` raw gives
+    /// `MIN`).
     /// #### Deviations
     /// * Panics instead of returning infinity.
     fn recip(self: Fixed) -> Fixed;
