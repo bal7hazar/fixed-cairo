@@ -135,14 +135,23 @@ fn imports(
             .or_default()
             .insert(item.to_owned());
     }
+    // `scarb fmt` sorts the `use` lines by their text, where `{` sorts after every letter:
+    // `use fixed::wide::X;` comes before `use fixed::{A, B};`.
+    let mut uses: Vec<String> = groups
+        .into_iter()
+        .map(|(parent, items)| {
+            let items: Vec<String> = items.into_iter().collect();
+            if items.len() == 1 {
+                format!("{parent}::{}", items[0])
+            } else {
+                format!("{parent}::{{{}}}", items.join(", "))
+            }
+        })
+        .collect();
+    uses.sort();
     let mut out = String::new();
-    for (parent, items) in groups {
-        let items: Vec<String> = items.into_iter().collect();
-        if items.len() == 1 {
-            out.push_str(&format!("use {parent}::{};\n", items[0]));
-        } else {
-            out.push_str(&format!("use {parent}::{{{}}};\n", items.join(", ")));
-        }
+    for path in uses {
+        out.push_str(&format!("use {path};\n"));
     }
     if !out.is_empty() {
         out.push('\n');
@@ -486,6 +495,32 @@ justification = "disabled entries need no oracle."
             .to_cols_array()
             .map(|x| (x * 4294967296.0) as i64);
         assert!(first.contains(&format!("    {},", identity[0])));
+    }
+
+    #[test]
+    fn use_lines_follow_the_formatter_order() {
+        let spec: Spec = toml::from_str(
+            r#"
+module = "demo"
+package = "fixed"
+imports = ["fixed::FixedTrait", "fixed::wide::dot3", "fixed::wide::RecipTrait"]
+
+[[function]]
+name = "id"
+call = "{0}"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 1
+tolerance = 0
+justification = "exact."
+"#,
+        )
+        .unwrap();
+        let mut registry = Registry::default();
+        registry.add("id", |a| a[0].f());
+        let text = module(&spec, Some(&registry)).unwrap();
+        assert!(text
+            .contains("use fixed::wide::{RecipTrait, dot3};\nuse fixed::{Fixed, FixedTrait};\n"));
     }
 
     #[test]
