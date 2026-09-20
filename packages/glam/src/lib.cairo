@@ -30,6 +30,10 @@ pub use bvec4::{BVec4, BVec4Trait};
 pub use ivec2::{IVec2, IVec2Trait};
 pub use ivec3::{IVec3, IVec3Trait};
 pub use ivec4::{IVec4, IVec4Trait};
+pub use swizzles::{
+    IVec2Swizzles, IVec3Swizzles, IVec4Swizzles, UVec2Swizzles, UVec3Swizzles, UVec4Swizzles,
+    Vec2Swizzles, Vec3Swizzles, Vec4Swizzles,
+};
 pub use uvec2::{UVec2, UVec2Trait};
 pub use uvec3::{UVec3, UVec3Trait};
 pub use uvec4::{UVec4, UVec4Trait};
