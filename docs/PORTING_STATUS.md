@@ -9,12 +9,12 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | F1 | `fixed::fixed` tier A | inprogress | |
 | F2 | `fixed::wide` fused kernels | inprogress | |
 | F3 | `fixed::trig` tier B | todo | |
-| T1 | `tools/refgen` golden vector generator | inprogress | |
+| T1 | `tools/refgen` golden vector generator | done | #3 |
 | V0 | `bvec2`, `bvec3`, `bvec4` | done | #2 |
 | V2 | `vec2` | todo | |
 | V3 | `vec3` | todo | |
 | V4 | `vec4` | todo | |
-| VI | `ivec2/3/4`, `uvec2/3/4` | todo | |
+| VI | `ivec2/3/4`, `uvec2/3/4` | inprogress | |
 | M2 | `mat2` | todo | |
 | M3 | `mat3` | todo | |
 | M4 | `mat4` | todo | |

@@ -11,3 +11,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - Workspace with the `fixed`, `glam` and `benches` packages; seed of the `Fixed` Q32.32 scalar.
 - Gas/step benchmark harness (`scripts/bench.py`, `gas/*.snap`) and CI.
 - `glam`: `BVec2`, `BVec3`, `BVec4` (#2).
+- `tools/refgen`: golden-vector generator using glam-rs 0.33.8 (f64) as the oracle, CI `golden` job (#3).

@@ -4,3 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  - package-ecosystem: cargo
+    directory: /tools/refgen
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: glam # pinned on purpose: it is the test oracle
