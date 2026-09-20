@@ -41,6 +41,25 @@ jobs:
         if: always()
         run: cat gas_report.md >> "$GITHUB_STEP_SUMMARY"
 
+  golden:
+    name: Golden vectors up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The stable Rust toolchain is preinstalled on ubuntu-latest.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            tools/refgen/target
+          key: refgen-${{ runner.os }}-${{ hashFiles('tools/refgen/Cargo.lock') }}
+      - name: Generator unit tests
+        run: cargo test --locked --manifest-path tools/refgen/Cargo.toml
+      # Fails when a committed packages/*/tests/golden_*.cairo differs from the generator output.
+      - name: Check golden vectors
+        run: cargo run --locked --manifest-path tools/refgen/Cargo.toml -- check
+
   docs:
     name: Docs build
     runs-on: ubuntu-latest
@@ -52,7 +71,7 @@ jobs:
   all-checks:
     name: All checks passed
     if: always()
-    needs: [fmt-lint, test, docs]
+    needs: [fmt-lint, test, golden, docs]
     runs-on: ubuntu-latest
     steps:
       - run: |

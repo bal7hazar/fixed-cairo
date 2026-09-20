@@ -1,0 +1,23 @@
+[package]
+name = "refgen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Golden-vector generator: glam-rs (f64) is the test oracle of the glam.cairo port"
+license = "MIT"
+
+# Own workspace: this crate is not part of the scarb workspace and must not be picked up by a
+# parent Cargo workspace either.
+[workspace]
+
+[dependencies]
+# The oracle. Pinned exactly: the port mirrors this release.
+# `scalar-math`: the code path that is ported. `libm`: platform-independent transcendentals, so
+# the generated files are byte-identical on every host.
+glam = { version = "=0.33.8", default-features = false, features = ["libm", "scalar-math", "f64", "i32", "u32"] }
+libm = "0.2"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[profile.dev]
+opt-level = 1

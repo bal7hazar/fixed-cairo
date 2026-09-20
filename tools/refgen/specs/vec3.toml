@@ -1,0 +1,339 @@
+# Golden vectors of `glam::vec3` - worked example, written before the Cairo module exists.
+# Oracles: tools/refgen/src/oracles/vec3.rs. Format: tools/refgen/README.md.
+#
+# To enable (task V3): set `enabled = true` below, align the `call` expressions and the
+# tolerances with the final Cairo API, then
+#   cargo run --manifest-path tools/refgen/Cargo.toml -- gen vec3
+#
+# Domains: f64 resolves half a raw ULP only below 2^20, so the inputs of the functions whose
+# result grows quadratically (dot, cross, length_squared, ...) are kept within |x| <= 500
+# (3 * 500^2 < 2^20). Larger results are skipped by the `max_abs` guard anyway.
+
+module = "vec3"
+package = "glam"
+enabled = false
+imports = ["glam::vec3::Vec3Trait"]
+
+[[function]]
+name = "new"
+call = "Vec3Trait::new({0}, {1}, {2})"
+args = ["Fixed", "Fixed", "Fixed"]
+ret = "Vec3"
+cases = 4
+tolerance = 0
+justification = "exact: constructor."
+
+[[function]]
+name = "splat"
+call = "Vec3Trait::splat({0})"
+args = ["Fixed"]
+ret = "Vec3"
+cases = 4
+tolerance = 0
+justification = "exact: constructor."
+
+[[function]]
+name = "add"
+call = "{0} + {1}"
+args = ["Vec3", "Vec3"]
+ret = "Vec3"
+cases = 16
+tolerance = 0
+justification = "exact: component-wise i64 addition."
+edges = [[[0, 0, 0], [0, 0, 0]], [[1, 2, 3], [-1, -2, -3]], [["raw:1", "raw:-1", 0], ["raw:1", "raw:1", 0.5]]]
+
+[[function]]
+name = "sub"
+call = "{0} - {1}"
+args = ["Vec3", "Vec3"]
+ret = "Vec3"
+cases = 16
+tolerance = 0
+justification = "exact: component-wise i64 subtraction."
+edges = [[[0, 0, 0], [0, 0, 0]], [[1, 2, 3], [1, 2, 3]]]
+
+[[function]]
+name = "mul"
+call = "{0} * {1}"
+args = ["Vec3", "Vec3"]
+ret = "Vec3"
+cases = 16
+tolerance = 1
+justification = "one floor rescale per component vs round to nearest: |diff| <= 1."
+edges = [[[1, 2, 3], [4, 5, 6]], [[-1.5, 0, 2.5], [2, 7, -0.5]]]
+
+[[function]]
+name = "div"
+call = "{0} / {1}"
+args = ["Vec3", { type = "Vec3", nonzero = true, min_abs = 0.01 }]
+ret = "Vec3"
+cases = 16
+tolerance = 1
+justification = "one truncated division per component vs round to nearest: |diff| <= 1."
+edges = [[[1, 2, 3], [4, 5, 6]], [[-1, 1, -1], [3, 3, -3]]]
+
+[[function]]
+name = "neg"
+call = "-{0}"
+args = ["Vec3"]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact."
+edges = [[[0, 0, 0]], [[1, -2, 3]]]
+
+[[function]]
+name = "mul_scalar"
+call = "{0}.mul_scalar({1})"
+args = ["Vec3", "Fixed"]
+ret = "Vec3"
+cases = 16
+tolerance = 1
+justification = "one floor rescale per component vs round to nearest: |diff| <= 1."
+edges = [[[1, 2, 3], 0], [[1, 2, 3], 1], [[1, 2, 3], -2.5]]
+
+[[function]]
+name = "div_scalar"
+call = "{0}.div_scalar({1})"
+args = ["Vec3", { type = "Fixed", nonzero = true, min_abs = 0.01 }]
+ret = "Vec3"
+cases = 16
+tolerance = 1
+justification = "one truncated division per component vs round to nearest: |diff| <= 1. Use 2 + |v/s| ULP if implemented as a multiplication by the reciprocal."
+edges = [[[1, 2, 3], 1], [[1, 2, 3], 3], [[1, 2, 3], -3]]
+
+[[function]]
+name = "dot"
+call = "{0}.dot({1})"
+args = [{ type = "Vec3", min = -500.0, max = 500.0 }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "fused kernel: the exact Q64.64 sum is floored once; the f64 oracle is within 0.4 ULP below 2^20, then rounded to nearest: |diff| <= 1."
+edges = [
+    [[0, 0, 0], [1, 2, 3]],
+    [[1, 0, 0], [0, 1, 0]],
+    [[1, 2, 3], [4, 5, 6]],
+    [[1, 2, 3], [-4, -5, -6]],
+    [["raw:1", "raw:1", "raw:1"], ["raw:1", "raw:1", "raw:1"]],
+]
+
+[[function]]
+name = "cross"
+call = "{0}.cross({1})"
+args = [{ type = "Vec3", min = -500.0, max = 500.0 }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Vec3"
+cases = 32
+tolerance = 1
+justification = "fused mul_sub per component (one floor rescale of the exact a*b - c*d) vs round to nearest: |diff| <= 1."
+edges = [
+    [[1, 0, 0], [0, 1, 0]],
+    [[0, 1, 0], [0, 0, 1]],
+    [[0, 0, 1], [1, 0, 0]],
+    [[1, 2, 3], [1, 2, 3]],
+    [[1, 2, 3], [-2, -4, -6]],
+]
+
+[[function]]
+name = "length"
+call = "{0}.length()"
+args = ["Vec3"]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "integer sqrt (floor) of the exact raw sum of squares vs round to nearest: |diff| <= 1."
+edges = [[[0, 0, 0]], [[1, 0, 0]], [[3, 4, 0]], [[2, 3, 6]], [["raw:1", 0, 0]], [["raw:1", "raw:1", "raw:1"]]]
+
+[[function]]
+name = "length_squared"
+call = "{0}.length_squared()"
+args = [{ type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Fixed"
+cases = 16
+tolerance = 1
+justification = "fused kernel: one floor rescale of the exact sum vs round to nearest: |diff| <= 1."
+edges = [[[0, 0, 0]], [[1, 2, 3]], [["raw:65536", 0, 0]]]
+
+[[function]]
+name = "length_recip"
+call = "{0}.length_recip()"
+args = [{ type = "Vec3", constraint = "nonzero", min_len = 1.0 }]
+ret = "Fixed"
+cases = 16
+tolerance = 2
+justification = "1 ULP on the length (floor sqrt) divided by len^2 <= 1 ULP for len >= 1, plus one truncated division vs round to nearest."
+
+[[function]]
+name = "distance"
+call = "{0}.distance({1})"
+args = ["Vec3", "Vec3"]
+ret = "Fixed"
+cases = 16
+tolerance = 1
+justification = "exact subtraction then `length`: |diff| <= 1."
+
+[[function]]
+name = "distance_squared"
+call = "{0}.distance_squared({1})"
+args = [{ type = "Vec3", min = -250.0, max = 250.0 }, { type = "Vec3", min = -250.0, max = 250.0 }]
+ret = "Fixed"
+cases = 16
+tolerance = 1
+justification = "exact subtraction then `length_squared`: |diff| <= 1."
+
+[[function]]
+name = "normalize"
+call = "{0}.normalize()"
+args = [{ type = "Vec3", constraint = "nonzero", min_len = 1.0 }]
+ret = "Vec3"
+cases = 32
+tolerance = 2
+justification = "per component: |x| / len^2 <= 1 ULP inherited from the floor sqrt (len >= 1) plus one truncated division vs round to nearest. Shorter vectors amplify the length error by 1 / len and need their own entry."
+edges = [[[1, 0, 0]], [[0, -2, 0]], [[3, 4, 0]], [[1, 1, 1]], [[1000, 1000, 1000]]]
+
+[[function.panics]]
+name = "zero"
+args = [[0, 0, 0]]
+expected = "Vec3: normalize zero"
+
+[[function]]
+name = "min"
+call = "{0}.min({1})"
+args = ["Vec3", "Vec3"]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "max"
+call = "{0}.max({1})"
+args = ["Vec3", "Vec3"]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "clamp"
+call = "{0}.clamp({1}, {2})"
+args = ["Vec3", { type = "Vec3", min = -1000.0, max = 0.0 }, { type = "Vec3", min = 0.0, max = 1000.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact. min <= max is a glam precondition: other cases are skipped by the oracle."
+
+[[function]]
+name = "abs"
+call = "{0}.abs()"
+args = ["Vec3"]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "signum"
+call = "{0}.signum()"
+args = ["Vec3"]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact: signum(0) = +1 (DESIGN section 3)."
+edges = [[[0, 0, 0]], [["raw:1", "raw:-1", 0]]]
+
+[[function]]
+name = "min_element"
+call = "{0}.min_element()"
+args = ["Vec3"]
+ret = "Fixed"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "max_element"
+call = "{0}.max_element()"
+args = ["Vec3"]
+ret = "Fixed"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "lerp"
+call = "{0}.lerp({1}, {2})"
+args = ["Vec3", "Vec3", { type = "Fixed", min = -1.0, max = 2.0 }]
+ret = "Vec3"
+cases = 16
+tolerance = 1
+justification = "self + (rhs - self) * s with one floor rescale per component vs round to nearest: |diff| <= 1."
+edges = [[[0, 0, 0], [1, 2, 3], 0], [[0, 0, 0], [1, 2, 3], 1], [[-1, -2, -3], [1, 2, 3], 0.5]]
+
+[[function]]
+name = "cmpeq"
+call = "{0}.cmpeq({1})"
+args = [{ type = "Vec3", min = -1.0, max = 1.0 }, { type = "Vec3", min = -1.0, max = 1.0 }]
+ret = "BVec3"
+cases = 8
+tolerance = 0
+justification = "exact: integer comparison."
+edges = [[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [1, 0, 3]]]
+
+[[function]]
+name = "cmplt"
+call = "{0}.cmplt({1})"
+args = ["Vec3", "Vec3"]
+ret = "BVec3"
+cases = 8
+tolerance = 0
+justification = "exact: integer comparison."
+edges = [[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [2, 1, 3]]]
+
+[[function]]
+name = "cmpge"
+call = "{0}.cmpge({1})"
+args = ["Vec3", "Vec3"]
+ret = "BVec3"
+cases = 8
+tolerance = 0
+justification = "exact: integer comparison."
+edges = [[[1, 2, 3], [1, 2, 3]], [[1, 2, 3], [2, 1, 3]]]
+
+[[function]]
+name = "select"
+call = "Vec3Trait::select({0}, {1}, {2})"
+args = ["BVec3", "Vec3", "Vec3"]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact."
+edges = [[[true, false, true], [1, 2, 3], [4, 5, 6]]]
+
+[[function]]
+name = "truncate"
+call = "{0}.truncate()"
+args = ["Vec3"]
+ret = "Vec2"
+cases = 4
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "extend"
+call = "{0}.extend({1})"
+args = ["Vec3", "Fixed"]
+ret = "Vec4"
+cases = 4
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "any_orthonormal_pair"
+call = "{0}.any_orthonormal_pair()"
+args = [{ type = "Vec3", constraint = "normalized" }]
+ret = "(Vec3, Vec3)"
+cases = 16
+tolerance = 4
+justification = "a = -1 / (sign + z) is a truncated division of magnitude <= 1 (1 ULP); every component chains at most three floor products of factors <= 1 on top of it: <= 4 ULP."
+edges = [[[1, 0, 0]], [[0, 1, 0]], [[0, 0, 1]], [[0, 0, -1]]]

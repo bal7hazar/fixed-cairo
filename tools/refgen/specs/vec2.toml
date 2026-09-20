@@ -1,0 +1,261 @@
+# Golden vectors of `glam::vec2` - worked example, written before the Cairo module exists.
+# Oracles: tools/refgen/src/oracles/vec2.rs. Format: tools/refgen/README.md.
+#
+# To enable (task V2): set `enabled = true` below, align the `call` expressions and the
+# tolerances with the final Cairo API, then
+#   cargo run --manifest-path tools/refgen/Cargo.toml -- gen vec2
+#
+# Domains: f64 resolves half a raw ULP only below 2^20, so the inputs of the functions whose
+# result grows quadratically (dot, perp_dot, length_squared) are kept within |x| <= 500.
+
+module = "vec2"
+package = "glam"
+enabled = false
+imports = ["glam::vec2::Vec2Trait"]
+
+[[function]]
+name = "new"
+call = "Vec2Trait::new({0}, {1})"
+args = ["Fixed", "Fixed"]
+ret = "Vec2"
+cases = 4
+tolerance = 0
+justification = "exact: constructor."
+
+[[function]]
+name = "splat"
+call = "Vec2Trait::splat({0})"
+args = ["Fixed"]
+ret = "Vec2"
+cases = 4
+tolerance = 0
+justification = "exact: constructor."
+
+[[function]]
+name = "add"
+call = "{0} + {1}"
+args = ["Vec2", "Vec2"]
+ret = "Vec2"
+cases = 16
+tolerance = 0
+justification = "exact: component-wise i64 addition."
+edges = [[[0, 0], [0, 0]], [[1, 2], [-1, -2]], [["raw:1", "raw:-1"], ["raw:1", 0.5]]]
+
+[[function]]
+name = "sub"
+call = "{0} - {1}"
+args = ["Vec2", "Vec2"]
+ret = "Vec2"
+cases = 16
+tolerance = 0
+justification = "exact: component-wise i64 subtraction."
+edges = [[[0, 0], [0, 0]], [[1, 2], [1, 2]]]
+
+[[function]]
+name = "mul"
+call = "{0} * {1}"
+args = ["Vec2", "Vec2"]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "one floor rescale per component vs round to nearest: |diff| <= 1."
+edges = [[[1, 2], [4, 5]], [[-1.5, 2.5], [2, -0.5]]]
+
+[[function]]
+name = "div"
+call = "{0} / {1}"
+args = ["Vec2", { type = "Vec2", nonzero = true, min_abs = 0.01 }]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "one truncated division per component vs round to nearest: |diff| <= 1."
+edges = [[[1, 2], [4, 5]], [[-1, 1], [3, -3]]]
+
+[[function]]
+name = "neg"
+call = "-{0}"
+args = ["Vec2"]
+ret = "Vec2"
+cases = 8
+tolerance = 0
+justification = "exact."
+edges = [[[0, 0]], [[1, -2]]]
+
+[[function]]
+name = "mul_scalar"
+call = "{0}.mul_scalar({1})"
+args = ["Vec2", "Fixed"]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "one floor rescale per component vs round to nearest: |diff| <= 1."
+edges = [[[1, 2], 0], [[1, 2], 1], [[1, 2], -2.5]]
+
+[[function]]
+name = "div_scalar"
+call = "{0}.div_scalar({1})"
+args = ["Vec2", { type = "Fixed", nonzero = true, min_abs = 0.01 }]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "one truncated division per component vs round to nearest: |diff| <= 1. Use 2 + |v/s| ULP if implemented as a multiplication by the reciprocal."
+edges = [[[1, 2], 1], [[1, 2], 3], [[1, 2], -3]]
+
+[[function]]
+name = "dot"
+call = "{0}.dot({1})"
+args = [{ type = "Vec2", min = -500.0, max = 500.0 }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "fused kernel: the exact Q64.64 sum is floored once; the f64 oracle is within 0.4 ULP below 2^20, then rounded to nearest: |diff| <= 1."
+edges = [[[0, 0], [1, 2]], [[1, 0], [0, 1]], [[1, 2], [4, 5]], [["raw:1", "raw:1"], ["raw:1", "raw:1"]]]
+
+[[function]]
+name = "perp"
+call = "{0}.perp()"
+args = ["Vec2"]
+ret = "Vec2"
+cases = 8
+tolerance = 0
+justification = "exact: (-y, x)."
+
+[[function]]
+name = "perp_dot"
+call = "{0}.perp_dot({1})"
+args = [{ type = "Vec2", min = -500.0, max = 500.0 }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "fused mul_sub: one floor rescale of the exact x0*y1 - y0*x1 vs round to nearest: |diff| <= 1."
+edges = [[[1, 0], [0, 1]], [[0, 1], [1, 0]], [[1, 2], [2, 4]]]
+
+[[function]]
+name = "length"
+call = "{0}.length()"
+args = ["Vec2"]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "integer sqrt (floor) of the exact raw sum of squares vs round to nearest: |diff| <= 1."
+edges = [[[0, 0]], [[1, 0]], [[3, 4]], [["raw:1", 0]], [["raw:1", "raw:1"]]]
+
+[[function]]
+name = "length_squared"
+call = "{0}.length_squared()"
+args = [{ type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Fixed"
+cases = 16
+tolerance = 1
+justification = "fused kernel: one floor rescale of the exact sum vs round to nearest: |diff| <= 1."
+edges = [[[0, 0]], [[1, 2]], [["raw:65536", 0]]]
+
+[[function]]
+name = "distance"
+call = "{0}.distance({1})"
+args = ["Vec2", "Vec2"]
+ret = "Fixed"
+cases = 16
+tolerance = 1
+justification = "exact subtraction then `length`: |diff| <= 1."
+
+[[function]]
+name = "normalize"
+call = "{0}.normalize()"
+args = [{ type = "Vec2", constraint = "nonzero", min_len = 1.0 }]
+ret = "Vec2"
+cases = 32
+tolerance = 2
+justification = "per component: |x| / len^2 <= 1 ULP inherited from the floor sqrt (len >= 1) plus one truncated division vs round to nearest. Shorter vectors amplify the length error by 1 / len and need their own entry."
+edges = [[[1, 0]], [[0, -2]], [[3, 4]], [[1, 1]], [[1000, 1000]]]
+
+[[function.panics]]
+name = "zero"
+args = [[0, 0]]
+expected = "Vec2: normalize zero"
+
+[[function]]
+name = "min"
+call = "{0}.min({1})"
+args = ["Vec2", "Vec2"]
+ret = "Vec2"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "max"
+call = "{0}.max({1})"
+args = ["Vec2", "Vec2"]
+ret = "Vec2"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "abs"
+call = "{0}.abs()"
+args = ["Vec2"]
+ret = "Vec2"
+cases = 8
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "lerp"
+call = "{0}.lerp({1}, {2})"
+args = ["Vec2", "Vec2", { type = "Fixed", min = -1.0, max = 2.0 }]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "self + (rhs - self) * s with one floor rescale per component vs round to nearest: |diff| <= 1."
+edges = [[[0, 0], [1, 2], 0], [[0, 0], [1, 2], 1], [[-1, -2], [1, 2], 0.5]]
+
+[[function]]
+name = "cmplt"
+call = "{0}.cmplt({1})"
+args = ["Vec2", "Vec2"]
+ret = "BVec2"
+cases = 8
+tolerance = 0
+justification = "exact: integer comparison."
+edges = [[[1, 2], [1, 2]], [[1, 2], [2, 1]]]
+
+[[function]]
+name = "select"
+call = "Vec2Trait::select({0}, {1}, {2})"
+args = ["BVec2", "Vec2", "Vec2"]
+ret = "Vec2"
+cases = 8
+tolerance = 0
+justification = "exact."
+edges = [[[true, false], [1, 2], [4, 5]]]
+
+[[function]]
+name = "extend"
+call = "{0}.extend({1})"
+args = ["Vec2", "Fixed"]
+ret = "Vec3"
+cases = 4
+tolerance = 0
+justification = "exact."
+
+[[function]]
+name = "rotate"
+call = "{0}.rotate({1})"
+args = [{ type = "Vec2", constraint = "normalized" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "each component is one fused mul_sub / dot2 (one floor rescale of the exact sum) vs round to nearest: |diff| <= 1."
+edges = [[[1, 0], [1, 2]], [[0, 1], [1, 2]], [[-1, 0], [1, 2]]]
+
+[[function]]
+name = "from_angle"
+call = "Vec2Trait::from_angle({0})"
+args = [{ type = "Fixed", domain = "angle" }]
+ret = "Vec2"
+cases = 32
+tolerance = 3
+justification = "fixed::trig sin/cos max error 4.7e-10 = 2.02 ULP (DESIGN 2.2) + 0.5 ULP oracle quantization, rounded up."
+edges = [[0], [1.5707963267948966], [3.141592653589793], [-1.5707963267948966]]

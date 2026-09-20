@@ -6,3 +6,4 @@ profile/
 .DS_Store
 __pycache__/
 .claude/worktrees/
+tools/refgen/target/

@@ -1,0 +1,397 @@
+# Golden vectors of `fixed::fixed` (scalar tier A).
+# Oracles: tools/refgen/src/oracles/fixed.rs. Format: tools/refgen/README.md.
+# Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen fixed
+
+module = "fixed"
+package = "fixed"
+imports = ["fixed::FixedTrait"]
+
+# ------------------------------------------------------------------------------------------
+# Available today.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "from_raw"
+call = "FixedTrait::from_raw({0})"
+args = [{ type = "i64", min = -9007199254740992, max = 9007199254740992 }]
+ret = "Fixed"
+cases = 8
+tolerance = 0
+justification = "exact: the raw value is stored as is."
+edges = [[0], [1], [-1], [4294967296], ["raw:0x7fffffffffffffff"], ["raw:-0x8000000000000000"]]
+
+[[function]]
+name = "add"
+call = "{0} + {1}"
+args = [{ type = "Fixed", domain = "full" }, { type = "Fixed", domain = "full" }]
+ret = "Fixed"
+cases = 32
+tolerance = 0
+justification = "exact: native i64 addition of the raw values (integer oracle, full range)."
+edges = [
+    [0, 0],
+    [1.5, -1.5],
+    [1000, 0.25],
+    ["raw:1", "raw:-1"],
+    ["raw:0x7fffffffffffffff", 0],
+    ["raw:0x7ffffffffffffffe", "raw:1"],
+    ["raw:-0x8000000000000000", 0],
+    ["raw:-0x8000000000000000", "raw:0x7fffffffffffffff"],
+]
+
+[[function.panics]]
+name = "overflow"
+args = ["raw:0x7fffffffffffffff", "raw:1"]
+expected = "i64_add Overflow"
+
+[[function.panics]]
+name = "underflow"
+args = ["raw:-0x8000000000000000", "raw:-1"]
+expected = "i64_add Underflow"
+
+[[function]]
+name = "sub"
+call = "{0} - {1}"
+args = [{ type = "Fixed", domain = "full" }, { type = "Fixed", domain = "full" }]
+ret = "Fixed"
+cases = 32
+tolerance = 0
+justification = "exact: native i64 subtraction of the raw values (integer oracle, full range)."
+edges = [
+    [0, 0],
+    [1.5, 1.5],
+    [-1000, 0.25],
+    ["raw:1", "raw:-1"],
+    ["raw:0x7fffffffffffffff", 0],
+    ["raw:-0x8000000000000000", "raw:-0x8000000000000000"],
+    ["raw:-1", "raw:0x7fffffffffffffff"],
+]
+
+[[function.panics]]
+name = "overflow"
+args = ["raw:0x7fffffffffffffff", "raw:-1"]
+expected = "i64_sub Overflow"
+
+[[function.panics]]
+name = "underflow"
+args = ["raw:-0x8000000000000000", "raw:1"]
+expected = "i64_sub Underflow"
+
+[[function]]
+name = "neg"
+call = "-{0}"
+args = [{ type = "Fixed", domain = "full" }]
+ret = "Fixed"
+cases = 16
+tolerance = 0
+justification = "exact: native i64 negation of the raw value (integer oracle, full range)."
+edges = [[0], [1], [-1], ["raw:1"], ["raw:0x7fffffffffffffff"], ["raw:-0x7fffffffffffffff"]]
+
+[[function.panics]]
+name = "min"
+args = ["raw:-0x8000000000000000"]
+expected = "i64_neg Underflow"
+
+# ------------------------------------------------------------------------------------------
+# Pending: the rest of tier A (task F1). The oracles exist; to enable an entry, delete its
+# `enabled = false` line (adjust `call` to the final Cairo API if needed) and regenerate.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "mul"
+enabled = false
+call = "{0} * {1}"
+args = ["Fixed", "Fixed"]
+ret = "Fixed"
+cases = 48
+tolerance = 1
+justification = "one floor rescale on the Cairo side vs the real product rounded to nearest: |diff| <= 1."
+edges = [
+    [0, 5],
+    [1, 1],
+    [-1, 1],
+    [1.5, -2.5],
+    ["raw:1", "raw:1"],
+    ["raw:-1", "raw:1"],
+    ["raw:0x80000000", "raw:1"],
+    ["raw:-0x80000000", "raw:1"],
+    [46340.5, 46340.5],
+    [-46341, 46340],
+    [0.0000152587890625, 0.0000152587890625],
+]
+
+[[function]]
+name = "div"
+enabled = false
+call = "{0} / {1}"
+args = ["Fixed", { type = "Fixed", nonzero = true }]
+ret = "Fixed"
+cases = 48
+tolerance = 1
+justification = "truncated (or floored) quotient on the Cairo side vs the real quotient rounded to nearest: |diff| <= 1."
+edges = [
+    [0, 5],
+    [1, 1],
+    [1, 3],
+    [-1, 3],
+    [1, -3],
+    [-1, -3],
+    [7.5, -2.5],
+    ["raw:1", 2],
+    ["raw:-1", 2],
+    [1000, 0.001],
+    [2147483647, 1],
+]
+
+[[function]]
+name = "rem"
+enabled = false
+call = "{0} % {1}"
+args = ["Fixed", { type = "Fixed", nonzero = true }]
+ret = "Fixed"
+cases = 32
+tolerance = 0
+justification = "exact: truncated remainder of the raw values (same sign as the dividend)."
+edges = [[7.5, 2], [-7.5, 2], [7.5, -2], [-7.5, -2], [0, 3], [1, 1], ["raw:1", "raw:-3"]]
+
+[[function]]
+name = "abs"
+enabled = false
+call = "{0}.abs()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 16
+tolerance = 0
+justification = "exact."
+edges = [[0], [1.5], [-1.5], ["raw:-1"]]
+
+[[function]]
+name = "signum"
+enabled = false
+call = "{0}.signum()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 16
+tolerance = 0
+justification = "exact: -1 or +1, signum(0) = +1 like f32::signum(+0.0) (DESIGN section 3)."
+edges = [[0], ["raw:1"], ["raw:-1"], [1000], [-1000]]
+
+[[function]]
+name = "copysign"
+enabled = false
+call = "{0}.copysign({1})"
+args = ["Fixed", "Fixed"]
+ret = "Fixed"
+cases = 16
+tolerance = 0
+justification = "exact: |self| with the sign of the argument, a zero argument counts as positive."
+edges = [[1.5, -2], [-1.5, 2], [-1.5, 0], [0, -1]]
+
+[[function]]
+name = "floor"
+enabled = false
+call = "{0}.floor()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact."
+edges = [[0], [1.5], [-1.5], [2], [-2], ["raw:1"], ["raw:-1"], [-0.5], [0.5]]
+
+[[function]]
+name = "ceil"
+enabled = false
+call = "{0}.ceil()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact."
+edges = [[0], [1.5], [-1.5], [2], [-2], ["raw:1"], ["raw:-1"], [-0.5], [0.5]]
+
+[[function]]
+name = "round"
+enabled = false
+call = "{0}.round()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact: half away from zero like f32::round."
+edges = [[0], [0.5], [-0.5], [1.5], [-1.5], [2.5], [-2.5], ["raw:0x7fffffff"], ["raw:-0x7fffffff"], ["raw:0x80000001"]]
+
+[[function]]
+name = "trunc"
+enabled = false
+call = "{0}.trunc()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact."
+edges = [[0], [1.5], [-1.5], [2], [-2], ["raw:1"], ["raw:-1"]]
+
+[[function]]
+name = "fract"
+enabled = false
+call = "{0}.fract()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact: x - trunc(x), keeps the sign of x."
+edges = [[0], [1.75], [-1.75], [2], [-2], ["raw:1"], ["raw:-1"]]
+
+[[function]]
+name = "fract_gl"
+enabled = false
+call = "{0}.fract_gl()"
+args = ["Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact: x - floor(x), always in [0, 1)."
+edges = [[0], [1.75], [-1.75], [2], [-2], ["raw:1"], ["raw:-1"]]
+
+[[function]]
+name = "recip"
+enabled = false
+call = "{0}.recip()"
+args = [{ type = "Fixed", nonzero = true }]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "one truncated division on the Cairo side vs 1/x rounded to nearest: |diff| <= 1."
+edges = [[1], [-1], [2], [0.5], [3], [-3], [1000], [-0.001], ["raw:0x7fffffffffffffff"]]
+
+[[function]]
+name = "sqrt"
+enabled = false
+call = "{0}.sqrt()"
+args = [{ type = "Fixed", domain = "full", min = 0.0 }]
+ret = "Fixed"
+cases = 48
+tolerance = 1
+justification = "integer square root (floor) on the Cairo side vs the real root rounded to nearest: |diff| <= 1."
+edges = [[0], [1], [4], [2], [0.25], [1000000], ["raw:1"], ["raw:2"], ["raw:0x7fffffffffffffff"]]
+
+[[function]]
+name = "min"
+enabled = false
+call = "{0}.min({1})"
+args = ["Fixed", "Fixed"]
+ret = "Fixed"
+cases = 16
+tolerance = 0
+justification = "exact."
+edges = [[1, 1], [1, -1], [-1, 1], ["raw:1", "raw:2"]]
+
+[[function]]
+name = "max"
+enabled = false
+call = "{0}.max({1})"
+args = ["Fixed", "Fixed"]
+ret = "Fixed"
+cases = 16
+tolerance = 0
+justification = "exact."
+edges = [[1, 1], [1, -1], [-1, 1], ["raw:1", "raw:2"]]
+
+[[function]]
+name = "clamp"
+enabled = false
+call = "{0}.clamp({1}, {2})"
+args = ["Fixed", "Fixed", "Fixed"]
+ret = "Fixed"
+cases = 24
+tolerance = 0
+justification = "exact. Cases with min > max (a glam precondition) are skipped by the oracle."
+edges = [[0, -1, 1], [5, -1, 1], [-5, -1, 1], [1, 1, 1], [-1, -1, 1]]
+
+[[function]]
+name = "lerp"
+enabled = false
+call = "{0}.lerp({1}, {2})"
+args = ["Fixed", "Fixed", { type = "Fixed", min = -1.0, max = 2.0 }]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "self + (rhs - self) * t with one floor rescale vs the real value rounded to nearest: |diff| <= 1."
+edges = [[0, 10, 0], [0, 10, 1], [0, 10, 0.5], [-10, 10, 0.25], [10, -10, 0.75], [3, 3, 0.3]]
+
+[[function]]
+name = "mul_add"
+enabled = false
+call = "{0}.mul_add({1}, {2})"
+args = ["Fixed", "Fixed", "Fixed"]
+ret = "Fixed"
+cases = 32
+tolerance = 1
+justification = "fused a * b + c with one floor rescale vs the real value rounded to nearest: |diff| <= 1."
+edges = [[0, 0, 0], [2, 3, 4], [-2, 3, 4], [1.5, 1.5, -2.25], ["raw:1", "raw:1", "raw:1"]]
+
+[[function]]
+name = "div_euclid"
+enabled = false
+call = "{0}.div_euclid({1})"
+args = ["Fixed", { type = "Fixed", nonzero = true, min_abs = 0.01 }]
+ret = "Fixed"
+cases = 32
+tolerance = 0
+justification = "exact: the euclidean quotient is an integer."
+edges = [[7, 4], [-7, 4], [7, -4], [-7, -4], [7.5, 2], [-7.5, 2], [0, 3]]
+
+[[function]]
+name = "rem_euclid"
+enabled = false
+call = "{0}.rem_euclid({1})"
+args = ["Fixed", { type = "Fixed", nonzero = true }]
+ret = "Fixed"
+cases = 32
+tolerance = 0
+justification = "exact: euclidean remainder of the raw values, always in [0, |rhs|)."
+edges = [[7, 4], [-7, 4], [7, -4], [-7, -4], [7.5, 2], [-7.5, 2], [0, 3], ["raw:-1", 2]]
+
+[[function]]
+name = "lt"
+enabled = false
+call = "{0} < {1}"
+args = ["Fixed", "Fixed"]
+ret = "bool"
+cases = 16
+tolerance = 0
+justification = "exact: integer comparison of the raw values."
+edges = [[1, 1], ["raw:1", "raw:2"], [-1, 1], [1, -1]]
+
+[[function]]
+name = "le"
+enabled = false
+call = "{0} <= {1}"
+args = ["Fixed", "Fixed"]
+ret = "bool"
+cases = 16
+tolerance = 0
+justification = "exact: integer comparison of the raw values."
+edges = [[1, 1], ["raw:1", "raw:2"], [-1, 1], [1, -1]]
+
+[[function]]
+name = "gt"
+enabled = false
+call = "{0} > {1}"
+args = ["Fixed", "Fixed"]
+ret = "bool"
+cases = 16
+tolerance = 0
+justification = "exact: integer comparison of the raw values."
+edges = [[1, 1], ["raw:1", "raw:2"], [-1, 1], [1, -1]]
+
+[[function]]
+name = "ge"
+enabled = false
+call = "{0} >= {1}"
+args = ["Fixed", "Fixed"]
+ret = "bool"
+cases = 16
+tolerance = 0
+justification = "exact: integer comparison of the raw values."
+edges = [[1, 1], ["raw:1", "raw:2"], [-1, 1], [1, -1]]
