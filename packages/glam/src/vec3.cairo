@@ -14,9 +14,10 @@
 use core::ops::index::IndexView;
 use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};
 use fixed::fixed::{Fixed, FixedTrait};
+use fixed::trig::TrigTrait;
 use fixed::wide::{
-    Norm, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, distance3,
-    distance3_squared, dot3, mul_add, mul_sub, norm3, norm3_squared, norm3_wide, wide_from,
+    Norm, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, det3, distance3,
+    distance3_squared, dot2, dot3, mul_add, mul_sub, norm3, norm3_squared, norm3_wide, wide_from,
     wide_mul,
 };
 use crate::bvec3::{BVec3, BVec3Trait};
@@ -38,7 +39,8 @@ use crate::vec4::Vec4;
 ///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
 ///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
 ///   exist in glam.cairo (`as_dvec3`, `as_i8vec3`, ...).
-/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.
+/// * Not ported yet: `rotate_axis`, `rotate_towards` and `slerp` (they need `Quat`), see
+///   `docs/PORTING_STATUS.md`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct Vec3 {
     pub x: Fixed,
@@ -729,6 +731,85 @@ pub trait Vec3Trait {
     /// * `k = 1 - eta^2 * (1 - n_dot_i^2)` is evaluated with two floor rescales and its
     ///   square root is floored; each output component is one `mul_sub` fused kernel.
     fn refract(self: Vec3, normal: Vec3, eta: Fixed) -> Vec3;
+    /// Returns the angle (in radians) between two vectors in the range `[0, +π]`.
+    ///
+    /// For the full rotation between two vectors as a quaternion, see
+    /// `Quat::from_rotation_arc`.
+    ///
+    /// The inputs do not need to be unit vectors however they must be non-zero.
+    ///
+    /// Mirrors `glam::Vec3::angle_between`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self x rhs|` or `dot` does not fit the scalar range,
+    ///   i.e. for `|self| * |rhs| >= 2^31`.
+    /// #### Deviations
+    /// * `atan2(|self x rhs|, dot)` instead of the `acos_approx(dot / sqrt(|self|^2 *
+    ///   |rhs|^2))` of glam-rs. It is not a change of formula but of conditioning: the
+    ///   `acos` form loses the angle near `0` and `PI` (the slope of `acos` is infinite
+    ///   there: one ULP of the cosine near 1 is up to `2e-5` rad), the `atan2` form does
+    ///   not. The `acos_clamped` form is kept in `benches::alt`.
+    /// * The three cross components are `mul_sub` kernels (one floor each), their norm is
+    ///   the integer square root of the raw sum of squares, `dot` is floored once: the
+    ///   total error is below `3.22 + 2.9 / (|self| * |rhs|)` ULP, about 6 ULP for vectors
+    ///   whose lengths multiply to at least 1, growing as they shrink.
+    /// * Parallel vectors give `0` and anti-parallel ones `PI` exactly; a zero input gives
+    ///   `0` (the non-zero precondition is not checked).
+    fn angle_between(self: Vec3, rhs: Vec3) -> Fixed;
+    /// Returns the signed angle (in radians) from `self` to `rhs` around `axis` in the
+    /// range `[-π, +π]`.
+    ///
+    /// The `axis` must be a unit vector. The angle follows the right-hand rule around
+    /// `axis` and can be used with `rotate_axis`, e.g. `self.rotate_axis(axis,
+    /// self.angle_to(rhs, axis))` will be equal to `rhs`.
+    ///
+    /// For the unsigned angle without a reference axis, see `angle_between`.
+    ///
+    /// The inputs do not need to be unit vectors however they must be non-zero.
+    ///
+    /// Mirrors `glam::Vec3::angle_to`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the triple product or `dot` does not fit the scalar range,
+    ///   i.e. for `|self| * |rhs| >= 2^31`.
+    /// #### Deviations
+    /// * `self.cross(rhs).dot(axis)` is the `det3` kernel (the scalar triple product, one
+    ///   floor rescale of the exact value) instead of three cross components rounded and
+    ///   then a dot product; `dot` is floored once. The error is below `3.22 + 1.42 /
+    ///   |(triple, dot)|` ULP.
+    /// * The `axis.is_normalized()` precondition and the non-zero inputs are not checked
+    ///   (`glam_assert!`).
+    /// * `Vec3::rotate_axis` (`Quat`) is not ported yet: the round trip of the doc above
+    ///   needs it.
+    fn angle_to(self: Vec3, rhs: Vec3, axis: Vec3) -> Fixed;
+    /// Rotates around the x axis by `angle` (in radians).
+    ///
+    /// Mirrors `glam::Vec3::rotate_x`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * One shared `sin_cos`, then one fused kernel (`mul_sub` / `dot2`, one floor
+    ///   rescale) per rotated component: each is within `1.02 * (|y| + |z|) + 1` ULP of
+    ///   the exact rotation, the `x` component is unchanged.
+    fn rotate_x(self: Vec3, angle: Fixed) -> Vec3;
+    /// Rotates around the y axis by `angle` (in radians).
+    ///
+    /// Mirrors `glam::Vec3::rotate_y`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * One shared `sin_cos`, then one fused kernel (`mul_sub` / `dot2`, one floor
+    ///   rescale) per rotated component: each is within `1.02 * (|z| + |x|) + 1` ULP of
+    ///   the exact rotation, the `y` component is unchanged.
+    fn rotate_y(self: Vec3, angle: Fixed) -> Vec3;
+    /// Rotates around the z axis by `angle` (in radians).
+    ///
+    /// Mirrors `glam::Vec3::rotate_z`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * One shared `sin_cos`, then one fused kernel (`mul_sub` / `dot2`, one floor
+    ///   rescale) per rotated component: each is within `1.02 * (|x| + |y|) + 1` ULP of
+    ///   the exact rotation, the `z` component is unchanged.
+    fn rotate_z(self: Vec3, angle: Fixed) -> Vec3;
     /// Returns any unit vector that is orthogonal to the given one.
     ///
     /// The input vector must be unit length.
@@ -1452,6 +1533,36 @@ pub impl Vec3Impl of Vec3Trait {
                 z: mul_sub(eta, self.z, f, normal.z),
             }
         }
+    }
+
+    #[inline(always)]
+    fn angle_between(self: Vec3, rhs: Vec3) -> Fixed {
+        let c = Self::cross(self, rhs);
+        norm3(c.x, c.y, c.z).atan2(Self::dot(self, rhs))
+    }
+
+    #[inline(always)]
+    fn angle_to(self: Vec3, rhs: Vec3, axis: Vec3) -> Fixed {
+        let s = det3(axis.x, axis.y, axis.z, self.x, self.y, self.z, rhs.x, rhs.y, rhs.z);
+        s.atan2(Self::dot(self, rhs))
+    }
+
+    #[inline(always)]
+    fn rotate_x(self: Vec3, angle: Fixed) -> Vec3 {
+        let (s, c) = angle.sin_cos();
+        Vec3 { x: self.x, y: mul_sub(self.y, c, self.z, s), z: dot2(self.y, s, self.z, c) }
+    }
+
+    #[inline(always)]
+    fn rotate_y(self: Vec3, angle: Fixed) -> Vec3 {
+        let (s, c) = angle.sin_cos();
+        Vec3 { x: dot2(self.x, c, self.z, s), y: self.y, z: mul_sub(self.z, c, self.x, s) }
+    }
+
+    #[inline(always)]
+    fn rotate_z(self: Vec3, angle: Fixed) -> Vec3 {
+        let (s, c) = angle.sin_cos();
+        Vec3 { x: mul_sub(self.x, c, self.y, s), y: dot2(self.x, s, self.y, c), z: self.z }
     }
 
     #[inline(always)]

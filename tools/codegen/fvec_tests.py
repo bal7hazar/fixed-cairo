@@ -19,6 +19,8 @@ call sites. A table here is one `const` of `[i64; W]` rows and ONE `#[test]` tha
 the cost is (checks) call sites, independent of the number of rows. Keep it that way: the CI
 runner is killed when the `glam_tests` modules need more than a few GB to compile.
 """
+import math
+import re
 from math import isqrt
 
 import fvec as g
@@ -289,6 +291,57 @@ LENGTHS = [
     [(1, 1024), (1, 2048), (-1, 4096), (1, 8192)],
 ]
 MASKS = {2: [0, 1, 2, 3], 3: list(range(8)), 4: [0, 15, 1, 2, 4, 8, 5, 10]}
+
+
+# --------------------------------------------------------------------------------------------
+# Trigonometry (`fixed::trig`): float references. The inputs are exact doubles (|raw| < 2^53) and
+# the reference is correct to 1e-16, i.e. 4e-7 ULP: it is the exact value up to the rounding of
+# the quantization (0.5 ULP), so a bound of `e` ULP on the implementation is a tolerance of
+# `floor(e + 0.5)` raw units on the integer comparison.
+# --------------------------------------------------------------------------------------------
+PI_RAW = 13493037705
+ANGLES = [0, 1, -1, 429497, -429497, 2147483648, -2147483648, 4294967296, -4294967296,
+          6746518852, -6746518852, 3373259426, -3373259426, 8589934592, -8589934592,
+          12884901888, -12884901888, 13485000000, -13485000000]
+"""Raw angles strictly inside (-pi, pi): 0, +-1 ULP, 1e-4, 0.5, 1, pi/2, pi/4, 2, 3, 3.14 rad."""
+
+
+def qr(x):
+    """The nearest raw value of a real number of radians / units."""
+    return round(x * ONE)
+
+
+def sin_cos_ref(a):
+    """`(cos, sin)` of the raw angle `a`, quantized: `<= 1.02` ULP from `fixed::trig`."""
+    r = a / ONE
+    return [qr(math.cos(r)), qr(math.sin(r))]
+
+
+def atan2_ref(y, x):
+    """`atan2` of two raw values (the ratio is scale free), quantized."""
+    return qr(math.atan2(y, x))
+
+
+def det3(a, b, c):
+    """`wide::det3`: the exact triple product `a . (b x c)`, floored once (Q96.96 -> Q32.32)."""
+    x = (b[1] * c[2] - c[1] * b[2]) * a[0]
+    y = (b[2] * c[0] - c[2] * b[0]) * a[1]
+    z = (b[0] * c[1] - c[0] * b[1]) * a[2]
+    return (x + y + z) >> 64
+
+
+def angle_to_2d(v, w):
+    """`Vec2::angle_to` on the kernel values (`mul_sub`, `dot2`, one `atan2`)."""
+    return atan2_ref(mul_sub(v[0], w[1], v[1], w[0]), dot(v, w))
+
+
+def rotate_towards_2d(v, w, m):
+    """`Vec2::rotate_towards`, from the exact `atan2` of the kernel values."""
+    a = math.atan2(mul_sub(v[0], w[1], v[1], w[0]), dot(v, w))
+    abs_a = abs(a)
+    ang = min(max(m / ONE, abs_a - PI_RAW / ONE), abs_a) * (-1 if a < 0 else 1)
+    c, s = math.cos(ang), math.sin(ang)
+    return [qr(c * v[0] / ONE - s * v[1] / ONE), qr(s * v[0] / ONE + c * v[1] / ONE)]
 
 
 # --------------------------------------------------------------------------------------------
@@ -774,6 +827,156 @@ def gen_tests(t):
         sp("test_perp_overflow", "'i64_neg Underflow'", f"{V([0, 0])}.with_y(f({MIN_RAW})).perp()")
         sp("test_perp_dot_overflow", "'Fixed: overflow'",
            f"{big}.perp_dot({Tt}::Y.mul_scalar(f({MAX_RAW})))")
+        sp("test_angle_to_overflow", "'Fixed: overflow'", f"{Tt}::MAX.angle_to({Tt}::MAX)")
+        sp("test_rotate_angle_overflow", "'Fixed: overflow'",
+           f"{Tt}::MAX.rotate_angle(f(3373259426))")
+        sp("test_rotate_towards_overflow", "'Fixed: overflow'",
+           f"{Tt}::MAX.rotate_towards({Tt}::MAX, f({ONE}))")
+    if n == 3:
+        sp("test_angle_between_overflow", "'Fixed: overflow'",
+           f"{Tt}::MAX.angle_between({Tt}::MAX)")
+        sp("test_angle_to_overflow", "'Fixed: overflow'",
+           f"{Tt}::MAX.angle_to({Tt}::MAX, {Tt}::Z)")
+        for ax in "xyz":
+            sp(f"test_rotate_{ax}_overflow", "'Fixed: overflow'",
+               f"{Tt}::MAX.rotate_{ax}(f(3373259426))")
+
+    # ----------------------------------------------------------- angles and rotations
+    nz = [(x, y) for x, y in small if any(x) and any(y)]
+    if n == 2:
+        # `from_angle`: the two components are the `sin_cos` of `fixed::trig` (cos 0.86 ULP, sin
+        # 1.02 ULP): the integer distance to the correctly rounded value is at most 1.
+        # `to_angle(from_angle(a))`: the vector is off by hypot(0.86, 1.02) = 1.34 ULP across
+        # the radius (|v| = 1) and `atan2` adds 3.22: 4.56 ULP, i.e. at most 4 raw units.
+        table("from_angle", [("a", "s"), ("e", "v")],
+              [{"a": a, "e": sin_cos_ref(a)} for a in ANGLES],
+              lambda c: [f"let (s, c) = {c['a']}.sin_cos();",
+                         eq(f"{Tt}::from_angle({c['a']})", f"{t.mod}(c, s)"),
+                         f"assert!({Tt}::from_angle({c['a']}).abs_diff_eq({c['e']}, f(1)));",
+                         f"assert!({Tt}::from_angle({c['a']}).to_angle().abs_diff_eq({c['a']}, "
+                         "f(4)));",
+                         "// sin is odd and cos is even, exactly",
+                         eq(f"{Tt}::from_angle(-{c['a']})", f"{t.mod}(c, -s)")])
+        test("test_from_angle_axes", [
+            eq(f"{Tt}::from_angle(f(0))", f"{Tt}::X"),
+            f"assert!({Tt}::from_angle(FRAC_PI_2).abs_diff_eq({Tt}::Y, f(1)));",
+            f"assert!({Tt}::from_angle(-FRAC_PI_2).abs_diff_eq({Tt}::NEG_Y, f(1)));",
+            f"assert!({Tt}::from_angle(PI).abs_diff_eq({Tt}::NEG_X, f(1)));",
+            "// the example of the glam-rs documentation",
+            f"assert!({Tt}::from_angle(PI).rotate({Tt}::Y).abs_diff_eq({Tt}::NEG_Y, f(1)));",
+            f"assert!({Tt}::from_angle(FRAC_PI_4).abs_diff_eq({t.mod}(f(0xB504F334), "
+            "f(0xB504F334)), f(1)));"])
+        # `to_angle`: one `atan2` of the raw components (3.22 ULP): tolerance 3.
+        table("to_angle", [("v", "v"), ("e", "s")],
+              [{"v": v, "e": atan2_ref(v[1], v[0])} for v, _ in small],
+              lambda c: [f"assert!({c['v']}.to_angle().abs_diff_eq({c['e']}, f(3)));"])
+        test("test_to_angle_axes", [
+            eq(f"{Tt}::X.to_angle()", "f(0)"), eq(f"{Tt}::Y.to_angle()", "FRAC_PI_2"),
+            eq(f"{Tt}::NEG_X.to_angle()", "PI"), eq(f"{Tt}::NEG_Y.to_angle()", "-FRAC_PI_2"),
+            eq(f"{V([1, 1])}.to_angle()", "FRAC_PI_4"), eq(f"{Tt}::ZERO.to_angle()", "f(0)"),
+            eq(f"{V([3, 4])}.to_angle()", f"{V([6, 8])}.to_angle()")])
+        # `angle_to`: `atan2` of the two floored products (`mul_sub`, `dot2`), 3.22 ULP.
+        table("angle_to", [("x", "v"), ("y", "v"), ("e", "s")],
+              [{"x": x, "y": y, "e": angle_to_2d(x, y)} for x, y in small],
+              lambda c: [f"assert!({c['x']}.angle_to({c['y']}).abs_diff_eq({c['e']}, f(3)));",
+                         eq(f"{c['x']}.rotate_angle({c['e']})",
+                            f"{c['x']}.rotate({Tt}::from_angle({c['e']}))")])
+        test("test_angle_to_axes", [
+            eq(f"{Tt}::X.angle_to({Tt}::Y)", "FRAC_PI_2"),
+            eq(f"{Tt}::Y.angle_to({Tt}::X)", "-FRAC_PI_2"),
+            eq(f"{Tt}::X.angle_to({Tt}::NEG_X)", "PI"), eq(f"{Tt}::NEG_X.angle_to({Tt}::X)", "PI"),
+            eq(f"{Tt}::X.angle_to({Tt}::X)", "f(0)"),
+            eq(f"{V([3, 4])}.angle_to({V([6, 8])})", "f(0)"),
+            "// the round trip of the glam-rs documentation: `self.rotate_angle(angle_to) = rhs`",
+            f"let v = {V([3, 4])};", f"let w = {V([-4, 3])};",
+            "// |v| = 5: 5 * (3.22 + 1.42 / 25 + 1.34) + 1 = 24.2 ULP",
+            "assert!(v.rotate_angle(v.angle_to(w)).abs_diff_eq(w, f(25)));"])
+        # `rotate_towards`. The reference rotates by `clamp(m, |a| - pi, |a|) * sign(a)` with `a`
+        # the exact angle of the kernel values. The implementation differs by `atan2` (3.22 ULP),
+        # the `angle_to` inputs (1.42 / (|v| |w|) ULP) and `from_angle` (1.34 ULP) on the
+        # angle, times `|v|` on the vector, plus the floor and the quantization (1.5 ULP).
+        rt = []
+        for x, y in nz:
+            lx, ly = math.hypot(*x) / ONE, math.hypot(*y) / ONE
+            for m in [0, ONE // 4, ONE, 100 * ONE, -100 * ONE]:
+                tol = math.ceil(lx * (3.22 + 1.34 + 1.42 / (lx * ly)) + 1.5)
+                rt.append({"x": x, "y": y, "m": m, "e": rotate_towards_2d(x, y, m), "tol": tol})
+        table("rotate_towards", [("x", "v"), ("y", "v"), ("m", "s"), ("e", "v"), ("tol", "s")], rt,
+              lambda c: [f"let res = {c['x']}.rotate_towards({c['y']}, {c['m']});",
+                         f"assert!(res.abs_diff_eq({c['e']}, {c['tol']}));",
+                         f"if {c['m']} == f(0) {{",
+                         f"    assert_eq!(res, {c['x']});",
+                         "}"])
+    if n == 3:
+        cross3 = lambda p, q: [mul_sub(p[1], q[2], q[1], p[2]), mul_sub(p[2], q[0], q[2], p[0]),
+                               mul_sub(p[0], q[1], q[0], p[1])]
+        test("test_angle_between_axes", [
+            eq(f"{Tt}::X.angle_between({Tt}::Y)", "FRAC_PI_2"),
+            eq(f"{Tt}::Y.angle_between({Tt}::X)", "FRAC_PI_2"),
+            eq(f"{Tt}::X.angle_between({Tt}::X)", "f(0)"),
+            eq(f"{Tt}::X.angle_between({Tt}::NEG_X)", "PI"),
+            eq(f"{Tt}::X.angle_between({V([1, 1, 0])}) + {Tt}::X.angle_between({V([1, 1, 0])})",
+               "FRAC_PI_2"),
+            eq(f"{V([1, 2, 3])}.angle_between({V([2, 4, 6])})", "f(0)"),
+            eq(f"{Tt}::ZERO.angle_between({Tt}::X)", "f(0)"),
+            "// where the acos form loses the angle: the cosine of 1.5e-5 rad is 1 - 1.2e-10, half",
+            "// a raw ULP below 1; the atan2 form keeps the angle to a few ULP (atan(2^-16))",
+            f"let w = {V([1, 0, 0])}.with_y(f(65536));",
+            f"assert!({Tt}::X.angle_between(w).abs_diff_eq(f(65536), f(3)));"])
+        # `angle_between` = `atan2(|cross|, dot)` and `angle_to` = `atan2(det3, dot)` on the
+        # kernel values: 3.22 ULP each.
+        axes = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [(3, 7), (6, 7), (2, 7)], [0, -1, 0]]
+        rows = [{"x": x, "y": y, "a": rawv(a, 3),
+                 "eb": atan2_ref(norm(cross3(x, y)), dot(x, y)),
+                 "et": atan2_ref(det3(rawv(a, 3), x, y), dot(x, y))}
+                for (x, y), a in zip(small, axes * 2)]
+        table("angles", [("x", "v"), ("y", "v"), ("a", "v"), ("eb", "s"), ("et", "s")], rows,
+              lambda c: [f"assert!({c['x']}.angle_between({c['y']}).abs_diff_eq({c['eb']}, "
+                         "f(3)));",
+                         f"assert!({c['x']}.angle_to({c['y']}, {c['a']}).abs_diff_eq({c['et']}, "
+                         "f(3)));"])
+        test("test_angle_to_axes", [
+            eq(f"{Tt}::X.angle_to({Tt}::Y, {Tt}::Z)", "FRAC_PI_2"),
+            eq(f"{Tt}::Y.angle_to({Tt}::X, {Tt}::Z)", "-FRAC_PI_2"),
+            eq(f"{Tt}::X.angle_to({Tt}::Y, {Tt}::NEG_Z)", "-FRAC_PI_2"),
+            eq(f"{Tt}::Y.angle_to({Tt}::Z, {Tt}::X)", "FRAC_PI_2"),
+            eq(f"{Tt}::Z.angle_to({Tt}::X, {Tt}::Y)", "FRAC_PI_2"),
+            eq(f"{Tt}::X.angle_to({Tt}::NEG_X, {Tt}::Z)", "PI"),
+            eq(f"{Tt}::X.angle_to({Tt}::X, {Tt}::Z)", "f(0)")])
+        # `rotate_x/y/z`: the exact rotation with the float `(cos, sin)` of the angle. Each
+        # component differs by `|b| * 1.02 + |c| * 1.02` ULP (the `sin_cos` error times the two
+        # inputs) plus the floor and the quantization (1.5 ULP).
+        rr = []
+        for x, _ in small:
+            for a in [0, ANGLES[5], ANGLES[9], ANGLES[16]]:
+                c_, s_ = math.cos(a / ONE), math.sin(a / ONE)
+                vx, vy, vz = (k / ONE for k in x)
+                ex = [x[0], qr(vy * c_ - vz * s_), qr(vy * s_ + vz * c_)]
+                ey = [qr(vx * c_ + vz * s_), x[1], qr(-vx * s_ + vz * c_)]
+                ez = [qr(vx * c_ - vy * s_), qr(vx * s_ + vy * c_), x[2]]
+                tol = math.ceil(1.02 * (abs(vx) + abs(vy) + abs(vz)) + 1.5)
+                rr.append({"x": x, "a": a, "ex": ex, "ey": ey, "ez": ez, "tol": tol})
+        table("rotate_xyz", [("x", "v"), ("a", "s"), ("ex", "v"), ("ey", "v"), ("ez", "v"),
+                             ("tol", "s")], rr,
+              lambda c: [f"assert!({c['x']}.rotate_x({c['a']}).abs_diff_eq({c['ex']}, {c['tol']}));",
+                         f"assert!({c['x']}.rotate_y({c['a']}).abs_diff_eq({c['ey']}, {c['tol']}));",
+                         f"assert!({c['x']}.rotate_z({c['a']}).abs_diff_eq({c['ez']}, {c['tol']}));",
+                         f"if {c['a']} == f(0) {{",
+                         f"    assert_eq!({c['x']}.rotate_x({c['a']}), {c['x']});",
+                         f"    assert_eq!({c['x']}.rotate_y({c['a']}), {c['x']});",
+                         f"    assert_eq!({c['x']}.rotate_z({c['a']}), {c['x']});",
+                         "}"])
+        test("test_rotate_axes", [
+            f"assert!({Tt}::Y.rotate_x(FRAC_PI_2).abs_diff_eq({Tt}::Z, f(1)));",
+            f"assert!({Tt}::Z.rotate_y(FRAC_PI_2).abs_diff_eq({Tt}::X, f(1)));",
+            f"assert!({Tt}::X.rotate_z(FRAC_PI_2).abs_diff_eq({Tt}::Y, f(1)));",
+            f"assert!({Tt}::Z.rotate_x(-FRAC_PI_2).abs_diff_eq({Tt}::Y, f(1)));",
+            f"assert!({Tt}::X.rotate_y(FRAC_PI_2).abs_diff_eq({Tt}::NEG_Z, f(1)));",
+            f"assert!({Tt}::Y.rotate_z(FRAC_PI_2).abs_diff_eq({Tt}::NEG_X, f(1)));",
+            "// the rotation axis is fixed exactly",
+            f"assert_eq!({Tt}::X.rotate_x(FRAC_PI_2), {Tt}::X);",
+            f"assert_eq!({Tt}::Y.rotate_y(PI), {Tt}::Y);",
+            f"assert_eq!({Tt}::Z.rotate_z(f(1)), {Tt}::Z);"])
 
     # --------------------------------------------------------------------------------- fuzz
     seed = 100 * n
@@ -892,6 +1095,55 @@ def gen_tests(t):
         f"    assert!((p + r).abs_diff_eq(va, f({2 * n})));",
         "}",
     ])
+    ang = "f(a % 13493037705)"
+    if n == 2:
+        G.fuzz("fuzz_from_angle", seed + 7, args, [
+            f"let ang = {ang};", f"let va = {va};",
+            f"let v = {Tt}::from_angle(ang);",
+            "// (cos + e1)^2 + (sin + e2)^2 with |e| <= 1.02 ULP: 2 * 1.02 * (|cos| + |sin|) = 2.9",
+            "// ULP from 1, and the floor of `length_squared` adds one: at most 3 raw units",
+            "assert!(v.length_squared().abs_diff_eq(f(0x100000000), f(3)));",
+            "// hypot(0.86, 1.02) = 1.34 ULP across the radius, plus the 3.22 ULP of `atan2`",
+            "assert!(v.to_angle().abs_diff_eq(ang, f(4)));",
+            f"assert_eq!({Tt}::from_angle(-ang), {t.mod}(v.x, -v.y));",
+            "assert_eq!(va.rotate_angle(ang), v.rotate(va));",
+        ])
+        G.fuzz("fuzz_angle_to", seed + 8, args, [
+            f"let va = {va};",
+            "assert_eq!(va.angle_to(va), f(0));",
+            "if va.length_squared() != f(0) {",
+            "    assert_eq!(va.angle_to(-va), PI);",
+            "    assert_eq!(va.angle_to(va.perp()), FRAC_PI_2);",
+            "    assert_eq!(va.perp().angle_to(va), -FRAC_PI_2);",
+            "}",
+        ])
+    if n == 3:
+        G.fuzz("fuzz_angle_between", seed + 7, args, [
+            f"let va = {va};", f"let vb = {vb};",
+            "assert_eq!(va.angle_between(va), f(0));",
+            f"assert_eq!(va.angle_to(va, {Tt}::Z), f(0));",
+            "// `atan2` of a non-negative first argument: in `[0, pi]` up to its 3.22 ULP",
+            "let ab = va.angle_between(vb);",
+            "assert!(ab >= f(0) && ab <= PI + f(4));",
+            "if va.dot(va) != f(0) {",
+            "    assert_eq!(va.angle_between(-va), PI);",
+            "}",
+        ])
+        G.fuzz("fuzz_rotate", seed + 8, args, [
+            f"let va = {va};", "let ang = f(a % 13493037705);",
+            "assert_eq!(va.rotate_x(f(0)), va);",
+            "assert_eq!(va.rotate_y(f(0)), va);",
+            "assert_eq!(va.rotate_z(f(0)), va);",
+            "assert_eq!(va.rotate_x(ang).x, va.x);",
+            "assert_eq!(va.rotate_y(ang).y, va.y);",
+            "assert_eq!(va.rotate_z(ang).z, va.z);",
+            "// |R v| = sqrt(c^2 + s^2) |v_yz| up to the floors: the length moves by at most",
+            "// 1.34 * |v_yz| + sqrt(2) (|v_yz| <= 8 sqrt(2)) + 1 (two floored lengths) < 18 ULP",
+            "let len = va.length();",
+            "assert!(va.rotate_x(ang).length().abs_diff_eq(len, f(17)));",
+            "assert!(va.rotate_y(ang).length().abs_diff_eq(len, f(17)));",
+            "assert!(va.rotate_z(ang).length().abs_diff_eq(len, f(17)));",
+        ])
     at = lambda i: "o" if i == 0 else f"o + {i}"
     body = "\n".join(G.out)
     neighbours = ""
@@ -901,6 +1153,10 @@ def gen_tests(t):
         d = t.dim(k)
         items = ([f"{d.name}Trait"] if f"{d.name}Trait" in body else []) + [d.mod]
         neighbours += f"use glam::{d.mod}::{{{', '.join(items)}}};\n"
+    consts = [c for c in ("FRAC_PI_2", "FRAC_PI_4", "PI") if re.search(r"\b" + c + r"\b", body)]
+    fixed_uses = "use fixed::fixed::{" + ", ".join(sorted(["Fixed", "FixedTrait"] + consts)) + "};\n"
+    if ".sin_cos()" in body:
+        fixed_uses += "use fixed::trig::TrigTrait;\n"
     prelude = f"""{g.HEADER}//! Tests of `glam::{t.mod}`: the glam-rs vector test macros of `tests/vec{n}.rs`, tables over pools
 //! of edge values (expected values computed by the generator with an exact Q32.32 Python oracle,
 //! one `const` table and one looping test per function group), seeded fuzz properties, and one
@@ -912,8 +1168,7 @@ def gen_tests(t):
 
 use core::hash::{{HashStateExTrait, HashStateTrait}};
 use core::poseidon::PoseidonTrait;
-use fixed::fixed::{{Fixed, FixedTrait}};
-use glam::{t.bmod}::{{{t.B}, {t.B}Trait}};
+{fixed_uses}use glam::{t.bmod}::{{{t.B}, {t.B}Trait}};
 use glam::{t.imod}::{{{t.I}, {t.imod}}};
 use glam::{t.mod}::{{{T}, {T}Trait, {t.mod}}};
 use glam::{t.umod}::{{{t.U}, {t.umod}}};

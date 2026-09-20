@@ -40,6 +40,7 @@ const K_EIGHTH: Fixed = Fixed { raw: 0x20000000 };
 const K_1_32: Fixed = Fixed { raw: 0x8000000 };
 const K_1_64: Fixed = Fixed { raw: 0x4000000 };
 const K_1_1024: Fixed = Fixed { raw: 0x400000 };
+const K_ANGLE: Fixed = Fixed { raw: 0x99999999 };
 const M_ALL: BVec2 = BVec2 { x: true, y: true };
 const M_NONE: BVec2 = BVec2 { x: false, y: false };
 const IV: IVec2 = IVec2 { x: 3, y: 3 };
@@ -1480,6 +1481,102 @@ fn refract_total__op() {
 }
 
 #[test]
+fn from_angle__base() {
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_angle__op() {
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(Vec2Trait::from_angle(k));
+}
+
+#[test]
+fn to_angle__base() {
+    let _a = bb(A);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn to_angle__op() {
+    let a = bb(A);
+    let _r = bb(K_ONE);
+    sink(a.to_angle());
+}
+
+#[test]
+fn angle_to__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn angle_to__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let _r = bb(K_ONE);
+    sink(a.angle_to(b));
+}
+
+#[test]
+fn rotate_angle__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_angle__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_angle(k));
+}
+
+#[test]
+fn rotate_towards_far__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_towards_far__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_towards(b, k));
+}
+
+#[test]
+fn rotate_towards_near__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HUNDRED);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_towards_near__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HUNDRED);
+    let _r = bb(A);
+    sink(a.rotate_towards(b, k));
+}
+
+#[test]
 fn add__base() {
     let _a = bb(A);
     let _b = bb(B);
@@ -2283,6 +2380,72 @@ fn alt_rotate_unfused__op() {
     let b = bb(B);
     let _r = bb(A);
     sink(alt::rotate_unfused(a, b));
+}
+
+#[test]
+fn alt_from_angle_cos_sin__base() {
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_angle_cos_sin__op() {
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::from_angle_cos_sin(k));
+}
+
+#[test]
+fn alt_angle_to_glam__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn alt_angle_to_glam__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let _r = bb(K_ONE);
+    sink(alt::angle_to_glam(a, b));
+}
+
+#[test]
+fn alt_rotate_towards_noinline_far__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_towards_noinline_far__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::rotate_towards_noinline(a, b, k));
+}
+
+#[test]
+fn alt_rotate_towards_noinline_near__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HUNDRED);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_towards_noinline_near__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HUNDRED);
+    let _r = bb(A);
+    sink(alt::rotate_towards_noinline(a, b, k));
 }
 
 #[test]

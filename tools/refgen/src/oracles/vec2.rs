@@ -26,8 +26,6 @@ pub fn register(r: &mut Registry) {
         let (v, w) = (a[0].dvec2(), a[1].dvec2());
         (v.perp(), v.perp_dot(w))
     });
-    // `self` is a unit vector `(cos, sin)`: a rotation without trigonometry. `from_angle`,
-    // `to_angle`, `angle_to` and `rotate_angle` land with `fixed::trig`.
     r.add("rotate", |a| a[0].dvec2().rotate(a[1].dvec2()));
     r.add("sum_product", |a| {
         let v = a[0].dvec2();
@@ -118,6 +116,28 @@ pub fn register(r: &mut Registry) {
             return skip("clamp_length: on a branch boundary");
         }
         v.clamp_length(min, max).into()
+    });
+    // Angles. glam-rs computes `angle_to` as `acos(cos)`, which loses the angle where `acos` is
+    // flat-sloped (near 0 and +-pi: one f64 ULP of the cosine is 1.5e-8 rad there, 64 Q32.32
+    // ULP), so the cases within 1e-3 rad of a parallel or anti-parallel pair are skipped and
+    // pinned by exact tests in `tests/test_vec2.cairo` instead.
+    r.add("from_angle", |a| DVec2::from_angle(a[0].f()));
+    r.add("to_angle", |a| a[0].dvec2().to_angle());
+    r.add("angle_to", |a| -> Out {
+        let angle = a[0].dvec2().angle_to(a[1].dvec2());
+        if angle.abs() < 1e-3 || angle.abs() > std::f64::consts::PI - 1e-3 {
+            return skip("angle_to: acos is ill-conditioned near 0 and pi");
+        }
+        angle.into()
+    });
+    r.add("rotate_angle", |a| a[0].dvec2().rotate_angle(a[1].f()));
+    r.add("rotate_towards", |a| -> Out {
+        let (v, w, m) = (a[0].dvec2(), a[1].dvec2(), a[2].f());
+        let angle = v.angle_to(w).abs();
+        if angle < 1e-3 || angle > std::f64::consts::PI - 1e-3 {
+            return skip("rotate_towards: the sign of angle_to is undefined near 0 and pi");
+        }
+        v.rotate_towards(w, m).into()
     });
     r.add("as_ivec2", |a| a[0].dvec2().as_ivec2());
     r.add("as_uvec2", |a| a[0].dvec2().as_uvec2());

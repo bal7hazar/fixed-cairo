@@ -9,6 +9,7 @@ bench_vec2::add_assign_scalar: 2600 22 4 0 0
 bench_vec2::add_scalar: 2600 22 4 0 0
 bench_vec2::alt_abs_diff_eq_glam_false: 6110 54 8 0 0
 bench_vec2::alt_abs_diff_eq_glam_true: 5860 51 8 0 0
+bench_vec2::alt_angle_to_glam: 43240 360 91 0 0
 bench_vec2::alt_clamp_min_max_above: 4620 42 4 0 0
 bench_vec2::alt_clamp_min_max_below: 4620 42 4 0 0
 bench_vec2::alt_clamp_min_max_inside: 4600 42 4 0 0
@@ -16,6 +17,7 @@ bench_vec2::alt_distance_sub_length: 4620 38 10 0 0
 bench_vec2::alt_div_scalar_plain: 6710 57 12 0 0
 bench_vec2::alt_dot_unfused: 5120 43 10 0 0
 bench_vec2::alt_element_product_chain: 1680 14 4 0 0
+bench_vec2::alt_from_angle_cos_sin: 44860 317 78 0 0
 bench_vec2::alt_is_negative_bitmask_felt_neg: 3200 28 4 0 0
 bench_vec2::alt_is_negative_bitmask_felt_pos: 3220 28 4 0 0
 bench_vec2::alt_length_recip_wide: 5360 44 12 0 0
@@ -31,9 +33,12 @@ bench_vec2::alt_project_onto_recip: 11520 97 24 0 0
 bench_vec2::alt_reflect_unfused: 8580 72 18 0 0
 bench_vec2::alt_reject_from_normalized_sub: 7840 66 16 0 0
 bench_vec2::alt_reject_from_sub: 12650 107 26 0 0
+bench_vec2::alt_rotate_towards_noinline_far: 72590 561 130 0 0
+bench_vec2::alt_rotate_towards_noinline_near: 72590 575 132 0 0
 bench_vec2::alt_rotate_unfused: 9320 78 20 0 0
 bench_vec2::alt_select_match_false: 1200 12 0 0 0
 bench_vec2::alt_select_match_true: 1000 10 0 0 0
+bench_vec2::angle_to: 32600 249 54 0 0
 bench_vec2::as_ivec2_neg: 4880 42 8 0 0
 bench_vec2::as_ivec2_pos: 4720 40 8 0 0
 bench_vec2::as_uvec2: 5260 44 10 0 0
@@ -75,6 +80,7 @@ bench_vec2::fract_gl_neg: 2420 20 6 0 0
 bench_vec2::fract_gl_pos: 2420 20 6 0 0
 bench_vec2::fract_neg: 4800 41 8 0 0
 bench_vec2::fract_pos: 4800 41 8 0 0
+bench_vec2::from_angle: 31300 243 62 0 0
 bench_vec2::from_ivec2: 200 2 0 0 0
 bench_vec2::from_uvec2: 940 8 2 0 0
 bench_vec2::index_first: 510 5 0 0 0
@@ -132,6 +138,9 @@ bench_vec2::rem_euclid_neg: 6260 54 10 0 0
 bench_vec2::rem_euclid_pos: 5740 48 10 0 0
 bench_vec2::rem_scalar: 5780 49 10 0 0
 bench_vec2::rotate: 4680 40 8 0 0
+bench_vec2::rotate_angle: 35780 281 70 0 0
+bench_vec2::rotate_towards_far: 71490 560 130 0 0
+bench_vec2::rotate_towards_near: 71580 574 132 0 0
 bench_vec2::round_neg: 5300 46 8 0 0
 bench_vec2::round_pos: 5300 46 8 0 0
 bench_vec2::select_false: 1200 12 0 0 0
@@ -143,6 +152,7 @@ bench_vec2::sub: 2600 22 4 0 0
 bench_vec2::sub_assign: 2600 22 4 0 0
 bench_vec2::sub_assign_scalar: 2600 22 4 0 0
 bench_vec2::sub_scalar: 2600 22 4 0 0
+bench_vec2::to_angle: 28120 210 46 0 0
 bench_vec2::trunc_neg: 4910 42 8 0 0
 bench_vec2::trunc_pos: 4910 42 8 0 0
 bench_vec2::try_normalize_none: 3370 29 5 0 0

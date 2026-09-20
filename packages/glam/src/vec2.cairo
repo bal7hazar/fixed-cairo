@@ -13,7 +13,8 @@
 
 use core::ops::index::IndexView;
 use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};
-use fixed::fixed::{Fixed, FixedTrait};
+use fixed::fixed::{Fixed, FixedTrait, PI};
+use fixed::trig::TrigTrait;
 use fixed::wide::{
     Norm, NormTrait, RecipTrait, WideLift, WideMul, WideNarrow, WideSub, distance2,
     distance2_squared, dot2, mul_add, mul_sub, norm2, norm2_squared, norm2_wide, wide_from,
@@ -37,7 +38,6 @@ use crate::vec3::Vec3;
 ///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
 ///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
 ///   exist in glam.cairo (`as_dvec2`, `as_i8vec2`, ...).
-/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct Vec2 {
     pub x: Fixed,
@@ -213,8 +213,6 @@ pub trait Vec2Trait {
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
     /// * One fused kernel per component (one floor rescale each).
-    /// * `Vec2::from_angle` needs `fixed::trig`: it is not ported yet, so `rotate` is
-    ///   called with a `(cos, sin)` vector built by the caller.
     fn rotate(self: Vec2, rhs: Vec2) -> Vec2;
     /// Returns a vector containing the minimum values for each element of `self` and
     /// `rhs`.
@@ -726,6 +724,85 @@ pub trait Vec2Trait {
     /// * `k = 1 - eta^2 * (1 - n_dot_i^2)` is evaluated with two floor rescales and its
     ///   square root is floored; each output component is one `mul_sub` fused kernel.
     fn refract(self: Vec2, normal: Vec2, eta: Fixed) -> Vec2;
+    /// Creates a 2D vector containing `[angle.cos(), angle.sin()]`. This can be used in
+    /// conjunction with the [`rotate()`][Self::rotate()] method, e.g.
+    /// `Vec2::from_angle(PI).rotate(Vec2::Y)` will create the vector `[-1, 0]` and rotate
+    /// [`Vec2::Y`] around it returning `-Vec2::Y`.
+    ///
+    /// Mirrors `glam::Vec2::from_angle`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * One shared `sin_cos` (1.4x the cost of `sin` alone) instead of two calls: each
+    ///   component is within 1.02 ULP of the exact value. `from_angle(0) = X` exactly,
+    ///   `from_angle(FRAC_PI_2)` is `Y` within 1 ULP and `from_angle(-a)` is the mirror
+    ///   image of `from_angle(a)` exactly (`fixed::trig` symmetries).
+    fn from_angle(angle: Fixed) -> Vec2;
+    /// Returns the angle (in radians) of this vector in the range `[-π, +π]`.
+    ///
+    /// The input does not need to be a unit vector however it must be non-zero.
+    ///
+    /// Mirrors `glam::Vec2::to_angle`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * `atan2` of `fixed::trig`: maximum error 3.22 ULP; the axes are exact
+    ///   (`to_angle(X) = 0`, `to_angle(Y) = FRAC_PI_2`, `to_angle(NEG_X) = PI`).
+    /// * The zero vector returns `0` (as `f32::atan2(0, 0)`); the non-zero precondition of
+    ///   glam-rs is not checked.
+    fn to_angle(self: Vec2) -> Fixed;
+    /// Returns the angle of rotation (in radians) from `self` to `rhs` in the range `[-π,
+    /// +π]`.
+    ///
+    /// The inputs do not need to be unit vectors however they must be non-zero.
+    ///
+    /// The returned angle can be used with `rotate_angle`, e.g.
+    /// `self.rotate_angle(self.angle_to(rhs))` will be equal to `rhs`.
+    ///
+    /// Mirrors `glam::Vec2::angle_to`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `perp_dot` or `dot` does not fit the scalar range, i.e.
+    ///   for `|self| * |rhs| >= 2^31`.
+    /// #### Deviations
+    /// * `atan2(perp_dot, dot)` on the two fused products instead of the `acos_approx(dot
+    ///   / sqrt(|self|^2 * |rhs|^2)) * signum(perp_dot)` of glam-rs: the same angle over
+    ///   the same range, without a division, a square root or the ill-conditioning of
+    ///   `acos` near `0` and `+-π` (the literal form is kept in `benches::alt`).
+    /// * Each product is floored once (1 ULP), which moves the angle by at most `1.42 /
+    ///   (|self| * |rhs|)` ULP: the total error is below `3.22 + 1.42 / (|self| * |rhs|)`
+    ///   ULP, i.e. about 5 ULP for vectors whose lengths multiply to at least 1, and it
+    ///   grows as the vectors shrink (normalize tiny inputs first).
+    /// * Parallel vectors give `0` and anti-parallel ones `PI` exactly, as `signum(0) = 1`
+    ///   in glam-rs; a zero input gives `0` (the non-zero precondition is not checked).
+    fn angle_to(self: Vec2, rhs: Vec2) -> Fixed;
+    /// Rotates `self` by `angle` (in radians), equivalent to
+    /// `self.rotate(Vec2::from_angle(angle))`.
+    ///
+    /// Mirrors `glam::Vec2::rotate_angle`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * `from_angle` (one `sin_cos`) followed by the two fused kernels of `rotate`: the
+    ///   result is within `1.02 * |self| + 1` ULP per component of the exact rotation.
+    fn rotate_angle(self: Vec2, angle: Fixed) -> Vec2;
+    /// Rotates towards `rhs` up to `max_angle` (in radians).
+    ///
+    /// When `max_angle` is `0`, the result will be equal to `self`. When `max_angle` is
+    /// equal to `self.angle_between(rhs)`, the result will be parallel to `rhs`. If
+    /// `max_angle` is negative, rotates towards the exact opposite of `rhs`. Will not go
+    /// past the target.
+    ///
+    /// Mirrors `glam::Vec2::rotate_towards`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * One `atan2` (`angle_to`, error bound as there) and one `sin_cos`; the clamp is
+    ///   exact and the sign is applied by a negation instead of the `signum` product.
+    ///   `max_angle = 0` returns `self` exactly. Inlined: `#[inline(never)]` is 1.5 % more
+    ///   expensive (`alt_rotate_towards_noinline`).
+    /// * glam-rs names the target in its doc as `angle_between`, which `Vec2` does not
+    ///   have in 0.33.8; the angle meant is `angle_to`.
+    fn rotate_towards(self: Vec2, rhs: Vec2, max_angle: Fixed) -> Vec2;
     /// Performs a linear interpolation between `self` and `rhs` based on the value `s`.
     ///
     /// When `s` is `0`, the result will be equal to `self`. When `s` is `1`, the result
@@ -1333,6 +1410,43 @@ pub impl Vec2Impl of Vec2Trait {
             let f = mul_add(eta, n_dot_i, k.sqrt());
             Vec2 { x: mul_sub(eta, self.x, f, normal.x), y: mul_sub(eta, self.y, f, normal.y) }
         }
+    }
+
+    #[inline(always)]
+    fn from_angle(angle: Fixed) -> Vec2 {
+        let (s, c) = angle.sin_cos();
+        Vec2 { x: c, y: s }
+    }
+
+    #[inline(always)]
+    fn to_angle(self: Vec2) -> Fixed {
+        self.y.atan2(self.x)
+    }
+
+    #[inline(always)]
+    fn angle_to(self: Vec2, rhs: Vec2) -> Fixed {
+        let p = mul_sub(self.x, rhs.y, self.y, rhs.x);
+        let d = dot2(self.x, rhs.x, self.y, rhs.y);
+        p.atan2(d)
+    }
+
+    #[inline(always)]
+    fn rotate_angle(self: Vec2, angle: Fixed) -> Vec2 {
+        Self::rotate(self, Self::from_angle(angle))
+    }
+
+    #[inline(always)]
+    fn rotate_towards(self: Vec2, rhs: Vec2, max_angle: Fixed) -> Vec2 {
+        let a = Self::angle_to(self, rhs);
+        let abs_a = a.abs();
+        // When `max_angle < 0`, rotate no further than `PI` radians away
+        let angle = max_angle.clamp(abs_a - PI, abs_a);
+        let angle = if a.is_negative() {
+            -angle
+        } else {
+            angle
+        };
+        Self::rotate(Self::from_angle(angle), self)
     }
 
     #[inline(always)]

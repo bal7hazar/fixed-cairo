@@ -3,7 +3,8 @@
 //! `gas/vec2.snap`). The library ships the cheapest formulation; the others stay here so that
 //! the comparison is reproducible across compiler upgrades.
 
-use fixed::fixed::{Fixed, FixedTrait};
+use fixed::fixed::{Fixed, FixedTrait, PI};
+use fixed::trig::TrigTrait;
 use fixed::wide::{NormTrait, RecipTrait, dot2, norm2, norm2_squared, norm2_wide, normalize2};
 use glam::bvec2::{BVec2, BVec2Trait};
 use glam::vec2::{Vec2, Vec2Trait};
@@ -162,6 +163,41 @@ pub fn perp_dot_unfused(lhs: Vec2, rhs: Vec2) -> Fixed {
 #[inline(always)]
 pub fn rotate_unfused(lhs: Vec2, rhs: Vec2) -> Vec2 {
     Vec2 { x: lhs.x * rhs.x - lhs.y * rhs.y, y: lhs.y * rhs.x + lhs.x * rhs.y }
+}
+
+/// Alternative to `Vec2::from_angle`. Two calls (`cos`, `sin`) instead of one shared `sin_cos`.
+#[inline(always)]
+pub fn from_angle_cos_sin(angle: Fixed) -> Vec2 {
+    Vec2 { x: angle.cos(), y: angle.sin() }
+}
+
+/// Alternative to `Vec2::angle_to`. The glam-rs formula: `acos` of the cosine (a division by the
+/// product of the lengths) with the sign of `perp_dot`.
+#[inline(always)]
+pub fn angle_to_glam(lhs: Vec2, rhs: Vec2) -> Fixed {
+    let angle = (Vec2Trait::dot(lhs, rhs) / (Vec2Trait::length(lhs) * Vec2Trait::length(rhs)))
+        .acos_clamped();
+    if Vec2Trait::perp_dot(lhs, rhs).is_negative() {
+        -angle
+    } else {
+        angle
+    }
+}
+
+/// Alternative to `Vec2::rotate_towards`. The same body behind a call boundary
+/// (`#[inline(never)]`): the large body is not cheaper to call than to inline.
+#[inline(never)]
+pub fn rotate_towards_noinline(lhs: Vec2, rhs: Vec2, max_angle: Fixed) -> Vec2 {
+    let a = Vec2Trait::angle_to(lhs, rhs);
+    let abs_a = a.abs();
+    // When `max_angle < 0`, rotate no further than `PI` radians away
+    let angle = max_angle.clamp(abs_a - PI, abs_a);
+    let angle = if a.is_negative() {
+        -angle
+    } else {
+        angle
+    };
+    Vec2Trait::rotate(Vec2Trait::from_angle(angle), lhs)
 }
 
 /// Alternative to `Vec2::min_element`. The `Fixed::min` chain of glam-rs instead of the nested

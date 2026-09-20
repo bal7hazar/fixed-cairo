@@ -10,7 +10,8 @@
 
 use core::hash::{HashStateExTrait, HashStateTrait};
 use core::poseidon::PoseidonTrait;
-use fixed::fixed::{Fixed, FixedTrait};
+use fixed::fixed::{FRAC_PI_2, FRAC_PI_4, Fixed, FixedTrait, PI};
+use fixed::trig::TrigTrait;
 use glam::bvec2::{BVec2, BVec2Trait};
 use glam::ivec2::{IVec2, ivec2};
 use glam::uvec2::{UVec2, uvec2};
@@ -833,6 +834,199 @@ fn test_perp_dot_overflow() {
 }
 
 #[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_angle_to_overflow() {
+    let _ = Vec2Trait::MAX.angle_to(Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_rotate_angle_overflow() {
+    let _ = Vec2Trait::MAX.rotate_angle(f(3373259426));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_rotate_towards_overflow() {
+    let _ = Vec2Trait::MAX.rotate_towards(Vec2Trait::MAX, f(4294967296));
+}
+#[cairofmt::skip]
+const FROM_ANGLE: [[i64; 3]; 19] = [
+    [0, 4294967296, 0],
+    [1, 4294967296, 1],
+    [-1, 4294967296, -1],
+    [429497, 4294967275, 429497],
+    [-429497, 4294967275, -429497],
+    [2147483648, 3769188403, 2059117009],
+    [-2147483648, 3769188403, -2059117009],
+    [4294967296, 2320580734, 3614090360],
+    [-4294967296, 2320580734, -3614090360],
+    [6746518852, 0, 4294967296],
+    [-6746518852, 0, -4294967296],
+    [3373259426, 3037000500, 3037000500],
+    [-3373259426, 3037000500, -3037000500],
+    [8589934592, -1787337053, 3905402711],
+    [-8589934592, -1787337053, -3905402711],
+    [12884901888, -4251985396, 606105819],
+    [-12884901888, -4251985396, -606105819],
+    [13485000000, -4294959775, 8037700],
+    [-13485000000, -4294959775, -8037700],
+];
+
+#[test]
+fn test_from_angle() {
+    for row in FROM_ANGLE.span() {
+        let r = row.span();
+        let (s, c) = fx(r, 0).sin_cos();
+        assert_eq!(Vec2Trait::from_angle(fx(r, 0)), vec2(c, s));
+        assert!(Vec2Trait::from_angle(fx(r, 0)).abs_diff_eq(vc(r, 1), f(1)));
+        assert!(Vec2Trait::from_angle(fx(r, 0)).to_angle().abs_diff_eq(fx(r, 0), f(4)));
+        // sin is odd and cos is even, exactly
+        assert_eq!(Vec2Trait::from_angle(-fx(r, 0)), vec2(c, -s));
+    }
+}
+
+#[test]
+fn test_from_angle_axes() {
+    assert_eq!(Vec2Trait::from_angle(f(0)), Vec2Trait::X);
+    assert!(Vec2Trait::from_angle(FRAC_PI_2).abs_diff_eq(Vec2Trait::Y, f(1)));
+    assert!(Vec2Trait::from_angle(-FRAC_PI_2).abs_diff_eq(Vec2Trait::NEG_Y, f(1)));
+    assert!(Vec2Trait::from_angle(PI).abs_diff_eq(Vec2Trait::NEG_X, f(1)));
+    // the example of the glam-rs documentation
+    assert!(Vec2Trait::from_angle(PI).rotate(Vec2Trait::Y).abs_diff_eq(Vec2Trait::NEG_Y, f(1)));
+    assert!(Vec2Trait::from_angle(FRAC_PI_4).abs_diff_eq(vec2(f(0xB504F334), f(0xB504F334)), f(1)));
+}
+#[cairofmt::skip]
+const TO_ANGLE: [[i64; 3]; 9] = [
+    [4294967296, 8589934592, 4755167535],
+    [-6442450944, 7516192768, 9790045516],
+    [0, 0, 0],
+    [1, -1, -3373259426],
+    [1431655765, 2863311530, 4755167535],
+    [34359738368, -34359738368, -3373259426],
+    [-2147483648, 2147483648, 10119778278],
+    [8589934592, -12884901888, -4221066900],
+    [4194304, -4194304, -3373259426],
+];
+
+#[test]
+fn test_to_angle() {
+    for row in TO_ANGLE.span() {
+        let r = row.span();
+        assert!(vc(r, 0).to_angle().abs_diff_eq(fx(r, 2), f(3)));
+    }
+}
+
+#[test]
+fn test_to_angle_axes() {
+    assert_eq!(Vec2Trait::X.to_angle(), f(0));
+    assert_eq!(Vec2Trait::Y.to_angle(), FRAC_PI_2);
+    assert_eq!(Vec2Trait::NEG_X.to_angle(), PI);
+    assert_eq!(Vec2Trait::NEG_Y.to_angle(), -FRAC_PI_2);
+    assert_eq!(vec2(f(4294967296), f(4294967296)).to_angle(), FRAC_PI_4);
+    assert_eq!(Vec2Trait::ZERO.to_angle(), f(0));
+    assert_eq!(
+        vec2(f(12884901888), f(17179869184)).to_angle(),
+        vec2(f(25769803776), f(34359738368)).to_angle(),
+    );
+}
+#[cairofmt::skip]
+const ANGLE_TO: [[i64; 5]; 9] = [
+    [4294967296, 8589934592, 21474836480, 25769803776, -992526858],
+    [-6442450944, 7516192768, 10737418240, -2147483648, -10637852990],
+    [0, 0, 4294967296, 8589934592, 0],
+    [1, -1, 5, -9, -6746518852],
+    [1431655765, 2863311530, -613566757, 2576980377, 2995270636],
+    [34359738368, -34359738368, 34359738368, 34359738368, 6746518852],
+    [-2147483648, 2147483648, 4294967296, 4294967296, -6746518852],
+    [8589934592, -12884901888, -47244640256, 55834574848, -13002319103],
+    [4194304, -4194304, 29360128, 2097152, 3679522655],
+];
+
+#[test]
+fn test_angle_to() {
+    for row in ANGLE_TO.span() {
+        let r = row.span();
+        assert!(vc(r, 0).angle_to(vc(r, 2)).abs_diff_eq(fx(r, 4), f(3)));
+        assert_eq!(
+            vc(r, 0).rotate_angle(fx(r, 4)), vc(r, 0).rotate(Vec2Trait::from_angle(fx(r, 4))),
+        );
+    }
+}
+
+#[test]
+fn test_angle_to_axes() {
+    assert_eq!(Vec2Trait::X.angle_to(Vec2Trait::Y), FRAC_PI_2);
+    assert_eq!(Vec2Trait::Y.angle_to(Vec2Trait::X), -FRAC_PI_2);
+    assert_eq!(Vec2Trait::X.angle_to(Vec2Trait::NEG_X), PI);
+    assert_eq!(Vec2Trait::NEG_X.angle_to(Vec2Trait::X), PI);
+    assert_eq!(Vec2Trait::X.angle_to(Vec2Trait::X), f(0));
+    assert_eq!(
+        vec2(f(12884901888), f(17179869184)).angle_to(vec2(f(25769803776), f(34359738368))), f(0),
+    );
+    // the round trip of the glam-rs documentation: `self.rotate_angle(angle_to) = rhs`
+    let v = vec2(f(12884901888), f(17179869184));
+    let w = vec2(f(-17179869184), f(12884901888));
+    // |v| = 5: 5 * (3.22 + 1.42 / 25 + 1.34) + 1 = 24.2 ULP
+    assert!(v.rotate_angle(v.angle_to(w)).abs_diff_eq(w, f(25)));
+}
+#[cairofmt::skip]
+const ROTATE_TOWARDS: [[i64; 8]; 40] = [
+    [4294967296, 8589934592, 21474836480, 25769803776, 0, 4294967296, 8589934592, 12],
+    [4294967296, 8589934592, 21474836480, 25769803776, 1073741824, 6148227799, 7377873359, 12],
+    [4294967296, 8589934592, 21474836480, 25769803776, 4294967296, 6148227799, 7377873359, 12],
+    [4294967296, 8589934592, 21474836480, 25769803776, 429496729600, 6148227799, 7377873359, 12],
+    [4294967296, 8589934592, 21474836480, 25769803776, -429496729600, -6148227798, -7377873360, 12],
+    [-6442450944, 7516192768, 10737418240, -2147483648, 0, -6442450944, 7516192768, 13],
+    [-6442450944, 7516192768, 10737418240, -2147483648, 1073741824, -4382634897, 8876420408, 13],
+    [-6442450944, 7516192768, 10737418240, -2147483648, 4294967296, 2843787030, 9482151824, 13],
+    [-6442450944, 7516192768, 10737418240, -2147483648, 429496729600, 9707170619, -1941434124, 13],
+    [-6442450944, 7516192768, 10737418240, -2147483648, -429496729600, -9707170620, 1941434123, 13],
+    [1, -1, 5, -9, 0, 1, -1, 592373026],
+    [1, -1, 5, -9, 1073741824, 1, -1, 592373026],
+    [1, -1, 5, -9, 4294967296, 0, -1, 592373026],
+    [1, -1, 5, -9, 429496729600, -1, -1, 592373026],
+    [1, -1, 5, -9, -429496729600, 1, 1, 592373026],
+    [1431655765, 2863311530, -613566757, 2576980377, 0, 1431655765, 2863311530, 8],
+    [1431655765, 2863311530, -613566757, 2576980377, 1073741824, 678754445, 3128495413, 8],
+    [1431655765, 2863311530, -613566757, 2576980377, 4294967296, -741482072, 3114224700, 8],
+    [1431655765, 2863311530, -613566757, 2576980377, 429496729600, -741482072, 3114224700, 8],
+    [1431655765, 2863311530, -613566757, 2576980377, -429496729600, 741482072, -3114224700, 8],
+    [34359738368, -34359738368, 34359738368, 34359738368, 0, 34359738368, -34359738368, 54],
+    [34359738368, -34359738368, 34359738368, 34359738368, 1073741824, 41792312623, -24790842000, 54],
+    [34359738368, -34359738368, 34359738368, 34359738368, 4294967296, 47477368752, 10348077013, 54],
+    [34359738368, -34359738368, 34359738368, 34359738368, 429496729600, 34359738368, 34359738368, 54],
+    [34359738368, -34359738368, 34359738368, 34359738368, -429496729600, -34359738372, -34359738364, 54],
+    [-2147483648, 2147483648, 4294967296, 4294967296, 0, -2147483648, 2147483648, 6],
+    [-2147483648, 2147483648, 4294967296, 4294967296, 1073741824, -1549427625, 2612019539, 6],
+    [-2147483648, 2147483648, 4294967296, 4294967296, 4294967296, 646754813, 2967335547, 6],
+    [-2147483648, 2147483648, 4294967296, 4294967296, 429496729600, 2147483648, 2147483648, 6],
+    [-2147483648, 2147483648, 4294967296, 4294967296, -429496729600, -2147483648, -2147483648, 6],
+    [8589934592, -12884901888, -47244640256, 55834574848, 0, 8589934592, -12884901888, 19],
+    [8589934592, -12884901888, -47244640256, 55834574848, 1073741824, 5135118586, -14609525320, 19],
+    [8589934592, -12884901888, -47244640256, 55834574848, 4294967296, -6201109614, -14189922922, 19],
+    [8589934592, -12884901888, -47244640256, 55834574848, 429496729600, -10002883796, 11821589941, 19],
+    [8589934592, -12884901888, -47244640256, 55834574848, -429496729600, 10002883797, -11821589939, 19],
+    [4194304, -4194304, 29360128, 2097152, 0, 4194304, -4194304, 209],
+    [4194304, -4194304, 29360128, 2097152, 1073741824, 5101601, -3026226, 209],
+    [4194304, -4194304, 29360128, 2097152, 4294967296, 5916568, 422612, 209],
+    [4194304, -4194304, 29360128, 2097152, 429496729600, 5916568, 422612, 209],
+    [4194304, -4194304, 29360128, 2097152, -429496729600, -5916568, -422612, 209],
+];
+
+#[test]
+fn test_rotate_towards() {
+    for row in ROTATE_TOWARDS.span() {
+        let r = row.span();
+        let res = vc(r, 0).rotate_towards(vc(r, 2), fx(r, 4));
+        assert!(res.abs_diff_eq(vc(r, 5), fx(r, 7)));
+        if fx(r, 4) == f(0) {
+            assert_eq!(res, vc(r, 0));
+        }
+    }
+}
+
+#[test]
 #[fuzzer(runs: 128, seed: 201)]
 fn fuzz_dot_length(a: i64, b: i64, c: i64, d: i64) {
     let va = vec2(small(a), small(b));
@@ -950,5 +1144,32 @@ fn fuzz_geometry(a: i64, b: i64, c: i64, d: i64) {
         let r = va.reject_from(vb);
         // `p + r` is `va` up to the floor rescales of both
         assert!((p + r).abs_diff_eq(va, f(4)));
+    }
+}
+
+#[test]
+#[fuzzer(runs: 128, seed: 207)]
+fn fuzz_from_angle(a: i64, b: i64, c: i64, d: i64) {
+    let ang = f(a % 13493037705);
+    let va = vec2(small(a), small(b));
+    let v = Vec2Trait::from_angle(ang);
+    // (cos + e1)^2 + (sin + e2)^2 with |e| <= 1.02 ULP: 2 * 1.02 * (|cos| + |sin|) = 2.9
+    // ULP from 1, and the floor of `length_squared` adds one: at most 3 raw units
+    assert!(v.length_squared().abs_diff_eq(f(0x100000000), f(3)));
+    // hypot(0.86, 1.02) = 1.34 ULP across the radius, plus the 3.22 ULP of `atan2`
+    assert!(v.to_angle().abs_diff_eq(ang, f(4)));
+    assert_eq!(Vec2Trait::from_angle(-ang), vec2(v.x, -v.y));
+    assert_eq!(va.rotate_angle(ang), v.rotate(va));
+}
+
+#[test]
+#[fuzzer(runs: 128, seed: 208)]
+fn fuzz_angle_to(a: i64, b: i64, c: i64, d: i64) {
+    let va = vec2(small(a), small(b));
+    assert_eq!(va.angle_to(va), f(0));
+    if va.length_squared() != f(0) {
+        assert_eq!(va.angle_to(-va), PI);
+        assert_eq!(va.angle_to(va.perp()), FRAC_PI_2);
+        assert_eq!(va.perp().angle_to(va), -FRAC_PI_2);
     }
 }

@@ -118,4 +118,26 @@ pub fn register(r: &mut Registry) {
     // Tuple results.
     r.add("any_orthonormal_vector", |a| a[0].dvec3().any_orthonormal_vector());
     r.add("any_orthonormal_pair", |a| a[0].dvec3().any_orthonormal_pair());
+    // Angles. glam-rs computes `angle_between` as `acos(cos)`, ill-conditioned near 0 and pi
+    // (one f64 ULP of the cosine is 1.5e-8 rad there, 64 Q32.32 ULP): those cases are skipped and
+    // pinned by exact tests in `tests/test_vec3.cairo` instead. `angle_to` is an `atan2`, but its
+    // error budget assumes the `atan2` arguments are not tiny (`skip` below).
+    r.add("angle_between", |a| -> Out {
+        let angle = a[0].dvec3().angle_between(a[1].dvec3());
+        if angle < 1e-3 || angle > std::f64::consts::PI - 1e-3 {
+            return skip("angle_between: acos is ill-conditioned near 0 and pi");
+        }
+        angle.into()
+    });
+    r.add("angle_to", |a| -> Out {
+        let (v, w, axis) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        if v.cross(w).dot(axis).hypot(v.dot(w)) < 1.0 {
+            return skip("angle_to: the atan2 arguments are too small for the error budget");
+        }
+        v.angle_to(w, axis).into()
+    });
+    r.add("rotate_xyz", |a| {
+        let (v, angle) = (a[0].dvec3(), a[1].f());
+        (v.rotate_x(angle), v.rotate_y(angle), v.rotate_z(angle))
+    });
 }

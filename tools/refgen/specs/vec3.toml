@@ -430,6 +430,50 @@ justification = "as `any_orthonormal_vector` (the second vector is exactly it)."
 edges = [[[1, 0, 0]], [[0, 1, 0]], [[0, 0, 1]], [[0, 0, -1]]]
 
 # ------------------------------------------------------------------------------------------
+# Angles and rotations (`fixed::trig`: sin 1.02, cos 0.86, atan2 3.22 ULP). The oracle is f64, so
+# the integer distance to the correctly rounded value is at most `floor(bound + 0.5)`: the 0.5 is
+# the quantization of the oracle result. The inputs have lengths >= 1 (the floor of a product is
+# 1 ULP, so the angle error grows as 1 / |self| |rhs| below that: see the doc of each method).
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "angle_between"
+call = "{0}.angle_between({1})"
+args = [
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+]
+ret = "Fixed"
+cases = 16
+tolerance = 6
+justification = "atan2(|cross|, dot): 3.22 ULP for the atan2 plus the floor of the three cross components and of the norm (<= 2.73 ULP on |cross|) and of the dot (1 ULP), which move the angle by at most hypot(2.73, 1) / (|self| |rhs|) <= 2.9 ULP for lengths >= 1: 3.22 + 2.9 + 0.5 quantization = 6.6. The oracle is glam-rs `acos`-based (skipped within 1e-3 rad of 0 and pi, where the oracle is ill-conditioned)."
+edges = [[[1, 0, 0], [0, 1, 0]], [[1, 0, 0], [1, 1, 0]], [[1, 2, 3], [-3, 2, 1]], [[0, 0, 1], [1, 0, 1]]]
+
+[[function]]
+name = "angle_to"
+call = "{0}.angle_to({1}, {2})"
+args = [
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Vec3", constraint = "normalized" },
+]
+ret = "Fixed"
+cases = 16
+tolerance = 5
+justification = "atan2(det3, dot): 3.22 ULP for the atan2 plus the floor of the triple product and of the dot (1 ULP each), which move the angle by at most sqrt(2) / hypot(triple, dot) <= 1.42 ULP (the oracle skips the cases with hypot < 1): 3.22 + 1.42 + 0.5 quantization = 5.1."
+edges = [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0, 1, 0], [1, 0, 0], [0, 0, 1]], [[1, 0, 0], [0, 1, 0], [0, 0, -1]], [[1, 2, 3], [-3, 2, 1], [0, 1, 0]]]
+
+[[function]]
+name = "rotate_xyz"
+call = "({0}.rotate_x({1}), {0}.rotate_y({1}), {0}.rotate_z({1}))"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Fixed", domain = "angle" }]
+ret = "(Vec3, Vec3, Vec3)"
+cases = 16
+tolerance = 18
+justification = "each rotated component is `b * cos -+ c * sin` with cos and sin off by <= 1.02 ULP: 1.02 * (|b| + |c|) <= 16.3 ULP for |b|, |c| <= 8, plus one floor rescale and the quantization: 17.8, rounded up. The component along the axis is exact."
+edges = [[[1, 2, 3], [0.5]], [[0, 1, 0], [1.5707963267948966]], [[1, 0, 0], [-1.5707963267948966]], [[-3, 4, 5], [3]]]
+
+# ------------------------------------------------------------------------------------------
 # Casts.
 # ------------------------------------------------------------------------------------------
 

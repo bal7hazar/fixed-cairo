@@ -4,6 +4,7 @@
 //! the comparison is reproducible across compiler upgrades.
 
 use fixed::fixed::{Fixed, FixedTrait};
+use fixed::trig::TrigTrait;
 use fixed::wide::{NormTrait, RecipTrait, dot3, norm3, norm3_squared, norm3_wide, normalize3};
 use glam::bvec3::{BVec3, BVec3Trait};
 use glam::vec3::{Vec3, Vec3Trait};
@@ -187,6 +188,41 @@ pub fn cross_unfused(lhs: Vec3, rhs: Vec3) -> Vec3 {
         y: lhs.z * rhs.x - rhs.z * lhs.x,
         z: lhs.x * rhs.y - rhs.x * lhs.y,
     }
+}
+
+/// Alternative to `Vec3::angle_between`. The glam-rs formula: `acos` of `dot / (|self| * |rhs|)`
+/// (imprecise near `0` and `PI`).
+#[inline(always)]
+pub fn angle_between_acos(lhs: Vec3, rhs: Vec3) -> Fixed {
+    (Vec3Trait::dot(lhs, rhs) / (Vec3Trait::length(lhs) * Vec3Trait::length(rhs))).acos_clamped()
+}
+
+/// Alternative to `Vec3::angle_to`. The glam-rs expression `self.cross(rhs).dot(axis)`: three cross
+/// components rounded, then a dot product.
+#[inline(always)]
+pub fn angle_to_glam(lhs: Vec3, rhs: Vec3, axis: Vec3) -> Fixed {
+    Vec3Trait::dot(Vec3Trait::cross(lhs, rhs), axis).atan2(Vec3Trait::dot(lhs, rhs))
+}
+
+/// Alternative to `Vec3::rotate_x`. The literal glam-rs expressions: two rescales per component.
+#[inline(always)]
+pub fn rotate_x_unfused(lhs: Vec3, angle: Fixed) -> Vec3 {
+    let (s, c) = angle.sin_cos();
+    Vec3 { x: lhs.x, y: lhs.y * c - lhs.z * s, z: lhs.y * s + lhs.z * c }
+}
+
+/// Alternative to `Vec3::rotate_y`. The literal glam-rs expressions: two rescales per component.
+#[inline(always)]
+pub fn rotate_y_unfused(lhs: Vec3, angle: Fixed) -> Vec3 {
+    let (s, c) = angle.sin_cos();
+    Vec3 { x: lhs.x * c + lhs.z * s, y: lhs.y, z: lhs.x * (-s) + lhs.z * c }
+}
+
+/// Alternative to `Vec3::rotate_z`. The literal glam-rs expressions: two rescales per component.
+#[inline(always)]
+pub fn rotate_z_unfused(lhs: Vec3, angle: Fixed) -> Vec3 {
+    let (s, c) = angle.sin_cos();
+    Vec3 { x: lhs.x * c - lhs.y * s, y: lhs.x * s + lhs.y * c, z: lhs.z }
 }
 
 /// Alternative to `Vec3::min_element`. The `Fixed::min` chain of glam-rs instead of the nested

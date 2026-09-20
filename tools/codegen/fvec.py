@@ -26,6 +26,7 @@ Every product goes through a fused kernel of `fixed::wide`: one rescale per outp
     fvec_tests.py  test template
 """
 import argparse
+import re
 import subprocess
 import sys
 import textwrap
@@ -253,6 +254,71 @@ def body_rotate(t, fused):
             "}")
 
 
+def body_from_angle(t, fused):
+    if fused:
+        return "let (s, c) = angle.sin_cos();\nVec2 { x: c, y: s }"
+    return "Vec2 { x: angle.cos(), y: angle.sin() }"
+
+
+def body_angle_to(t, fused):
+    """Vec2: `atan2(perp_dot, dot)` on the two fused products; Vec3: `atan2(triple, dot)`."""
+    if t.n == 2:
+        if fused:
+            return ("let p = mul_sub(self.x, rhs.y, self.y, rhs.x);\n"
+                    "let d = dot2(self.x, rhs.x, self.y, rhs.y);\n"
+                    "p.atan2(d)")
+        return ("let angle = (Self::dot(self, rhs) / (Self::length(self) * Self::length(rhs)))"
+                ".acos_clamped();\n"
+                "if Self::perp_dot(self, rhs).is_negative() {\n    -angle\n} else {\n"
+                "    angle\n}")
+    if fused:
+        return ("let s = det3(axis.x, axis.y, axis.z, self.x, self.y, self.z, rhs.x, rhs.y, "
+                "rhs.z);\ns.atan2(Self::dot(self, rhs))")
+    return "Self::dot(Self::cross(self, rhs), axis).atan2(Self::dot(self, rhs))"
+
+
+def body_angle_between(t, fused):
+    if fused:
+        return ("let c = Self::cross(self, rhs);\n"
+                "norm3(c.x, c.y, c.z).atan2(Self::dot(self, rhs))")
+    return ("(Self::dot(self, rhs) / (Self::length(self) * Self::length(rhs))).acos_clamped()")
+
+
+def body_rotate_towards(t):
+    return ("let a = Self::angle_to(self, rhs);\n"
+            "let abs_a = a.abs();\n"
+            "// When `max_angle < 0`, rotate no further than `PI` radians away\n"
+            "let angle = max_angle.clamp(abs_a - PI, abs_a);\n"
+            "let angle = if a.is_negative() {\n    -angle\n} else {\n    angle\n};\n"
+            "Self::rotate(Self::from_angle(angle), self)")
+
+
+ROTATE_AXES = {
+    "x": ("x: self.x", "y: {a}", "z: {b}"),
+    "y": ("x: {a}", "y: self.y", "z: {b}"),
+    "z": ("x: {a}", "y: {b}", "z: self.z"),
+}
+
+
+def body_rotate_axis(axis):
+    """`rotate_x/y/z`: one `sin_cos`, then a fused 2-term sum per rotated component."""
+    def body(t, fused):
+        y, z, x = "self.y", "self.z", "self.x"
+        if axis == "x":
+            a, b = ((f"mul_sub({y}, c, {z}, s)", f"dot2({y}, s, {z}, c)") if fused else
+                    (f"{y} * c - {z} * s", f"{y} * s + {z} * c"))
+        elif axis == "y":
+            a, b = ((f"dot2({x}, c, {z}, s)", f"mul_sub({z}, c, {x}, s)") if fused else
+                    (f"{x} * c + {z} * s", f"{x} * (-s) + {z} * c"))
+        else:
+            a, b = ((f"mul_sub({x}, c, {y}, s)", f"dot2({x}, s, {y}, c)") if fused else
+                    (f"{x} * c - {y} * s", f"{x} * s + {y} * c"))
+        fields = [f.format(a=a, b=b) for f in ROTATE_AXES[axis]]
+        return ("let (s, c) = angle.sin_cos();\nVec3 {\n" + "".join(f"    {f},\n" for f in fields)
+                + "}")
+    return body
+
+
 def body_mul_add(t, fused):
     if fused:
         return t.cw(lambda c: f"mul_add(self.{c}, a.{c}, b.{c})")
@@ -392,6 +458,9 @@ FUSED_BODIES = {
     "project_onto": body_project_onto, "reject_from": body_reject_from,
     "reject_from_normalized": body_reject_from_normalized, "abs_diff_eq": body_abs_diff_eq, "select": body_select,
     "clamp": body_clamp, "is_negative_bitmask": body_is_negative_bitmask,
+    "from_angle": body_from_angle, "angle_to": body_angle_to,
+    "angle_between": body_angle_between, "rotate_x": body_rotate_axis("x"),
+    "rotate_y": body_rotate_axis("y"), "rotate_z": body_rotate_axis("z"),
 }
 
 
@@ -401,9 +470,9 @@ def fused_ops(t):
            "distance", "length_recip", "project_onto", "reject_from", "reject_from_normalized",
            "abs_diff_eq", "select", "clamp", "is_negative_bitmask"]
     if t.n == 3:
-        ops.append("cross")
+        ops += ["cross", "angle_between", "angle_to", "rotate_x", "rotate_y", "rotate_z"]
     if t.n == 2:
-        ops += ["perp_dot", "rotate"]
+        ops += ["perp_dot", "rotate", "from_angle", "angle_to"]
     return ops
 
 
@@ -480,9 +549,7 @@ def methods(t):
             "just rotation. This is what you usually want. Otherwise, it will be like a rotation "
             "with a multiplication by `self`'s length.\n\nThis can be used to rotate by 90 degree "
             "increments, e.g. `[cos(90), sin(90)]` = `[0, 1]`.", fz("rotate"), [OVF],
-            ["One fused kernel per component (one floor rescale each).",
-             "`Vec2::from_angle` needs `fixed::trig`: it is not ported yet, so `rotate` is "
-             "called with a `(cos, sin)` vector built by the caller."])
+            ["One fused kernel per component (one floor rescale each)."])
 
     # ------------------------------------------------------------- min / max / clamp / reduce
     add("min", f"(self: {T}, rhs: {T}) -> {T}",
@@ -732,6 +799,110 @@ def methods(t):
         ["The `is_normalized` preconditions are not checked (`glam_assert!`).",
          "`k = 1 - eta^2 * (1 - n_dot_i^2)` is evaluated with two floor rescales and its square "
          "root is floored; each output component is one `mul_sub` fused kernel."])
+    # ------------------------------------------------------------------ angles and rotations
+    # (`fixed::trig`). The error bounds are those of `fixed::trig` (sin / cos 1.02 ULP, atan2
+    # 3.22 ULP) plus the floor rescale of the fused products that feed the arctangent.
+    if n == 2:
+        add("from_angle", f"(angle: Fixed) -> {T}",
+            "Creates a 2D vector containing `[angle.cos(), angle.sin()]`. This can be used in "
+            "conjunction with the [`rotate()`][Self::rotate()] method, e.g. "
+            "`Vec2::from_angle(PI).rotate(Vec2::Y)` will create the vector `[-1, 0]` and rotate "
+            "[`Vec2::Y`] around it returning `-Vec2::Y`.", fz("from_angle"), None,
+            ["One shared `sin_cos` (1.4x the cost of `sin` alone) instead of two calls: each "
+             "component is within 1.02 ULP of the exact value. `from_angle(0) = X` exactly, "
+             "`from_angle(FRAC_PI_2)` is `Y` within 1 ULP and `from_angle(-a)` is the mirror "
+             "image of `from_angle(a)` exactly (`fixed::trig` symmetries)."])
+        add("to_angle", f"(self: {T}) -> Fixed",
+            "Returns the angle (in radians) of this vector in the range `[-π, +π]`.\n\nThe "
+            "input does not need to be a unit vector however it must be non-zero.",
+            "self.y.atan2(self.x)", None,
+            ["`atan2` of `fixed::trig`: maximum error 3.22 ULP; the axes are exact "
+             "(`to_angle(X) = 0`, `to_angle(Y) = FRAC_PI_2`, `to_angle(NEG_X) = PI`).",
+             "The zero vector returns `0` (as `f32::atan2(0, 0)`); the non-zero precondition of "
+             "glam-rs is not checked."])
+        add("angle_to", f"(self: {T}, rhs: {T}) -> Fixed",
+            "Returns the angle of rotation (in radians) from `self` to `rhs` in the range "
+            "`[-π, +π]`.\n\nThe inputs do not need to be unit vectors however they must be "
+            "non-zero.\n\nThe returned angle can be used with `rotate_angle`, e.g. "
+            "`self.rotate_angle(self.angle_to(rhs))` will be equal to `rhs`.", fz("angle_to"),
+            ["`'Fixed: overflow'` if `perp_dot` or `dot` does not fit the scalar range, i.e. "
+             "for `|self| * |rhs| >= 2^31`."],
+            ["`atan2(perp_dot, dot)` on the two fused products instead of the "
+             "`acos_approx(dot / sqrt(|self|^2 * |rhs|^2)) * signum(perp_dot)` of glam-rs: the "
+             "same angle over the same range, without a division, a square root or the "
+             "ill-conditioning of `acos` near `0` and `+-π` (the literal form is kept in "
+             "`benches::alt`).",
+             "Each product is floored once (1 ULP), which moves the angle by at most "
+             "`1.42 / (|self| * |rhs|)` ULP: the total error is below `3.22 + 1.42 / "
+             "(|self| * |rhs|)` ULP, i.e. about 5 ULP for vectors whose lengths multiply to at "
+             "least 1, and it grows as the vectors shrink (normalize tiny inputs first).",
+             "Parallel vectors give `0` and anti-parallel ones `PI` exactly, as `signum(0) = 1` "
+             "in glam-rs; a zero input gives `0` (the non-zero precondition is not checked)."])
+        add("rotate_angle", f"(self: {T}, angle: Fixed) -> {T}",
+            "Rotates `self` by `angle` (in radians), equivalent to "
+            "`self.rotate(Vec2::from_angle(angle))`.", "Self::rotate(self, Self::from_angle(angle))",
+            [OVF], ["`from_angle` (one `sin_cos`) followed by the two fused kernels of `rotate`: "
+                    "the result is within `1.02 * |self| + 1` ULP per component of the exact "
+                    "rotation."])
+        add("rotate_towards", f"(self: {T}, rhs: {T}, max_angle: Fixed) -> {T}",
+            "Rotates towards `rhs` up to `max_angle` (in radians).\n\nWhen `max_angle` is `0`, "
+            "the result will be equal to `self`. When `max_angle` is equal to "
+            "`self.angle_between(rhs)`, the result will be parallel to `rhs`. If `max_angle` is "
+            "negative, rotates towards the exact opposite of `rhs`. Will not go past the "
+            "target.",
+            body_rotate_towards(t),
+            [OVF],
+            ["One `atan2` (`angle_to`, error bound as there) and one `sin_cos`; the clamp is "
+             "exact and the sign is applied by a negation instead of the `signum` product. "
+             "`max_angle = 0` returns `self` exactly. Inlined: `#[inline(never)]` is 1.5 % more "
+             "expensive (`alt_rotate_towards_noinline`).",
+             "glam-rs names the target in its doc as `angle_between`, which `Vec2` does not have "
+             "in 0.33.8; the angle meant is `angle_to`."])
+    if n == 3:
+        add("angle_between", f"(self: {T}, rhs: {T}) -> Fixed",
+            "Returns the angle (in radians) between two vectors in the range `[0, +π]`.\n\nFor "
+            "the full rotation between two vectors as a quaternion, see "
+            "`Quat::from_rotation_arc`.\n\nThe inputs do not need to be unit vectors however "
+            "they must be non-zero.", fz("angle_between"),
+            ["`'Fixed: overflow'` if `|self x rhs|` or `dot` does not fit the scalar range, i.e. "
+             "for `|self| * |rhs| >= 2^31`."],
+            ["`atan2(|self x rhs|, dot)` instead of the `acos_approx(dot / sqrt(|self|^2 * "
+             "|rhs|^2))` of glam-rs. It is not a change of formula but of conditioning: the "
+             "`acos` form loses the angle near `0` and `PI` (the slope of `acos` is infinite "
+             "there: one ULP of the cosine near 1 is up to `2e-5` rad), the `atan2` form does "
+             "not. The `acos_clamped` form is kept in `benches::alt`.",
+             "The three cross components are `mul_sub` kernels (one floor each), their norm is "
+             "the integer square root of the raw sum of squares, `dot` is floored once: the "
+             "total error is below `3.22 + 2.9 / (|self| * |rhs|)` ULP, about 6 ULP for "
+             "vectors whose lengths multiply to at least 1, growing as they shrink.",
+             "Parallel vectors give `0` and anti-parallel ones `PI` exactly; a zero input gives "
+             "`0` (the non-zero precondition is not checked)."])
+        add("angle_to", f"(self: {T}, rhs: {T}, axis: {T}) -> Fixed",
+            "Returns the signed angle (in radians) from `self` to `rhs` around `axis` in the "
+            "range `[-π, +π]`.\n\nThe `axis` must be a unit vector. The angle follows the "
+            "right-hand rule around `axis` and can be used with `rotate_axis`, e.g. "
+            "`self.rotate_axis(axis, self.angle_to(rhs, axis))` will be equal to `rhs`.\n\nFor "
+            "the unsigned angle without a reference axis, see `angle_between`.\n\nThe inputs "
+            "do not need to be unit vectors however they must be non-zero.", fz("angle_to"),
+            ["`'Fixed: overflow'` if the triple product or `dot` does not fit the scalar range, "
+             "i.e. for `|self| * |rhs| >= 2^31`."],
+            ["`self.cross(rhs).dot(axis)` is the `det3` kernel (the scalar triple product, one "
+             "floor rescale of the exact value) instead of three cross components rounded and "
+             "then a dot product; `dot` is floored once. The error is below `3.22 + 1.42 / "
+             "|(triple, dot)|` ULP.",
+             "The `axis.is_normalized()` precondition and the non-zero inputs are not checked "
+             "(`glam_assert!`).",
+             "`Vec3::rotate_axis` (`Quat`) is not ported yet: the round trip of the doc above "
+             "needs it."])
+        for ax, others in [("x", ("y", "z")), ("y", ("z", "x")), ("z", ("x", "y"))]:
+            add(f"rotate_{ax}", f"(self: {T}, angle: Fixed) -> {T}",
+                f"Rotates around the {ax} axis by `angle` (in radians).", fz(f"rotate_{ax}"),
+                [OVF],
+                [f"One shared `sin_cos`, then one fused kernel (`mul_sub` / `dot2`, one floor "
+                 f"rescale) per rotated component: each is within `1.02 * (|{others[0]}| + "
+                 f"|{others[1]}|) + 1` ULP of the exact rotation, the `{ax}` component is "
+                 "unchanged."])
+
     if n == 3:
         ortho_dev = ("`a = -1 / (sign + z)` is one truncated division; every other term is a "
                      "triple product rescaled once. The inputs are unit vectors, so `|sign + z| "
@@ -1024,7 +1195,7 @@ def operators(t):
 # --------------------------------------------------------------------------------------------
 # The module
 # --------------------------------------------------------------------------------------------
-WIDE_NAMES = ["dot2", "dot3", "dot4", "mul_add", "mul_sub", "norm2", "norm3", "norm4",
+WIDE_NAMES = ["dot2", "dot3", "dot4", "det3", "mul_add", "mul_sub", "norm2", "norm3", "norm4",
               "norm2_squared", "norm3_squared", "norm4_squared", "norm2_wide", "norm3_wide",
               "norm4_wide", "distance2", "distance3", "distance4", "distance2_squared",
               "distance3_squared", "distance4_squared", "normalize2", "normalize3", "normalize4",
@@ -1033,6 +1204,18 @@ WIDE_TRAITS = {"NormTrait": [".is_zero()", ".to_fixed()", ".try_recip()"],
                "RecipTrait": ["RecipTrait::"],
                "WideAdd": [".add("], "WideLift": [".lift()"],
                "WideNarrow": [".narrow()"], "WideSub": [".sub("]}
+
+
+TRIG_TOKENS = [".sin_cos()", ".atan2(", ".acos_clamped(", ".cos()", ".sin()"]
+
+
+def uses_pi(code):
+    """`PI` used by the code (not by a doc comment)."""
+    return any(re.search(r"\bPI\b", l) for l in code.split("\n") if not l.lstrip().startswith("//"))
+
+
+def uses_trig(code):
+    return any(tok in code for tok in TRIG_TOKENS)
 
 
 def wide_imports(code):
@@ -1074,7 +1257,10 @@ def gen_module(t):
 
     uses = ["use core::ops::index::IndexView;",
             "use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};",
-            "use fixed::fixed::{Fixed, FixedTrait};"]
+            "use fixed::fixed::{Fixed, FixedTrait" + (", PI" if uses_pi(code) else "")
+            + "};"]
+    if uses_trig(code):
+        uses.append("use fixed::trig::TrigTrait;")
     wide = wide_imports(code)
     if wide:
         uses.append("use fixed::wide::{" + ", ".join(wide) + "};")
@@ -1088,6 +1274,12 @@ def gen_module(t):
         uses.append(f"use crate::{name.lower()}::{name};")
     uses.append(f"use crate::{t.umod}::{t.U};")
 
+    trig_note = {
+        2: "",
+        3: ("/// * Not ported yet: `rotate_axis`, `rotate_towards` and `slerp` (they need `Quat`), see\n"
+            "///   `docs/PORTING_STATUS.md`.\n"),
+        4: "/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.\n",
+    }[n]
     head = f"""{HEADER}//! Port of glam-rs `f32/{t.mod}.rs` @ 0.33.8 on the Q32.32 scalar: a {n}-dimensional
 //! `fixed::Fixed` vector.
 //!
@@ -1115,8 +1307,7 @@ def gen_module(t):
 ///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
 ///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
 ///   exist in glam.cairo (`as_dvec{n}`, `as_i8vec{n}`, ...).
-/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.
-#[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
+{trig_note}#[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct {T} {{
 {chr(10).join(f"    pub {c}: Fixed," for c in t.c)}
 }}
@@ -1200,7 +1391,7 @@ UNITS_NEG = {2: [(3, 5), (-4, 5), 0, 0], 3: [(3, 7), (6, 7), (-2, 7), 0],
              4: [(1, 2), (1, 2), (-1, 2), (1, 2)]}
 SCALARS = {"K_ONE": 1, "K_THREE": 3, "K_FOUR": 4, "K_HUNDRED": 100, "K_TWO_HUNDRED": 200,
            "K_HALF": (1, 2), "K_QUARTER": (1, 4), "K_EIGHTH": (1, 8), "K_1_32": (1, 32),
-           "K_1_64": (1, 64), "K_1_1024": (1, 1024)}
+           "K_1_64": (1, 64), "K_1_1024": (1, 1024), "K_ANGLE": (3, 5)}
 MASKS = {"M_ALL": [1, 1, 1, 1], "M_NONE": [0, 0, 0, 0]}
 
 
@@ -1314,7 +1505,20 @@ def lib_benches(t):
     b("reflect", [("a", "A"), ("b", "UNIT")], "T", "a.reflect(b)")
     b("refract_through", [("a", "UNIT"), ("b", "AXIS"), ("e", "K_HALF")], "T", "a.refract(b, e)")
     b("refract_total", [("a", "UNIT"), ("b", "AXIS"), ("e", "K_FOUR")], "T", "a.refract(b, e)")
+    if n == 2:
+        b("from_angle", [("k", "K_ANGLE")], "T", "Vec2Trait::from_angle(k)")
+        b("to_angle", [("a", "A")], "S", "a.to_angle()")
+        b("angle_to", [("a", "A"), ("b", "B")], "S", "a.angle_to(b)")
+        b("rotate_angle", [("a", "A"), ("k", "K_ANGLE")], "T", "a.rotate_angle(k)")
+        b("rotate_towards_far", [("a", "A"), ("b", "B"), ("k", "K_ANGLE")], "T",
+          "a.rotate_towards(b, k)")
+        b("rotate_towards_near", [("a", "A"), ("b", "B"), ("k", "K_HUNDRED")], "T",
+          "a.rotate_towards(b, k)")
     if n == 3:
+        b("angle_between", [("a", "A"), ("b", "B")], "S", "a.angle_between(b)")
+        b("angle_to", [("a", "A"), ("b", "B"), ("x", "UNIT")], "S", "a.angle_to(b, x)")
+        for ax in "xyz":
+            b(f"rotate_{ax}", [("a", "A"), ("k", "K_ANGLE")], "T", f"a.rotate_{ax}(k)")
         b("any_orthonormal_vector_pos", [("a", "UNIT")], "T", "a.any_orthonormal_vector()")
         b("any_orthonormal_vector_neg", [("a", "UNIT_NEG")], "T", "a.any_orthonormal_vector()")
         b("any_orthonormal_pair_pos", [("a", "UNIT")], "TT", "a.any_orthonormal_pair()")
@@ -1361,6 +1565,9 @@ ALT_NAMES = {
     "reject_from": "reject_from_sub", "reject_from_normalized": "reject_from_normalized_sub",
     "abs_diff_eq": "abs_diff_eq_glam", "select": "select_match", "clamp": "clamp_min_max",
     "is_negative_bitmask": "is_negative_bitmask_felt",
+    "from_angle": "from_angle_cos_sin", "angle_to": "angle_to_glam",
+    "angle_between": "angle_between_acos", "rotate_x": "rotate_x_unfused",
+    "rotate_y": "rotate_y_unfused", "rotate_z": "rotate_z_unfused",
 }
 
 
@@ -1388,6 +1595,13 @@ def alts(t):
         "select": f"(mask: {t.B}, if_true: {T}, if_false: {T}) -> {T}",
         "clamp": f"(lhs: {T}, min: {T}, max: {T}) -> {T}",
         "is_negative_bitmask": f"(lhs: {T}) -> u32",
+        "from_angle": f"(angle: Fixed) -> {T}",
+        "angle_to": (f"(lhs: {T}, rhs: {T}) -> Fixed" if n == 2
+                     else f"(lhs: {T}, rhs: {T}, axis: {T}) -> Fixed"),
+        "angle_between": f"(lhs: {T}, rhs: {T}) -> Fixed",
+        "rotate_x": f"(lhs: {T}, angle: Fixed) -> {T}",
+        "rotate_y": f"(lhs: {T}, angle: Fixed) -> {T}",
+        "rotate_z": f"(lhs: {T}, angle: Fixed) -> {T}",
     }
     notes = {
         "element_product": "The literal chain of `Fixed * Fixed` (one rescale per product).",
@@ -1414,11 +1628,27 @@ def alts(t):
         "clamp": "The glam-rs `self.max(min).min(max)`: always two comparisons per component.",
         "is_negative_bitmask": "Weighted `felt252` sum of the sign tests instead of the "
                                f"`{t.B}::bitmask` decision tree.",
+        "from_angle": "Two calls (`cos`, `sin`) instead of one shared `sin_cos`.",
+        "angle_to": ("The glam-rs formula: `acos` of the cosine (a division by the product of "
+                     "the lengths) with the sign of `perp_dot`."
+                     if n == 2 else
+                     "The glam-rs expression `self.cross(rhs).dot(axis)`: three cross "
+                     "components rounded, then a dot product."),
+        "angle_between": "The glam-rs formula: `acos` of `dot / (|self| * |rhs|)` (imprecise "
+                         "near `0` and `PI`).",
+        "rotate_x": "The literal glam-rs expressions: two rescales per component.",
+        "rotate_y": "The literal glam-rs expressions: two rescales per component.",
+        "rotate_z": "The literal glam-rs expressions: two rescales per component.",
     }
     for op in fused_ops(t):
         body = to_free(t, FUSED_BODIES[op](t, not is_fused(t, op)))
         add(ALT_NAMES[op], op, sigs[op], body, notes[op])
 
+    if n == 2:
+        add("rotate_towards_noinline", "rotate_towards",
+            f"(lhs: {T}, rhs: {T}, max_angle: Fixed) -> {T}", to_free(t, body_rotate_towards(t)),
+            "The same body behind a call boundary (`#[inline(never)]`): the large body is not "
+            "cheaper to call than to inline.", inline="never")
     add("min_element_fixed", "min_element", f"(lhs: {T}) -> Fixed",
         to_free(t, min_chain(t, "<", False)),
         "The `Fixed::min` chain of glam-rs instead of the nested `if`s.")
@@ -1463,7 +1693,10 @@ def gen_alt(t):
     helpers = "".join(ALT_HELPERS[h] for h in ("F_ZERO", "F_ONE", "F_HALF") if h in code)
     code += helpers
 
-    uses = ["use fixed::fixed::{Fixed, FixedTrait};"]
+    uses = ["use fixed::fixed::{Fixed, FixedTrait" + (", PI" if uses_pi(code) else "")
+            + "};"]
+    if uses_trig(code):
+        uses.append("use fixed::trig::TrigTrait;")
     wide = wide_imports(code)
     if wide:
         uses.append("use fixed::wide::{" + ", ".join(wide) + "};")

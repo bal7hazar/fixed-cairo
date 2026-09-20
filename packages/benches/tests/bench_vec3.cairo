@@ -67,6 +67,7 @@ const K_EIGHTH: Fixed = Fixed { raw: 0x20000000 };
 const K_1_32: Fixed = Fixed { raw: 0x8000000 };
 const K_1_64: Fixed = Fixed { raw: 0x4000000 };
 const K_1_1024: Fixed = Fixed { raw: 0x400000 };
+const K_ANGLE: Fixed = Fixed { raw: 0x99999999 };
 const M_ALL: BVec3 = BVec3 { x: true, y: true, z: true };
 const M_NONE: BVec3 = BVec3 { x: false, y: false, z: false };
 const IV: IVec3 = IVec3 { x: 3, y: 3, z: 3 };
@@ -1477,6 +1478,88 @@ fn refract_total__op() {
 }
 
 #[test]
+fn angle_between__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn angle_between__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let _r = bb(K_ONE);
+    sink(a.angle_between(b));
+}
+
+#[test]
+fn angle_to__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _x = bb(UNIT);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn angle_to__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let x = bb(UNIT);
+    let _r = bb(K_ONE);
+    sink(a.angle_to(b, x));
+}
+
+#[test]
+fn rotate_x__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_x__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_x(k));
+}
+
+#[test]
+fn rotate_y__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_y__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_y(k));
+}
+
+#[test]
+fn rotate_z__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_z__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_z(k));
+}
+
+#[test]
 fn any_orthonormal_vector_pos__base() {
     let _a = bb(UNIT);
     let r = bb(A);
@@ -2320,6 +2403,88 @@ fn alt_cross_unfused__op() {
     let b = bb(B);
     let _r = bb(A);
     sink(alt::cross_unfused(a, b));
+}
+
+#[test]
+fn alt_angle_between_acos__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn alt_angle_between_acos__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let _r = bb(K_ONE);
+    sink(alt::angle_between_acos(a, b));
+}
+
+#[test]
+fn alt_angle_to_glam__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _x = bb(UNIT);
+    let r = bb(K_ONE);
+    sink(r);
+}
+
+#[test]
+fn alt_angle_to_glam__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let x = bb(UNIT);
+    let _r = bb(K_ONE);
+    sink(alt::angle_to_glam(a, b, x));
+}
+
+#[test]
+fn alt_rotate_x_unfused__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_x_unfused__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::rotate_x_unfused(a, k));
+}
+
+#[test]
+fn alt_rotate_y_unfused__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_y_unfused__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::rotate_y_unfused(a, k));
+}
+
+#[test]
+fn alt_rotate_z_unfused__base() {
+    let _a = bb(A);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_z_unfused__op() {
+    let a = bb(A);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::rotate_z_unfused(a, k));
 }
 
 #[test]

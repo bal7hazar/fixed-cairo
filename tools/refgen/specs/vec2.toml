@@ -119,7 +119,7 @@ args = [{ type = "Vec2", constraint = "normalized" }, { type = "Vec2", min = -50
 ret = "Vec2"
 cases = 8
 tolerance = 1
-justification = "each component is one fused kernel (one floor rescale of the exact sum) vs round to nearest: |diff| <= 1. `self` is the `(cos, sin)` vector: `from_angle` needs `fixed::trig` and lands with it."
+justification = "each component is one fused kernel (one floor rescale of the exact sum) vs round to nearest: |diff| <= 1. `self` is the `(cos, sin)` vector: `from_angle` and `rotate_angle` are checked below."
 edges = [[[1, 0], [1, 2]], [[0, 1], [1, 2]], [[-1, 0], [1, 2]]]
 
 [[function]]
@@ -412,6 +412,69 @@ ret = "Vec2"
 cases = 6
 tolerance = 24
 justification = "target / len is rounded to nearest on a length floored to 1 ULP (<= 1 + 2 * target / len^2 <= 3 ULP for len >= 1/2 and target <= 8), multiplied by |self| <= 8 and floored: <= 25 ULP. Cases on a branch boundary are skipped by the oracle."
+
+# ------------------------------------------------------------------------------------------
+# Angles and rotations (`fixed::trig`: sin 1.02, cos 0.86, atan2 3.22 ULP). The oracle is f64, so
+# the integer distance to the correctly rounded value is at most `floor(bound + 0.5)`: the 0.5 is
+# the quantization of the oracle result.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "from_angle"
+call = "Vec2Trait::from_angle({0})"
+args = [{ type = "Fixed", domain = "angle" }]
+ret = "Vec2"
+cases = 16
+tolerance = 1
+justification = "one shared `sin_cos`: cos within 0.86 ULP and sin within 1.02 ULP of the exact value (`fixed::trig`, whole turn), i.e. within floor(1.02 + 0.5) = 1 raw unit of the rounded oracle."
+edges = [[0.0], [1.5707963267948966], [-1.5707963267948966], [3.141592653589793], [-3.141592653589793], ["raw:1"], ["raw:-1"]]
+
+[[function]]
+name = "to_angle"
+call = "{0}.to_angle()"
+args = [{ type = "Vec2", constraint = "nonzero" }]
+ret = "Fixed"
+cases = 16
+tolerance = 3
+justification = "one `atan2` of the raw components, no rescale: 3.22 ULP (`fixed::trig`), i.e. within floor(3.22 + 0.5) = 3 raw units of the rounded oracle."
+edges = [[[1, 0]], [[0, 1]], [[-1, 0]], [[0, -1]], [[1, 1]], [[-3, 4]], [["raw:1", "raw:-1"]]]
+
+[[function]]
+name = "angle_to"
+call = "{0}.angle_to({1})"
+args = [
+    { type = "Vec2", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Vec2", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+]
+ret = "Fixed"
+cases = 16
+tolerance = 5
+justification = "atan2(perp_dot, dot): 3.22 ULP for the atan2 plus the floor of the two products (1 ULP each), which moves the angle by at most sqrt(2) / (|self| |rhs|) <= 1.42 ULP for lengths >= 1: 3.22 + 1.42 + 0.5 quantization = 5.1. The oracle is glam-rs `acos`-based (skipped within 1e-3 rad of 0 and pi, where the oracle is ill-conditioned)."
+edges = [[[1, 0], [0, 1]], [[0, 1], [1, 0]], [[1, 0], [1, 1]], [[2, 1], [-1, 3]], [[1, 2], [3, -4]]]
+
+[[function]]
+name = "rotate_angle"
+call = "{0}.rotate_angle({1})"
+args = [{ type = "Vec2", min = -8.0, max = 8.0 }, { type = "Fixed", domain = "angle" }]
+ret = "Vec2"
+cases = 16
+tolerance = 18
+justification = "each component is `x * cos -+ y * sin` with cos and sin off by <= 1.02 ULP: 1.02 * (|x| + |y|) <= 16.3 ULP for |x|, |y| <= 8, plus one floor rescale and the quantization: 17.8, rounded up."
+edges = [[[1, 0], [0.5]], [[0, 1], [1.5707963267948966]], [[3, 4], [-2]]]
+
+[[function]]
+name = "rotate_towards"
+call = "{0}.rotate_towards({1}, {2})"
+args = [
+    { type = "Vec2", constraint = "normalized" },
+    { type = "Vec2", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Fixed", domain = "angle" },
+]
+ret = "Vec2"
+cases = 16
+tolerance = 8
+justification = "the angle carries the 3.22 ULP of atan2, 1.42 ULP from the floored products (lengths >= 1) and 0.3 ULP of the raw `PI`; the rotation multiplies it by |self| = 1 and adds the 1.34 ULP (hypot of the cos / sin errors) of `from_angle`, one floor rescale and the quantization: 4.64 + 0.3 + 1.34 + 1 + 0.5 = 7.8, rounded up. Cases within 1e-3 rad of a parallel / anti-parallel pair are skipped (the sign of the angle is undefined there)."
+edges = [[[1, 0], [0, 1], [0.5]], [[1, 0], [0, 1], [3]], [[1, 0], [0, 1], [-1]], [[0, 1], [1, 1], [0.25]]]
 
 # ------------------------------------------------------------------------------------------
 # Casts.
