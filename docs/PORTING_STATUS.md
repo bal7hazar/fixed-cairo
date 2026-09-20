@@ -23,7 +23,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | X1 | cross-type methods | inprogress | worktree `cli-x1`, branch `feat/x1`, uncommitted |
 | A2 | `affine2` | done | #14 |
 | A3 | `affine3` | todo | |
-| E1 | `euler` | inreview | #15 |
+| E1 | `euler` | done | #15 |
 | C1 | `camera` | inprogress | worktree `cli-camera`, branch `feat/camera`, uncommitted |
 | S2 | swizzles (Vec4, integer) | done | #10 |
 | F4 | `fixed` tier C (`exp`, `ln`, `powf`) | todo | |
@@ -32,12 +32,10 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 
 ## Resume notes (2026-09-20 19:40, graceful shutdown)
 
-- #15 (`feat/euler`) was green on fmt/lint/fixed/golden/docs with `Test glam` and the bench job
-  still running: merge it when `all-checks` is green, then add
-  `pub use euler::{EulerRot, QuatEulerTrait, Mat3EulerTrait, Mat4EulerTrait};` (check the exact
-  names in `packages/glam/src/euler.cairo`) to `packages/glam/src/lib.cairo`.
+- #15 (`feat/euler`) merged at 19:48 with its re-exports.
 - X1 and C1 agents were still working when the machine was shut down: their files are on disk in
-  `.claude/worktrees/cli-x1` and `cli-camera`; resume with `claude --continue -p "<finish: run
+  `.claude/worktrees/cli-x1` and `cli-camera` and snapshotted as ungated `wip(...)` commits on
+  `origin/feat/x1` and `origin/feat/camera` (squash them into the real commit before the PR); resume with `claude --continue -p "<finish: run
   scripts/check.sh in the foreground, commit, push, open the PR, write REPORT.md>"` from the
   worktree, or restart from `docs/ORCHESTRATOR.md` briefs (`scratchpad/prompts/*.md` are
   session-local and may be gone).

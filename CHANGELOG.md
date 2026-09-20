@@ -22,3 +22,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glam`: `Quat` core (Hamilton product fused, `mul_vec3`, `slerp`, axis-angle, rotation arcs) with glam-rs golden vectors (#12).
 - `glam`: `Mat2`, `Mat3`, `Mat4` (fused products, adjugate inverse with one shared division) generated from `tools/codegen/fmat.py`, with glam-rs golden vectors (#13).
 - `glam`: `Affine2` (fused composition, inverse with shared reciprocal) with glam-rs golden vectors (#14).
+- `glam`: `EulerRot` (24 orders) and Euler conversions of `Quat`, `Mat3`, `Mat4` as extension traits (#15).

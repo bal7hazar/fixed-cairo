@@ -28,6 +28,7 @@ pub use affine2::{Affine2, Affine2Trait};
 pub use bvec2::{BVec2, BVec2Trait};
 pub use bvec3::{BVec3, BVec3Trait};
 pub use bvec4::{BVec4, BVec4Trait};
+pub use euler::{EulerRot, Mat3EulerTrait, Mat4EulerTrait, QuatEulerTrait};
 pub use ivec2::{IVec2, IVec2Trait};
 pub use ivec3::{IVec3, IVec3Trait};
 pub use ivec4::{IVec4, IVec4Trait};
