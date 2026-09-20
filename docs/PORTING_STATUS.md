@@ -15,9 +15,9 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | V3 | `vec3` | done | #9 |
 | V4 | `vec4` | done | #9 |
 | VI | `ivec2/3/4`, `uvec2/3/4` | done | #5 |
-| M2 | `mat2` | inprogress | |
-| M3 | `mat3` | inprogress | |
-| M4 | `mat4` | inprogress | |
+| M2 | `mat2` | done | #13 |
+| M3 | `mat3` | done | #13 |
+| M4 | `mat4` | done | #13 |
 | Q1 | `quat` | done | #12 |
 | S1 | swizzles (Vec2, Vec3) | done | #10 |
 | X1 | cross-type methods | todo | |
