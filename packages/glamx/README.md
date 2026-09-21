@@ -27,6 +27,16 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `nlerp` | 34 910 | 284 | 59 |
 | `to_mat4` | 21 360 | 183 | 42 |
 
+### `Pose2`
+
+| op | l2 gas | steps | range checks |
+|---|---:|---:|---:|
+| `mul` | 8 840 | 76 | 16 |
+| `inv_mul` | 9 920 | 84 | 20 |
+| `inverse` | 5 180 | 45 | 8 |
+| `transform_point` | 5 080 | 44 | 8 |
+| `transform_vector` | 4 680 | 40 | 8 |
+
 ### `Rot2`
 
 | op | l2 gas | steps | range checks |

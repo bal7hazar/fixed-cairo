@@ -18,4 +18,5 @@ else
   echo "cargo not found: skipping the golden vector check"
 fi
 scarb doc --workspace --disable-remote-linking >/dev/null
+python3 scripts/gen_eigen3.py emit --check
 echo "all checks passed"

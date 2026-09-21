@@ -35,8 +35,8 @@ this repository; nothing depends on a previous session's scratchpad, worktrees o
    `CHANGELOG.md`, and `docs/DESIGN.md` when a decision was taken, and pushes to `main`.
 2. After merging a pull request that touched shared generated files (`docs/API_PARITY.md`,
    `tools/refgen/src/**`, the READMEs' gas tables), re-run the matching `--check` on `main`
-   (`python3 scripts/api_parity.py --check`, `cargo run --manifest-path tools/refgen/Cargo.toml
-   -- check`, `cargo test --manifest-path tools/refgen/Cargo.toml`) and regenerate if stale.
+   (`python3 scripts/api_parity.py --check`, `python3 scripts/gas_tables.py --check`, `cargo run
+   --manifest-path tools/refgen/Cargo.toml -- check`, `cargo test --manifest-path tools/refgen/Cargo.toml`) and regenerate if stale.
 3. New work: write `docs/briefs/<TASK>.md`, pre-declare any new stub in the shared `lib.cairo`
    files, push, create a worktree + branch from `origin/main`, launch the porter with a one-line
    prompt pointing at the brief and `docs/briefs/COMMON.md`.
@@ -48,9 +48,14 @@ this repository; nothing depends on a previous session's scratchpad, worktrees o
 
 ## What remains (see `docs/PORTING_STATUS.md` for the live state)
 
-- Any `glamx` module still open there (`pose2`, `eigen3`) and the README gas tables task (R1b).
+- Every porting task of `docs/PLAN.md` is merged as of 2026-09-21 (glam-rs 0.33.8 parity: 0
+  missing item in `docs/API_PARITY.md`; `glamx`: `Rot2`, `Rot3`, `Pose2`, `Pose3`, `SdpMatrix2/3`,
+  `SymmetricEigen3`). No pull request is open, no agent is running, no work is left in a local
+  worktree.
 - R1, the release audit:
-  - optimizer pass over the hottest benches (`gas/*.snap`): candidates already noted are the
+  - optimizer pass over the hottest benches (`gas/*.snap`, headline numbers in the READMEs'
+    generated tables): candidates already noted are `SymmetricEigen3` (586k gas on a generic
+    matrix: skip the polish of `v3`, a values-only path for `eigenvalues`; PR #29), the
     shared non-inlined `slerp` helper (+1 880 gas, PR #26), `camera_impl::look_to_mat4_rh`
     duplicating `Mat4::look_to_rh` (PR #16), a cheaper single-division path than `Recip`
     (`project_onto`, `length_recip`, PR #9), a `norm_squared_wide` kernel so that

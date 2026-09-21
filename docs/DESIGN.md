@@ -62,7 +62,8 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
   <= 300 gas); intermediate rescales still floor. `exp2` / `exp` / `powf` (`fixed::exp`) keep
   a floor final rescale: with round-to-nearest the generator found 1 ULP descents at segment
   junctions, and monotonicity is worth more than the 1 ULP gained; the logarithms round to
-  nearest. `sqrt` and `norm*` return the floor of the
+  nearest. Third exception: the Jacobi rotations of `glamx::eigen3` round to nearest (one-sided
+  floor errors accumulate over ~12 rotations: residual 14.0 -> 6.7 ULP measured). `sqrt` and `norm*` return the floor of the
   exact root. Rounding is part of the API: results are bit-exact
   and any change is a MINOR version bump.
 - **Overflow**: panics (native `i64` checks and the final `downcast` of each kernel). Never wraps,
