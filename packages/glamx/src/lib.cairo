@@ -9,3 +9,6 @@ pub mod pose3;
 pub mod rot2;
 pub mod rot3;
 pub mod sdp;
+
+pub use pose3::{Pose3, Pose3Trait, Rot3Pose3Trait};
+pub use rot3::Rot3;

@@ -28,7 +28,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | S2 | swizzles (Vec4, integer) | done | #10 |
 | F4 | `fixed` tier C (`exp`, `ln`, `powf`) | done | #18 |
 | P0 | `glamx` package bootstrap + scope research (`docs/research/06-glamx-scope.md`) | done | #19 |
-| P1a | `glamx::pose3`, `glamx::rot3` | todo | |
+| P1a | `glamx::pose3`, `glamx::rot3` | done | #22 |
 | P1b | `glamx::rot2` | todo | |
 | P1c | `glamx::pose2` | todo | |
 | P1d | `glamx::sdp` | todo | |
