@@ -19,6 +19,8 @@ Read `docs/DESIGN.md` before writing any code. It is short and every rule in it 
 | `scripts/check.sh` | the full gate; `scripts/bench.py` the bench runner |
 | `docs/DESIGN.md`, `docs/PLAN.md`, `docs/PORTING_STATUS.md` | decisions, sequencing, progress |
 | `docs/ORCHESTRATOR.md` | how the orchestrator session spawns and briefs sub-agents (CLIs, model choice, brief format) |
+| `docs/HANDOFF.md` | where a new orchestrator session starts: reading order, machine setup, operating loop, what remains |
+| `docs/briefs/` | every porter brief (`COMMON.md` + one file per task) |
 | `docs/research/` | the five research reports and the benchmark prototype (`bench/`) they are based on |
 
 ## Commands
