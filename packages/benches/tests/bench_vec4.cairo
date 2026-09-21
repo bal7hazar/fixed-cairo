@@ -2612,6 +2612,22 @@ fn alt_project_div__op() {
 }
 
 #[test]
+fn alt_project_onto_wide_i128__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_project_onto_wide_i128__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let _r = bb(A);
+    sink(alt::project_onto_wide_i128(a, b));
+}
+
+#[test]
 fn alt_sqrt_noinline__base() {
     let _a = bb(POS);
     let r = bb(A);

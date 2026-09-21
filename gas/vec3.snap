@@ -36,10 +36,13 @@ bench_vec3::alt_mul_add_unfused: 8480 71 18 0 0
 bench_vec3::alt_normalize_kernel: 10770 89 25 0 0
 bench_vec3::alt_powf_inline: 142890 1022 243 0 0
 bench_vec3::alt_project_onto_recip: 13600 115 28 0 0
+bench_vec3::alt_project_onto_wide_i128: 65420 480 108 0 0
 bench_vec3::alt_reflect_unfused: 11300 95 24 0 0
 bench_vec3::alt_reject_from_normalized_sub: 10560 89 22 0 0
 bench_vec3::alt_reject_from_sub: 15570 132 32 0 0
 bench_vec3::alt_rotate_axis_mat3: 58730 472 112 0 0
+bench_vec3::alt_rotate_towards_recompute_far: 103450 823 196 0 0
+bench_vec3::alt_rotate_towards_recompute_near: 103540 835 198 0 0
 bench_vec3::alt_rotate_x_unfused: 40520 320 82 0 0
 bench_vec3::alt_rotate_y_unfused: 40820 323 82 0 0
 bench_vec3::alt_rotate_z_unfused: 40520 320 82 0 0
@@ -47,6 +50,9 @@ bench_vec3::alt_select_match_false: 1900 19 0 0 0
 bench_vec3::alt_select_match_true: 1600 16 0 0 0
 bench_vec3::alt_sin_cos_two_calls: 135500 1034 242 0 0
 bench_vec3::alt_sin_inline: 68190 535 127 0 0
+bench_vec3::alt_slerp_sin_cos_identity_general: 123350 1000 253 0 0
+bench_vec3::alt_slerp_sin_cos_identity_opposite: 123350 711 173 0 0
+bench_vec3::alt_slerp_sin_cos_identity_parallel: 123350 186 43 0 0
 bench_vec3::alt_smoothstep_glam: 35630 299 78 0 0
 bench_vec3::alt_smoothstep_noinline: 25620 205 48 0 0
 bench_vec3::alt_sqrt_noinline: 8260 61 18 0 0
@@ -113,8 +119,8 @@ bench_vec3::index_last: 700 7 0 0 0
 bench_vec3::is_negative_bitmask_neg: 3430 31 3 0 0
 bench_vec3::is_negative_bitmask_pos: 3450 31 3 0 0
 bench_vec3::is_negative_mask: 3550 32 3 0 0
-bench_vec3::is_normalized_false: 4850 43 6 0 0
-bench_vec3::is_normalized_true: 4740 42 6 0 0
+bench_vec3::is_normalized_false: 2110 19 3 0 0
+bench_vec3::is_normalized_true: 2210 20 3 0 0
 bench_vec3::length: 3340 28 6 0 0
 bench_vec3::length_recip: 5390 45 11 0 0
 bench_vec3::length_squared: 2080 18 4 0 0
@@ -164,8 +170,8 @@ bench_vec3::rem_euclid_neg: 8930 77 15 0 0
 bench_vec3::rem_euclid_pos: 8150 68 15 0 0
 bench_vec3::rem_scalar: 8170 69 15 0 0
 bench_vec3::rotate_axis: 51120 401 90 0 0
-bench_vec3::rotate_towards_far: 109970 830 196 0 0
-bench_vec3::rotate_towards_near: 109970 842 198 0 0
+bench_vec3::rotate_towards_far: 102380 766 179 0 0
+bench_vec3::rotate_towards_near: 102380 778 181 0 0
 bench_vec3::rotate_x: 35880 282 70 0 0
 bench_vec3::rotate_y: 35880 282 70 0 0
 bench_vec3::rotate_z: 35880 282 70 0 0

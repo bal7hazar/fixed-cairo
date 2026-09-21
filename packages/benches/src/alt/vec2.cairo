@@ -212,6 +212,19 @@ pub fn angle_to_glam(lhs: Vec2, rhs: Vec2) -> Fixed {
     }
 }
 
+/// Alternative to `Vec2::project_onto`. The exact Q64.64 dot-product ratio before the component
+/// rescales. It uses `i128` multiplication and division to measure the >64-bit operand cost cliff;
+/// this benchmark variant is not intended to cover full-range intermediate overflow.
+#[inline(always)]
+pub fn project_onto_wide_i128(lhs: Vec2, rhs: Vec2) -> Vec2 {
+    let num: i128 = Into::<i64, i128>::into(lhs.x.raw) * rhs.x.raw.into()
+        + Into::<i64, i128>::into(lhs.y.raw) * rhs.y.raw.into();
+    let den: i128 = Into::<i64, i128>::into(rhs.x.raw) * rhs.x.raw.into()
+        + Into::<i64, i128>::into(rhs.y.raw) * rhs.y.raw.into();
+    let k = Fixed { raw: ((num * 0x100000000) / den).try_into().expect('Fixed: overflow') };
+    Vec2 { x: rhs.x * k, y: rhs.y * k }
+}
+
 /// Alternative to `Vec2::rotate_towards`. The same body behind a call boundary
 /// (`#[inline(never)]`): the large body is not cheaper to call than to inline.
 #[inline(never)]

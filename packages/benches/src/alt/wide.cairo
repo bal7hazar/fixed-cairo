@@ -46,6 +46,13 @@ pub fn norm3_via_squared(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
     fixed::wide::norm3_squared(x, y, z).sqrt()
 }
 
+/// The old `is_normalized` formulation: narrow the sum of squares before comparing it with one.
+/// It panics instead of returning `false` when the squared length does not fit `Fixed`.
+#[inline(always)]
+pub fn is_unit3_narrowed(x: Fixed, y: Fixed, z: Fixed, max_abs_diff_raw: i64) -> bool {
+    fixed::wide::norm3_squared(x, y, z).abs_diff_eq(ONE, Fixed { raw: max_abs_diff_raw })
+}
+
 /// glam-rs formulation of `normalize`: `v * (1 / length)`, i.e. one truncated Q32.32 reciprocal
 /// and three `Fixed * Fixed`. The reciprocal only carries 32 fractional bits: the result is off
 /// by `length * 2^-32` relative, and `normalize((3, 0, 0))` is `1 - 1 ULP`.

@@ -10,9 +10,9 @@ use fixed::fixed::{EPSILON, HALF, MAX, MIN, NEG_ONE, TWO};
 use fixed::wide::{
     NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt, WideSub, det3,
     distance2, distance2_squared, distance3, distance3_squared, distance4, distance4_squared, dot2,
-    dot2_add, dot3, dot3_add, dot4, mul_add, mul_sub, norm2, norm2_squared, norm2_wide, norm3,
-    norm3_squared, norm3_wide, norm4, norm4_squared, norm4_wide, normalize2, normalize3, normalize4,
-    wide_from, wide_mul,
+    dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add, mul_sub, norm2,
+    norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4, norm4_squared, norm4_wide,
+    normalize2, normalize3, normalize4, wide_from, wide_mul,
 };
 use fixed::{Fixed, FixedTrait, ONE, ONE_RAW, ZERO};
 
@@ -199,6 +199,33 @@ fn test_norm_of_tiny_vectors_does_not_underflow() {
     assert_eq!(norm4(f(2), f(4), f(5), f(6)).raw, 9);
     assert_eq!(distance2(f(1), f(1), f(4), f(5)).raw, 5);
     assert_eq!(norm3(ZERO, ZERO, ZERO), ZERO);
+}
+
+#[test]
+fn test_is_unit_preserves_floored_length_squared_threshold() {
+    // These exact Q64.64 sums floor to 1 - 1025, 1 - 1024, 1 + 1024 and 1 + 1025 raw ULP.
+    let below = f(0xfffffdff);
+    let lower = f(0xfffffe00);
+    let upper = f(0x100000200);
+    let fill = f(0x10000);
+    assert!(!is_unit2(below, fill, 1024));
+    assert!(is_unit2(lower, ZERO, 1024));
+    assert!(is_unit2(upper, ZERO, 1024));
+    assert!(!is_unit2(upper, fill, 1024));
+    assert!(is_unit3(lower, ZERO, ZERO, 1024));
+    assert!(is_unit4(upper, ZERO, ZERO, ZERO, 1024));
+    assert!(is_unit2(ONE, ZERO, 0));
+}
+
+#[test]
+fn test_is_unit_long_vectors_return_false() {
+    assert!(!is_unit2(MAX, MAX, 1024));
+    assert!(!is_unit2(MIN, MIN, 1024));
+    assert!(!is_unit3(MAX, MIN, MAX, 1024));
+    assert!(!is_unit3(MIN, MIN, MIN, 1024));
+    assert!(!is_unit4(MAX, MIN, MAX, MIN, 1024));
+    // The sum is exactly 2^128, which does not fit `u128`; the predicate is still total.
+    assert!(!is_unit4(MIN, MIN, MIN, MIN, 1024));
 }
 
 #[test]

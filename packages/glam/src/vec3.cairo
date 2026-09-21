@@ -18,8 +18,8 @@ use fixed::fixed::{Fixed, FixedTrait, PI};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
     Norm, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, det3, distance3,
-    distance3_squared, dot2, dot3, mul_add, mul_sub, norm3, norm3_squared, norm3_wide, wide_from,
-    wide_mul,
+    distance3_squared, dot2, dot3, is_unit3, mul_add, mul_sub, norm3, norm3_squared, norm3_wide,
+    wide_from, wide_mul,
 };
 use crate::bvec3::{BVec3, BVec3Trait};
 use crate::ivec3::IVec3;
@@ -820,14 +820,14 @@ pub trait Vec3Trait {
     ///
     /// Mirrors `glam::Vec3::is_normalized`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * The threshold is re-derived for Q32.32: `|length_squared - 1| <= 1024` raw ULP,
     ///   about `2.4e-7`, where glam-rs uses `2e-4` (about 1700 f32 epsilons). The squared
     ///   length of the output of `normalize` is within 7 ULP of 1, so the margin is a
     ///   hundredfold.
-    /// * `'Fixed: overflow'` for `|self| >= 2^31` (`length_squared` overflows) where glam-
-    ///   rs returns `false`.
+    /// * The exact wide sum of squares is compared without narrowing, so long vectors
+    ///   return `false` instead of panicking.
     fn is_normalized(self: Vec3) -> bool;
     /// Returns the vector projection of `self` onto `rhs`.
     ///
@@ -1026,7 +1026,8 @@ pub trait Vec3Trait {
     /// * The rotation axis is the normalized `self.cross(rhs)`, falling back to the
     ///   normalized `any_orthogonal_vector` when the two vectors are parallel, as in glam-
     ///   rs (`try_normalize` there). The length of the fallback is never zero for a non-
-    ///   zero `self`. The normalization shares one square root and one division.
+    ///   zero `self`. The cross product and its norm are shared with the `atan2` angle;
+    ///   axis normalization adds one division but no second square root.
     /// * `max_angle` is clamped with `FixedTrait::clamp`, which panics on a reversed
     ///   range; here `angle_between - PI <= angle_between` always holds.
     fn rotate_towards(self: Vec3, rhs: Vec3, max_angle: Fixed) -> Vec3;
@@ -1806,7 +1807,7 @@ pub impl Vec3Impl of Vec3Trait {
 
     #[inline(always)]
     fn is_normalized(self: Vec3) -> bool {
-        Self::length_squared(self).abs_diff_eq(F_ONE, NORMALIZED_EPS)
+        is_unit3(self.x, self.y, self.z, NORMALIZED_EPS_RAW)
     }
 
     #[inline(always)]
@@ -1904,13 +1905,14 @@ pub impl Vec3Impl of Vec3Trait {
     }
 
     fn rotate_towards(self: Vec3, rhs: Vec3, max_angle: Fixed) -> Vec3 {
-        let angle_between = Self::angle_between(self, rhs);
+        let c = Self::cross(self, rhs);
+        let cn = norm3_wide(c.x, c.y, c.z);
+        let angle_between = cn.to_fixed().atan2(Self::dot(self, rhs));
         // When `max_angle < 0`, rotate no further than `PI` radians away
         let angle = max_angle.clamp(angle_between - PI, angle_between);
         // The rotation axis: the normalized cross product, or an arbitrary orthogonal
         // direction when the two vectors are parallel.
-        let c = Self::cross(self, rhs);
-        let axis = match norm3_wide(c.x, c.y, c.z).try_recip() {
+        let axis = match cn.try_recip() {
             Some(r) => Vec3 { x: r.mul(c.x), y: r.mul(c.y), z: r.mul(c.z) },
             None => Self::normalize(Self::any_orthogonal_vector(self)),
         };
@@ -2392,7 +2394,7 @@ const F_HALF: Fixed = Fixed { raw: 0x80000000 };
 /// The `is_normalized` threshold: 1024 raw ULP (`2^-22`) on the squared length.
 /// The squared length of a vector normalized by this module is within a few ULP of 1; glam-rs
 /// uses `2e-4`, which is ~1700 f32 epsilons, while this is ~1000 Q32.32 epsilons.
-const NORMALIZED_EPS: Fixed = Fixed { raw: 1024 };
+const NORMALIZED_EPS_RAW: u16 = 1024;
 
 /// `1 - 2^-20`, the cosine band in which [`Vec3Trait::slerp`] falls back to a linear
 /// interpolation, where glam-rs uses `1 - 3e-7`.

@@ -666,6 +666,15 @@ def gen_tests(t):
         *([eq(f"{V([3, 4])}.normalize()",
               V([("raw", k) for k in normalize(rawv([3, 4], 2))]))] if n == 2 else []),
     ])
+    test("test_is_normalized_threshold_and_long_vectors", [
+        "// The floored squared lengths are 1 - 1025, 1 - 1024, 1 + 1024 and 1 + 1025 ULP.",
+        f"assert!(!{V([('raw', ONE - 513), ('raw', 1 << 16), 0, 0])}.is_normalized());",
+        f"assert!({V([('raw', ONE - 512), 0, 0, 0])}.is_normalized());",
+        f"assert!({V([('raw', ONE + 512), 0, 0, 0])}.is_normalized());",
+        f"assert!(!{V([('raw', ONE + 512), ('raw', 1 << 16), 0, 0])}.is_normalized());",
+        f"assert!(!{Tt}::MAX.is_normalized());",
+        f"assert!(!{Tt}::MIN.is_normalized());",
+    ])
 
     # ------------------------------------------------------------ projection and reflection
     rows = []
@@ -914,7 +923,6 @@ def gen_tests(t):
     sp("test_reject_from_zero", "'Fixed: division by zero'", f"{Tt}::ONE.reject_from({zero})")
     sp("test_clamp_length_min_zero", "'Fixed: division by zero'",
        f"{zero}.clamp_length_min(f({ONE}))")
-    sp("test_is_normalized_overflow", "'Fixed: overflow'", f"{Tt}::MAX.is_normalized()")
     sp("test_exp_overflow", "'Fixed: exp overflow'", f"{Tt}::splat(f({22 * ONE})).exp()")
     sp("test_exp2_overflow", "'Fixed: exp overflow'", f"{Tt}::splat(f({31 * ONE})).exp2()")
     sp("test_ln_domain", "'Fixed: ln domain'", f"{zero}.ln()")

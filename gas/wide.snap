@@ -1,6 +1,7 @@
 # bench: l2_gas steps range_check bitwise other_builtins
 bench_wide::alt_det3_cross_dot: 8640 74 16 0 0
 bench_wide::alt_dot3_unfused: 7540 63 16 0 0
+bench_wide::alt_is_unit3_narrowed: 4240 37 6 0 0
 bench_wide::alt_mul_sub_unfused: 5120 43 10 0 0
 bench_wide::alt_norm3_via_squared: 5020 42 10 0 0
 bench_wide::alt_normalize3_div: 11790 99 24 0 0
@@ -32,6 +33,12 @@ bench_wide::dot2_add: 2080 18 4 0 0
 bench_wide::dot3: 2080 18 4 0 0
 bench_wide::dot3_add: 2280 20 4 0 0
 bench_wide::dot4: 2280 20 4 0 0
+bench_wide::is_unit2_false: 2730 24 3 0 0
+bench_wide::is_unit2_true: 3970 35 5 0 0
+bench_wide::is_unit3_false: 2930 26 3 0 0
+bench_wide::is_unit3_true: 4170 37 5 0 0
+bench_wide::is_unit4_false: 3130 28 3 0 0
+bench_wide::is_unit4_true: 4370 39 5 0 0
 bench_wide::mul_add: 1880 16 4 0 0
 bench_wide::mul_sub: 1880 16 4 0 0
 bench_wide::norm2: 2220 18 6 0 0

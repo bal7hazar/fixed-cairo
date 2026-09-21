@@ -331,12 +331,25 @@ def body_rotate_axis_quat(t):
 
 
 def body_rotate_towards3(t):
-    """Vec3: clamp the travelled angle, then rotate around the (normalized) cross product."""
-    return ("let angle_between = Self::angle_between(self, rhs);\n"
+    """Vec3: share the cross product and its norm between the angle and rotation axis."""
+    return ("let c = Self::cross(self, rhs);\n"
+            "let cn = norm3_wide(c.x, c.y, c.z);\n"
+            "let angle_between = cn.to_fixed().atan2(Self::dot(self, rhs));\n"
             "// When `max_angle < 0`, rotate no further than `PI` radians away\n"
             "let angle = max_angle.clamp(angle_between - PI, angle_between);\n"
             "// The rotation axis: the normalized cross product, or an arbitrary orthogonal\n"
             "// direction when the two vectors are parallel.\n"
+            "let axis = match cn.try_recip() {\n"
+            "    Some(r) => " + normalized_fields(t, "r", "c") + ",\n"
+            "    None => Self::normalize(Self::any_orthogonal_vector(self)),\n"
+            "};\n"
+            "QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), self)")
+
+
+def body_rotate_towards3_recompute(t):
+    """The original composition, which computes the cross product and its norm twice."""
+    return ("let angle_between = Self::angle_between(self, rhs);\n"
+            "let angle = max_angle.clamp(angle_between - PI, angle_between);\n"
             "let c = Self::cross(self, rhs);\n"
             "let axis = match norm3_wide(c.x, c.y, c.z).try_recip() {\n"
             "    Some(r) => " + normalized_fields(t, "r", "c") + ",\n"
@@ -389,6 +402,42 @@ def body_slerp(t):
             "    // Almost parallel: the linear interpolation is the spherical one to within\n"
             "    // `theta^2 / 8`.\n"
             "    Self::lerp(self, rhs, s)\n"
+            "}")
+
+
+def body_slerp_sin_cos_identity(t):
+    """Candidate: derive the first sine weight from one `sin` plus one `sin_cos`."""
+    return ("let la = norm3_wide(lhs.x, lhs.y, lhs.z);\n"
+            "let lb = norm3_wide(rhs.x, rhs.y, rhs.z);\n"
+            "let self_length = la.to_fixed();\n"
+            "let rhs_length = lb.to_fixed();\n"
+            "let d = RecipTrait::new(self_length * rhs_length)"
+            ".mul(Vec3Trait::dot(lhs, rhs));\n"
+            "if d.abs() < NEAR_ONE {\n"
+            "    let theta = d.acos_clamped();\n"
+            "    let sin_theta = theta.sin();\n"
+            "    let u = theta * s;\n"
+            "    let (sin_u, cos_u) = u.sin_cos();\n"
+            "    let r = RecipTrait::new(sin_theta);\n"
+            "    let cot_theta = r.mul(d);\n"
+            "    let t1 = wide_from(cos_u).sub(wide_mul(cot_theta, sin_u)).narrow();\n"
+            "    let t2 = r.mul(sin_u);\n"
+            "    let len = self_length.lerp(rhs_length, s);\n"
+            "    let k1 = la.recip().mul(len * t1);\n"
+            "    let k2 = lb.recip().mul(len * t2);\n"
+            "    Vec3 {\n"
+            "        x: wide_mul(lhs.x, k1).add(wide_mul(rhs.x, k2)).narrow(),\n"
+            "        y: wide_mul(lhs.y, k1).add(wide_mul(rhs.y, k2)).narrow(),\n"
+            "        z: wide_mul(lhs.z, k1).add(wide_mul(rhs.z, k2)).narrow(),\n"
+            "    }\n"
+            "} else if d.is_negative() {\n"
+            "    let q = QuatTrait::from_axis_angle(\n"
+            "        Vec3Trait::normalize(Vec3Trait::any_orthogonal_vector(lhs)), PI * s,\n"
+            "    );\n"
+            "    let k = la.recip().mul(self_length.lerp(rhs_length, s));\n"
+            "    Vec3Trait::mul_scalar(QuatTrait::mul_vec3(q, lhs), k)\n"
+            "} else {\n"
+            "    Vec3Trait::lerp(lhs, rhs, s)\n"
             "}")
 
 
@@ -482,6 +531,17 @@ def body_project_onto(t, fused):
                 + t.cw(lambda c: f"rhs.{c} * k"))
     return ("let k = RecipTrait::new(Self::dot(rhs, rhs)).mul(Self::dot(self, rhs));\n"
             + t.cw(lambda c: f"rhs.{c} * k"))
+
+
+def body_project_onto_wide_i128(t):
+    """Benchmark-only exact Q64.64 ratio using wide integer multiplication and division."""
+    num = t.join(" + ", lambda c: f"Into::<i64, i128>::into(lhs.{c}.raw) * rhs.{c}.raw.into()")
+    den = t.join(" + ", lambda c: f"Into::<i64, i128>::into(rhs.{c}.raw) * rhs.{c}.raw.into()")
+    return (f"let num: i128 = {num};\n"
+            f"let den: i128 = {den};\n"
+            "let k = Fixed {\n"
+            "    raw: ((num * 0x100000000) / den).try_into().expect('Fixed: overflow'),\n"
+            "};\n" + t.cw(lambda c: f"rhs.{c} * k"))
 
 
 def body_reject_from(t, fused):
@@ -965,13 +1025,13 @@ def methods(t):
     add("is_normalized", f"(self: {T}) -> bool",
         "Returns whether `self` is of length `1` or not.\n\nUses a precision threshold of "
         f"`{NORMALIZED_EPS_RAW}` raw ULP (`2^-22`) on the squared length.",
-        f"Self::length_squared(self).abs_diff_eq(F_ONE, NORMALIZED_EPS)", [OVF],
+        f"is_unit{n}(" + t.join(", ", lambda c: f"self.{c}") + ", NORMALIZED_EPS_RAW)", [],
         [f"The threshold is re-derived for Q32.32: `|length_squared - 1| <= "
          f"{NORMALIZED_EPS_RAW}` raw ULP, about `2.4e-7`, where glam-rs uses `2e-4` (about 1700 "
          "f32 epsilons). The squared length of the output of `normalize` is within "
          f"{2 * n + 1} ULP of 1, so the margin is a hundredfold.",
-         "`'Fixed: overflow'` for `|self| >= 2^31` (`length_squared` overflows) where glam-rs "
-         "returns `false`."])
+         "The exact wide sum of squares is compared without narrowing, so long vectors return "
+         "`false` instead of panicking."])
 
     # -------------------------------------------------------------- projection and reflection
     add("project_onto", f"(self: {T}, rhs: {T}) -> {T}",
@@ -1154,7 +1214,8 @@ def methods(t):
              "The rotation axis is the normalized `self.cross(rhs)`, falling back to the "
              "normalized `any_orthogonal_vector` when the two vectors are parallel, as in "
              "glam-rs (`try_normalize` there). The length of the fallback is never zero for a "
-             "non-zero `self`. The normalization shares one square root and one division.",
+             "non-zero `self`. The cross product and its norm are shared with the `atan2` angle; "
+             "axis normalization adds one division but no second square root.",
              "`max_angle` is clamped with `FixedTrait::clamp`, which panics on a reversed "
              "range; here `angle_between - PI <= angle_between` always holds."], inline=False)
 
@@ -1344,11 +1405,11 @@ HELPERS = {
     "F_ONE": f"\n/// `1`.\nconst F_ONE: Fixed = Fixed {{ raw: {hex(ONE_RAW)} }};\n",
     "F_NEG_ONE": f"\n/// `-1`.\nconst F_NEG_ONE: Fixed = Fixed {{ raw: -{hex(ONE_RAW)} }};\n",
     "F_HALF": f"\n/// `1 / 2`.\nconst F_HALF: Fixed = Fixed {{ raw: {hex(HALF_RAW)} }};\n",
-    "NORMALIZED_EPS": f"""
+    "NORMALIZED_EPS_RAW": f"""
 /// The `is_normalized` threshold: {NORMALIZED_EPS_RAW} raw ULP (`2^-22`) on the squared length.
 /// The squared length of a vector normalized by this module is within a few ULP of 1; glam-rs
 /// uses `2e-4`, which is ~1700 f32 epsilons, while this is ~1000 Q32.32 epsilons.
-const NORMALIZED_EPS: Fixed = Fixed {{ raw: {NORMALIZED_EPS_RAW} }};
+const NORMALIZED_EPS_RAW: u16 = {NORMALIZED_EPS_RAW};
 """,
     "NEAR_ONE": f"""
 /// `1 - 2^-20`, the cosine band in which [`Vec3Trait::slerp`] falls back to a linear
@@ -1499,8 +1560,9 @@ def operators(t):
 # The module
 # --------------------------------------------------------------------------------------------
 WIDE_NAMES = ["dot2", "dot3", "dot4", "det3", "mul_add", "mul_sub", "norm2", "norm3", "norm4",
-              "norm2_squared", "norm3_squared", "norm4_squared", "norm2_wide", "norm3_wide",
-              "norm4_wide", "distance2", "distance3", "distance4", "distance2_squared",
+              "norm2_squared", "norm3_squared", "norm4_squared", "is_unit2", "is_unit3",
+              "is_unit4", "norm2_wide", "norm3_wide", "norm4_wide", "distance2", "distance3",
+              "distance4", "distance2_squared",
               "distance3_squared", "distance4_squared", "normalize2", "normalize3", "normalize4",
               "wide_from", "wide_mul"]
 WIDE_TRAITS = {"NormTrait": [".is_zero()", ".to_fixed()", ".try_recip()"],
@@ -2011,12 +2073,30 @@ def alts(t):
     for op in fused_ops(t):
         body = to_free(t, FUSED_BODIES[op](t, not is_fused(t, op)))
         add(ALT_NAMES[op], op, sigs[op], body, notes[op])
+    add("project_onto_wide_i128", "project_onto", f"(lhs: {T}, rhs: {T}) -> {T}",
+        body_project_onto_wide_i128(t),
+        "The exact Q64.64 dot-product ratio before the component rescales. It uses `i128` "
+        "multiplication and division to measure the >64-bit operand cost cliff; this benchmark "
+        "variant is not intended to cover full-range intermediate overflow.")
 
     if n == 2:
         add("rotate_towards_noinline", "rotate_towards",
             f"(lhs: {T}, rhs: {T}, max_angle: Fixed) -> {T}", to_free(t, body_rotate_towards(t)),
             "The same body behind a call boundary (`#[inline(never)]`): the large body is not "
             "cheaper to call than to inline.", inline="never")
+    if n == 3:
+        add("rotate_towards_recompute", "rotate_towards",
+            f"(lhs: {T}, rhs: {T}, max_angle: Fixed) -> {T}",
+            to_free(t, body_rotate_towards3_recompute(t)),
+            "The original composition through `angle_between`: it recomputes both the cross "
+            "product and its norm when constructing the normalized rotation axis.")
+        add("slerp_sin_cos_identity", "slerp", f"(lhs: {T}, rhs: {T}, s: Fixed) -> {T}",
+            body_slerp_sin_cos_identity(t),
+            "The general branch derives `sin(theta * (1 - s)) / sin(theta)` from one `sin` "
+            "and one `sin_cos` using the angle-subtraction identity. It saves 14 700 gas but "
+            "changes rounding; a 50 000-case seeded f64-oracle sweep improved mean maximum-"
+            "component error (15.71 -> 13.83 ULP) but worsened the maximum (22 550.33 -> "
+            "22 728.33 ULP), so the bit-exact library formulation stays.", inline="never")
     add("sqrt_noinline", "sqrt", f"(lhs: {T}) -> {T}", t.cw(lambda c: f"lhs.{c}.sqrt()"),
         "The same body behind a call boundary (`#[inline(never)]`): the library inlines it.",
         inline="never")
@@ -2064,6 +2144,7 @@ ALT_HELPERS = {
     "F_ONE": HELPERS["F_ONE"],
     "F_HALF": HELPERS["F_HALF"],
     "F_ZERO": HELPERS["F_ZERO"],
+    "NEAR_ONE": HELPERS["NEAR_ONE"],
 }
 
 
@@ -2075,7 +2156,9 @@ def gen_alt(t):
         fns.append(f"/// Alternative to `{t.name}::{a.of}`. {a.note}\n{attr}"
                    f"pub fn {a.name}{a.sig} {{\n{indent(a.body, 4)}\n}}\n")
     code = "\n".join(fns)
-    helpers = "".join(ALT_HELPERS[h] for h in ("F_ZERO", "F_ONE", "F_HALF") if h in code)
+    helpers = "".join(
+        ALT_HELPERS[h] for h in ("F_ZERO", "F_ONE", "F_HALF", "NEAR_ONE") if h in code
+    )
     code += helpers
 
     uses = ["use fixed::fixed::{Fixed, FixedTrait" + (", PI" if uses_pi(code) else "")
@@ -2093,6 +2176,8 @@ def gen_alt(t):
         uses.append(f"use glam::{t.bmod}::{t.B};")
     if "Mat3Trait::" in code:
         uses.append("use glam::mat3::Mat3Trait;")
+    if "QuatTrait::" in code:
+        uses.append("use glam::quat::QuatTrait;")
     uses.append(f"use glam::{t.mod}::{{{t.name}, {t.name}Trait}};")
     for d in (t.dim(3), t.dim(4)):
         if d.name != t.name and re.search(rf"\b{d.name}\b", code):
@@ -2105,7 +2190,7 @@ def gen_alt(t):
 
 VARIANTS = {"pos", "neg", "zero", "true", "false", "first", "last", "some", "none", "lhs", "rhs",
             "below", "inside", "above", "near", "far", "min", "max", "clamped", "through",
-            "total", "scalar"}
+            "total", "scalar", "general", "opposite", "parallel"}
 
 
 def alt_benches(t, lib):

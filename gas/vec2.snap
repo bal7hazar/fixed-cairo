@@ -33,6 +33,7 @@ bench_vec2::alt_normalize_kernel: 8790 72 21 0 0
 bench_vec2::alt_perp_dot_unfused: 5120 43 10 0 0
 bench_vec2::alt_powf_inline: 95260 681 162 0 0
 bench_vec2::alt_project_onto_recip: 11520 97 24 0 0
+bench_vec2::alt_project_onto_wide_i128: 47900 350 78 0 0
 bench_vec2::alt_reflect_unfused: 8580 72 18 0 0
 bench_vec2::alt_reject_from_normalized_sub: 7840 66 16 0 0
 bench_vec2::alt_reject_from_sub: 12650 107 26 0 0
@@ -101,8 +102,8 @@ bench_vec2::index_last: 500 5 0 0 0
 bench_vec2::is_negative_bitmask_neg: 1640 15 2 0 0
 bench_vec2::is_negative_bitmask_pos: 1650 15 2 0 0
 bench_vec2::is_negative_mask: 1750 16 2 0 0
-bench_vec2::is_normalized_false: 4650 41 6 0 0
-bench_vec2::is_normalized_true: 4540 40 6 0 0
+bench_vec2::is_normalized_false: 1910 17 3 0 0
+bench_vec2::is_normalized_true: 2010 18 3 0 0
 bench_vec2::length: 2220 18 6 0 0
 bench_vec2::length_recip: 5190 43 11 0 0
 bench_vec2::length_squared: 1880 16 4 0 0

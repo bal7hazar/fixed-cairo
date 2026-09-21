@@ -8,9 +8,9 @@ use fixed::Fixed;
 use fixed::wide::{
     NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt, WideSub, det3,
     distance2, distance2_squared, distance3, distance3_squared, distance4, distance4_squared, dot2,
-    dot2_add, dot3, dot3_add, dot4, mul_add, mul_sub, norm2, norm2_squared, norm2_wide, norm3,
-    norm3_squared, norm3_wide, norm4, norm4_squared, norm4_wide, normalize2, normalize3, normalize4,
-    wide_from, wide_mul,
+    dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add, mul_sub, norm2,
+    norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4, norm4_squared, norm4_wide,
+    normalize2, normalize3, normalize4, wide_from, wide_mul,
 };
 
 #[derive(Copy, Drop)]
@@ -653,6 +653,114 @@ fn norm4_squared__op() {
 }
 
 #[test]
+fn is_unit2_true__base() {
+    let _x = bb(Fixed { raw: 0xfffffe00 });
+    let _y = bb(Fixed { raw: 0 });
+    let _eps = bb(1024_u16);
+    sink(bb(true));
+}
+
+#[test]
+fn is_unit2_true__op() {
+    let x = bb(Fixed { raw: 0xfffffe00 });
+    let y = bb(Fixed { raw: 0 });
+    let eps = bb(1024_u16);
+    sink(is_unit2(x, y, eps));
+}
+
+#[test]
+fn is_unit2_false__base() {
+    let _x = bb(Fixed { raw: 0x500000000 });
+    let _y = bb(Fixed { raw: -0x280000001 });
+    let _eps = bb(1024_u16);
+    sink(bb(false));
+}
+
+#[test]
+fn is_unit2_false__op() {
+    let x = bb(Fixed { raw: 0x500000000 });
+    let y = bb(Fixed { raw: -0x280000001 });
+    let eps = bb(1024_u16);
+    sink(is_unit2(x, y, eps));
+}
+
+#[test]
+fn is_unit3_true__base() {
+    let _x = bb(Fixed { raw: 0xfffffe00 });
+    let _y = bb(Fixed { raw: 0 });
+    let _z = bb(Fixed { raw: 0 });
+    let _eps = bb(1024_u16);
+    sink(bb(true));
+}
+
+#[test]
+fn is_unit3_true__op() {
+    let x = bb(Fixed { raw: 0xfffffe00 });
+    let y = bb(Fixed { raw: 0 });
+    let z = bb(Fixed { raw: 0 });
+    let eps = bb(1024_u16);
+    sink(is_unit3(x, y, z, eps));
+}
+
+#[test]
+fn is_unit3_false__base() {
+    let _x = bb(Fixed { raw: 0x500000000 });
+    let _y = bb(Fixed { raw: -0x280000001 });
+    let _z = bb(Fixed { raw: 0x16a09e667 });
+    let _eps = bb(1024_u16);
+    sink(bb(false));
+}
+
+#[test]
+fn is_unit3_false__op() {
+    let x = bb(Fixed { raw: 0x500000000 });
+    let y = bb(Fixed { raw: -0x280000001 });
+    let z = bb(Fixed { raw: 0x16a09e667 });
+    let eps = bb(1024_u16);
+    sink(is_unit3(x, y, z, eps));
+}
+
+#[test]
+fn is_unit4_true__base() {
+    let _x = bb(Fixed { raw: 0x100000200 });
+    let _y = bb(Fixed { raw: 0 });
+    let _z = bb(Fixed { raw: 0 });
+    let _w = bb(Fixed { raw: 0 });
+    let _eps = bb(1024_u16);
+    sink(bb(true));
+}
+
+#[test]
+fn is_unit4_true__op() {
+    let x = bb(Fixed { raw: 0x100000200 });
+    let y = bb(Fixed { raw: 0 });
+    let z = bb(Fixed { raw: 0 });
+    let w = bb(Fixed { raw: 0 });
+    let eps = bb(1024_u16);
+    sink(is_unit4(x, y, z, w, eps));
+}
+
+#[test]
+fn is_unit4_false__base() {
+    let _x = bb(Fixed { raw: 0x500000000 });
+    let _y = bb(Fixed { raw: -0x280000001 });
+    let _z = bb(Fixed { raw: 0x16a09e667 });
+    let _w = bb(Fixed { raw: 0x3243f6a88 });
+    let _eps = bb(1024_u16);
+    sink(bb(false));
+}
+
+#[test]
+fn is_unit4_false__op() {
+    let x = bb(Fixed { raw: 0x500000000 });
+    let y = bb(Fixed { raw: -0x280000001 });
+    let z = bb(Fixed { raw: 0x16a09e667 });
+    let w = bb(Fixed { raw: 0x3243f6a88 });
+    let eps = bb(1024_u16);
+    sink(is_unit4(x, y, z, w, eps));
+}
+
+#[test]
 fn norm2__base() {
     let _a = bb(Fixed { raw: 0x500000000 });
     let _b = bb(Fixed { raw: -0x280000001 });
@@ -1262,6 +1370,24 @@ fn alt_norm3_via_squared__op() {
     let c = bb(Fixed { raw: 0x16a09e667 });
     let _r = bb(Fixed { raw: 1 });
     sink(alt_wide::norm3_via_squared(a, b, c));
+}
+
+#[test]
+fn alt_is_unit3_narrowed__base() {
+    let _a = bb(Fixed { raw: 0xfffffe00 });
+    let _b = bb(Fixed { raw: 0 });
+    let _c = bb(Fixed { raw: 0 });
+    let _eps = bb(1024_i64);
+    sink(bb(true));
+}
+
+#[test]
+fn alt_is_unit3_narrowed__op() {
+    let a = bb(Fixed { raw: 0xfffffe00 });
+    let b = bb(Fixed { raw: 0 });
+    let c = bb(Fixed { raw: 0 });
+    let eps = bb(1024_i64);
+    sink(alt_wide::is_unit3_narrowed(a, b, c, eps));
 }
 
 #[test]

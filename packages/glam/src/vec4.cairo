@@ -18,8 +18,8 @@ use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
     Norm, NormTrait, RecipTrait, WideLift, WideMul, WideNarrow, WideSub, distance4,
-    distance4_squared, dot4, mul_add, mul_sub, norm4, norm4_squared, norm4_wide, wide_from,
-    wide_mul,
+    distance4_squared, dot4, is_unit4, mul_add, mul_sub, norm4, norm4_squared, norm4_wide,
+    wide_from, wide_mul,
 };
 use crate::bvec4::{BVec4, BVec4Trait};
 use crate::ivec4::IVec4;
@@ -812,14 +812,14 @@ pub trait Vec4Trait {
     ///
     /// Mirrors `glam::Vec4::is_normalized`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * The threshold is re-derived for Q32.32: `|length_squared - 1| <= 1024` raw ULP,
     ///   about `2.4e-7`, where glam-rs uses `2e-4` (about 1700 f32 epsilons). The squared
     ///   length of the output of `normalize` is within 9 ULP of 1, so the margin is a
     ///   hundredfold.
-    /// * `'Fixed: overflow'` for `|self| >= 2^31` (`length_squared` overflows) where glam-
-    ///   rs returns `false`.
+    /// * The exact wide sum of squares is compared without narrowing, so long vectors
+    ///   return `false` instead of panicking.
     fn is_normalized(self: Vec4) -> bool;
     /// Returns the vector projection of `self` onto `rhs`.
     ///
@@ -1724,7 +1724,7 @@ pub impl Vec4Impl of Vec4Trait {
 
     #[inline(always)]
     fn is_normalized(self: Vec4) -> bool {
-        Self::length_squared(self).abs_diff_eq(F_ONE, NORMALIZED_EPS)
+        is_unit4(self.x, self.y, self.z, self.w, NORMALIZED_EPS_RAW)
     }
 
     #[inline(always)]
@@ -2223,7 +2223,7 @@ const F_HALF: Fixed = Fixed { raw: 0x80000000 };
 /// The `is_normalized` threshold: 1024 raw ULP (`2^-22`) on the squared length.
 /// The squared length of a vector normalized by this module is within a few ULP of 1; glam-rs
 /// uses `2e-4`, which is ~1700 f32 epsilons, while this is ~1000 Q32.32 epsilons.
-const NORMALIZED_EPS: Fixed = Fixed { raw: 1024 };
+const NORMALIZED_EPS_RAW: u16 = 1024;
 
 /// `v * (target / len)`: one division shared by the components, one fused product each.
 #[inline(always)]

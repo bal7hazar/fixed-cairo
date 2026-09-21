@@ -37,8 +37,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [camera::rh::proj::opengl](#camera-rh-proj-opengl) | 3 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::proj::vulkan](#camera-rh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::view](#camera-rh-view) | 8 | 0 | 4 | 0 | 0 | 100.0% |
-| [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 34 | 100.0% |
-| **Total** | **2869** | **655** | **124** | **0** | **240** | **82.0%** |
+| [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 37 | 100.0% |
+| **Total** | **2869** | **655** | **124** | **0** | **243** | **82.0%** |
 
 ## Affine2
 
@@ -4207,6 +4207,9 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 - method `dot3`
 - method `dot3_add`
 - method `dot4`
+- method `is_unit2`
+- method `is_unit3`
+- method `is_unit4`
 - method `is_zero`
 - method `mul`
 - method `mul_add`

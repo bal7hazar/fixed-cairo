@@ -400,6 +400,17 @@ fn test_normalize_axes() {
         vec2(f(12884901888), f(17179869184)).normalize(), vec2(f(2576980378), f(3435973837)),
     );
 }
+
+#[test]
+fn test_is_normalized_threshold_and_long_vectors() {
+    // The floored squared lengths are 1 - 1025, 1 - 1024, 1 + 1024 and 1 + 1025 ULP.
+    assert!(!vec2(f(4294966783), f(65536)).is_normalized());
+    assert!(vec2(f(4294966784), f(0)).is_normalized());
+    assert!(vec2(f(4294967808), f(0)).is_normalized());
+    assert!(!vec2(f(4294967808), f(65536)).is_normalized());
+    assert!(!Vec2Trait::MAX.is_normalized());
+    assert!(!Vec2Trait::MIN.is_normalized());
+}
 #[cairofmt::skip]
 const PROJECT_REJECT: [[i64; 12]; 8] = [
     [4294967296, 8589934592, 21474836480, 25769803776, 5984790490, 7181748588, -1689823194, 1408186004, 365072220160, 438086664192, -360777252864, -429496729600],
@@ -870,12 +881,6 @@ fn test_reject_from_zero() {
 #[should_panic(expected: 'Fixed: division by zero')]
 fn test_clamp_length_min_zero() {
     let _ = Vec2Trait::ZERO.clamp_length_min(f(4294967296));
-}
-
-#[test]
-#[should_panic(expected: 'Fixed: overflow')]
-fn test_is_normalized_overflow() {
-    let _ = Vec2Trait::MAX.is_normalized();
 }
 
 #[test]

@@ -7,8 +7,8 @@
 //! Two layers:
 //!
 //! * named kernels for the common shapes: [`dot2`], [`dot3`], [`dot4`], [`mul_sub`], [`mul_add`],
-//!   [`dot2_add`], [`dot3_add`], [`det3`], [`norm2`], [`norm3`], [`norm4`], [`normalize2`],
-//!   [`normalize3`], [`normalize4`], ...
+//!   [`dot2_add`], [`dot3_add`], [`det3`], [`norm2`], [`norm3`], [`norm4`], [`is_unit2`],
+//!   [`is_unit3`], [`is_unit4`], [`normalize2`], [`normalize3`], [`normalize4`], ...
 //! * a composable accumulator API for everything else:
 //!   `wide_mul(a, b).add(wide_mul(c, d)).sub(wide_mul(e, f)).narrow()`.
 //!
@@ -217,6 +217,61 @@ pub fn norm3_squared(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
 #[inline(always)]
 pub fn norm4_squared(x: Fixed, y: Fixed, z: Fixed, w: Fixed) -> Fixed {
     wide_mul(x, x).add(wide_mul(y, y)).add(wide_mul(z, z)).add(wide_mul(w, w)).narrow()
+}
+
+/// Returns whether `floor(x^2 + y^2)` differs from `1` by at most
+/// `max_abs_diff_raw * 2^-32`.
+///
+/// Mirrors the wide comparison needed by `glam::Vec2::is_normalized`.
+/// #### Panics
+/// * Never.
+/// #### Deviations
+/// * The tolerance is supplied in raw Q32.32 ULPs and is limited to `u16`; the comparison is
+///   performed on the exact Q64.64 sum, without narrowing or overflowing on long vectors.
+#[inline(always)]
+pub fn is_unit2(x: Fixed, y: Fixed, max_abs_diff_raw: u16) -> bool {
+    is_unit_squared(upcast(wide_mul(x, x).add(wide_mul(y, y)).v), max_abs_diff_raw)
+}
+
+/// Returns whether `floor(x^2 + y^2 + z^2)` differs from `1` by at most
+/// `max_abs_diff_raw * 2^-32`.
+///
+/// Mirrors the wide comparison needed by `glam::Vec3::is_normalized`.
+/// #### Panics
+/// * Never.
+/// #### Deviations
+/// * The tolerance is supplied in raw Q32.32 ULPs and is limited to `u16`; the comparison is
+///   performed on the exact Q64.64 sum, without narrowing or overflowing on long vectors.
+#[inline(always)]
+pub fn is_unit3(x: Fixed, y: Fixed, z: Fixed, max_abs_diff_raw: u16) -> bool {
+    is_unit_squared(upcast(sum_squares3(x, y, z).v), max_abs_diff_raw)
+}
+
+/// Returns whether `floor(x^2 + y^2 + z^2 + w^2)` differs from `1` by at most
+/// `max_abs_diff_raw * 2^-32`.
+///
+/// Mirrors the wide comparison needed by `glam::Vec4::is_normalized` and
+/// `glam::Quat::is_normalized`.
+/// #### Panics
+/// * Never.
+/// #### Deviations
+/// * The tolerance is supplied in raw Q32.32 ULPs and is limited to `u16`; the comparison is
+///   performed on the exact Q64.64 sum, without narrowing or overflowing on long vectors.
+#[inline(always)]
+pub fn is_unit4(x: Fixed, y: Fixed, z: Fixed, w: Fixed, max_abs_diff_raw: u16) -> bool {
+    is_unit_squared(upcast(sum_squares4(x, y, z, w).v), max_abs_diff_raw)
+}
+
+/// Tests the interval accepted by `floor(sum / 2^32).abs_diff_eq(1, eps)` without the rescale.
+/// The old inclusive upper bound becomes an exclusive Q64.64 bound one raw `Fixed` ULP higher.
+#[inline(always)]
+fn is_unit_squared(sum: felt252, max_abs_diff_raw: u16) -> bool {
+    let eps: u64 = max_abs_diff_raw.into();
+    let lower = 0x10000000000000000 - Into::<u64, felt252>::into(eps) * 0x100000000;
+    match (sum - lower).try_into() {
+        Some(offset) => offset < (eps + eps + 1) * 0x100000000,
+        None => false,
+    }
 }
 
 /// Computes the length `sqrt(x^2 + y^2)` as the integer square root of the raw Q64.64 sum of

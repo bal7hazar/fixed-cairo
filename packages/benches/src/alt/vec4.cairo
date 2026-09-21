@@ -242,6 +242,23 @@ pub fn project_div(lhs: Vec4) -> Vec3 {
     Vec3 { x: lhs.x / lhs.w, y: lhs.y / lhs.w, z: lhs.z / lhs.w }
 }
 
+/// Alternative to `Vec4::project_onto`. The exact Q64.64 dot-product ratio before the component
+/// rescales. It uses `i128` multiplication and division to measure the >64-bit operand cost cliff;
+/// this benchmark variant is not intended to cover full-range intermediate overflow.
+#[inline(always)]
+pub fn project_onto_wide_i128(lhs: Vec4, rhs: Vec4) -> Vec4 {
+    let num: i128 = Into::<i64, i128>::into(lhs.x.raw) * rhs.x.raw.into()
+        + Into::<i64, i128>::into(lhs.y.raw) * rhs.y.raw.into()
+        + Into::<i64, i128>::into(lhs.z.raw) * rhs.z.raw.into()
+        + Into::<i64, i128>::into(lhs.w.raw) * rhs.w.raw.into();
+    let den: i128 = Into::<i64, i128>::into(rhs.x.raw) * rhs.x.raw.into()
+        + Into::<i64, i128>::into(rhs.y.raw) * rhs.y.raw.into()
+        + Into::<i64, i128>::into(rhs.z.raw) * rhs.z.raw.into()
+        + Into::<i64, i128>::into(rhs.w.raw) * rhs.w.raw.into();
+    let k = Fixed { raw: ((num * 0x100000000) / den).try_into().expect('Fixed: overflow') };
+    Vec4 { x: rhs.x * k, y: rhs.y * k, z: rhs.z * k, w: rhs.w * k }
+}
+
 /// Alternative to `Vec4::sqrt`. The same body behind a call boundary (`#[inline(never)]`): the
 /// library inlines it.
 #[inline(never)]

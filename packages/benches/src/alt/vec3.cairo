@@ -4,11 +4,15 @@
 //! the comparison is reproducible across compiler upgrades.
 
 use fixed::exp::ExpTrait;
-use fixed::fixed::{Fixed, FixedTrait};
+use fixed::fixed::{Fixed, FixedTrait, PI};
 use fixed::trig::TrigTrait;
-use fixed::wide::{NormTrait, RecipTrait, dot3, norm3, norm3_squared, norm3_wide, normalize3};
+use fixed::wide::{
+    NormTrait, RecipTrait, WideAdd, WideNarrow, WideSub, dot3, norm3, norm3_squared, norm3_wide,
+    normalize3, wide_from, wide_mul,
+};
 use glam::bvec3::{BVec3, BVec3Trait};
 use glam::mat3::Mat3Trait;
+use glam::quat::QuatTrait;
 use glam::vec3::{Vec3, Vec3Trait};
 use glam::vec4::Vec4;
 
@@ -263,6 +267,75 @@ pub fn rotate_z_unfused(lhs: Vec3, angle: Fixed) -> Vec3 {
     Vec3 { x: lhs.x * c - lhs.y * s, y: lhs.x * s + lhs.y * c, z: lhs.z }
 }
 
+/// Alternative to `Vec3::project_onto`. The exact Q64.64 dot-product ratio before the component
+/// rescales. It uses `i128` multiplication and division to measure the >64-bit operand cost cliff;
+/// this benchmark variant is not intended to cover full-range intermediate overflow.
+#[inline(always)]
+pub fn project_onto_wide_i128(lhs: Vec3, rhs: Vec3) -> Vec3 {
+    let num: i128 = Into::<i64, i128>::into(lhs.x.raw) * rhs.x.raw.into()
+        + Into::<i64, i128>::into(lhs.y.raw) * rhs.y.raw.into()
+        + Into::<i64, i128>::into(lhs.z.raw) * rhs.z.raw.into();
+    let den: i128 = Into::<i64, i128>::into(rhs.x.raw) * rhs.x.raw.into()
+        + Into::<i64, i128>::into(rhs.y.raw) * rhs.y.raw.into()
+        + Into::<i64, i128>::into(rhs.z.raw) * rhs.z.raw.into();
+    let k = Fixed { raw: ((num * 0x100000000) / den).try_into().expect('Fixed: overflow') };
+    Vec3 { x: rhs.x * k, y: rhs.y * k, z: rhs.z * k }
+}
+
+/// Alternative to `Vec3::rotate_towards`. The original composition through `angle_between`: it
+/// recomputes both the cross product and its norm when constructing the normalized rotation axis.
+#[inline(always)]
+pub fn rotate_towards_recompute(lhs: Vec3, rhs: Vec3, max_angle: Fixed) -> Vec3 {
+    let angle_between = Vec3Trait::angle_between(lhs, rhs);
+    let angle = max_angle.clamp(angle_between - PI, angle_between);
+    let c = Vec3Trait::cross(lhs, rhs);
+    let axis = match norm3_wide(c.x, c.y, c.z).try_recip() {
+        Some(r) => Vec3 { x: r.mul(c.x), y: r.mul(c.y), z: r.mul(c.z) },
+        None => Vec3Trait::normalize(Vec3Trait::any_orthogonal_vector(lhs)),
+    };
+    QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), lhs)
+}
+
+/// Alternative to `Vec3::slerp`. The general branch derives `sin(theta * (1 - s)) / sin(theta)`
+/// from one `sin` and one `sin_cos` using the angle-subtraction identity. It saves 14 700 gas but
+/// changes rounding; a 50 000-case seeded f64-oracle sweep improved mean maximum-component error
+/// (15.71 -> 13.83 ULP) but worsened the maximum (22 550.33 -> 22 728.33 ULP), so the bit-exact
+/// library formulation stays.
+#[inline(never)]
+pub fn slerp_sin_cos_identity(lhs: Vec3, rhs: Vec3, s: Fixed) -> Vec3 {
+    let la = norm3_wide(lhs.x, lhs.y, lhs.z);
+    let lb = norm3_wide(rhs.x, rhs.y, rhs.z);
+    let self_length = la.to_fixed();
+    let rhs_length = lb.to_fixed();
+    let d = RecipTrait::new(self_length * rhs_length).mul(Vec3Trait::dot(lhs, rhs));
+    if d.abs() < NEAR_ONE {
+        let theta = d.acos_clamped();
+        let sin_theta = theta.sin();
+        let u = theta * s;
+        let (sin_u, cos_u) = u.sin_cos();
+        let r = RecipTrait::new(sin_theta);
+        let cot_theta = r.mul(d);
+        let t1 = wide_from(cos_u).sub(wide_mul(cot_theta, sin_u)).narrow();
+        let t2 = r.mul(sin_u);
+        let len = self_length.lerp(rhs_length, s);
+        let k1 = la.recip().mul(len * t1);
+        let k2 = lb.recip().mul(len * t2);
+        Vec3 {
+            x: wide_mul(lhs.x, k1).add(wide_mul(rhs.x, k2)).narrow(),
+            y: wide_mul(lhs.y, k1).add(wide_mul(rhs.y, k2)).narrow(),
+            z: wide_mul(lhs.z, k1).add(wide_mul(rhs.z, k2)).narrow(),
+        }
+    } else if d.is_negative() {
+        let q = QuatTrait::from_axis_angle(
+            Vec3Trait::normalize(Vec3Trait::any_orthogonal_vector(lhs)), PI * s,
+        );
+        let k = la.recip().mul(self_length.lerp(rhs_length, s));
+        Vec3Trait::mul_scalar(QuatTrait::mul_vec3(q, lhs), k)
+    } else {
+        Vec3Trait::lerp(lhs, rhs, s)
+    }
+}
+
 /// Alternative to `Vec3::sqrt`. The same body behind a call boundary (`#[inline(never)]`): the
 /// library inlines it.
 #[inline(never)]
@@ -350,3 +423,13 @@ const F_ONE: Fixed = Fixed { raw: 0x100000000 };
 
 /// `1 / 2`.
 const F_HALF: Fixed = Fixed { raw: 0x80000000 };
+
+/// `1 - 2^-20`, the cosine band in which [`Vec3Trait::slerp`] falls back to a linear
+/// interpolation, where glam-rs uses `1 - 3e-7`.
+///
+/// Below `theta = acos(NEAR_ONE) = 1.38e-3` rad the slerp branch divides the two sine weights
+/// by `sin(theta)`, which costs `2 ULP / sin(theta) = 3.4e-7` relative on the result, while the
+/// linear fallback differs from the exact slerp by `theta^2 / 8 = 2.4e-7`: the two branches
+/// meet with the same accuracy, which is what fixes the threshold. It is the same value as
+/// `quat::NEAR_ONE`, whose derivation is the same one on the half angle.
+pub const NEAR_ONE: Fixed = Fixed { raw: 0xfffff000 };

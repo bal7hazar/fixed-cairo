@@ -2984,6 +2984,112 @@ fn alt_rotate_z_unfused__op() {
 }
 
 #[test]
+fn alt_project_onto_wide_i128__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_project_onto_wide_i128__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let _r = bb(A);
+    sink(alt::project_onto_wide_i128(a, b));
+}
+
+#[test]
+fn alt_rotate_towards_recompute_far__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_towards_recompute_far__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::rotate_towards_recompute(a, b, k));
+}
+
+#[test]
+fn alt_rotate_towards_recompute_near__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HUNDRED);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_towards_recompute_near__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HUNDRED);
+    let _r = bb(A);
+    sink(alt::rotate_towards_recompute(a, b, k));
+}
+
+#[test]
+fn alt_slerp_sin_cos_identity_general__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_slerp_sin_cos_identity_general__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::slerp_sin_cos_identity(a, b, k));
+}
+
+#[test]
+fn alt_slerp_sin_cos_identity_opposite__base() {
+    let _a = bb(UNIT);
+    let _b = bb(UNIT_OPP);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_slerp_sin_cos_identity_opposite__op() {
+    let a = bb(UNIT);
+    let b = bb(UNIT_OPP);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::slerp_sin_cos_identity(a, b, k));
+}
+
+#[test]
+fn alt_slerp_sin_cos_identity_parallel__base() {
+    let _a = bb(UNIT);
+    let _b = bb(UNIT);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_slerp_sin_cos_identity_parallel__op() {
+    let a = bb(UNIT);
+    let b = bb(UNIT);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::slerp_sin_cos_identity(a, b, k));
+}
+
+#[test]
 fn alt_sqrt_noinline__base() {
     let _a = bb(POS);
     let r = bb(A);
