@@ -41,12 +41,12 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (see `docs/HANDOFF.md`, briefs `docs/briefs/R1-common.md` + `R1c`..`R1i`) | inprogress | |
 | R1c | optimizer pass on `glamx::eigen3` (values-only path, polish, rotation cost) | inprogress | |
 | R1d | optimizer pass on `quat` (shared `slerp` helper, `rotate_towards`, wide `is_normalized`); after R1e | todo | |
-| R1e | optimizer pass on `fixed::wide` + `Vec2/3/4` (non-panicking `is_normalized` kernel, single division, `slerp` / `rotate_towards`) | inprogress | |
+| R1e | optimizer pass on `fixed::wide` + `Vec2/3/4`: `is_unit2/3/4` kernels (`is_normalized` total and ~2x cheaper), shared norm in `Vec3::rotate_towards`; single-division and `slerp` candidates measured and kept in `benches::alt` | done | #32 |
 | R1f | `camera` / `Mat4::look_to_*` duplication; after R1i (bytecode evidence) | todo | |
 | R1g | faster bench job (one compile for the two snforge runs, CI and local gate) | inprogress | |
 | R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`); 8 rows added to DESIGN section 3 | done | #30 |
 | R1j | `glamx::rot2`: `lerp` aligned with upstream (not normalised), `is_normalized` added (audit P0); after R1e (wide kernel) | todo | |
 | R1k | panic coverage: item/branch -> `should_panic` test manifest and checker, doc template on the nine `IndexView` impls (audit P0) | todo | |
 | R1l | doc-only deviation fixes, one PR per package: `Deviations: None.` on items that panic where upstream continues, stale camera module doc, non-semantic bullets moved out of `Deviations` (audit P1/P2); after the optimizer PRs | todo | |
-| R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`) | inprogress | |
+| R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining | inreview | #31 |
 | R1z | `v0.1.0`: changelog, tag, GitHub release, scarbs.xyz (owner's confirmation required) | todo | |
