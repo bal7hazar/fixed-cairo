@@ -21,6 +21,13 @@ large directly.
 - The agent writes a `REPORT.md` (not committed) at the root of its worktree: the orchestrator
   reads that file and the log, not the transcript.
 
+## Briefs live in the repository
+
+Task briefs are committed under `docs/briefs/<TASK>.md` and share `docs/briefs/COMMON.md` (rules,
+definition of done, report format). A porter is launched with a one-line prompt:
+`"Read docs/briefs/<TASK>.md and docs/briefs/COMMON.md, then execute the task."` Session
+scratchpads do not survive a reboot; committed briefs do, and they document what was asked.
+
 ## Model choice by difficulty
 
 | difficulty | claude CLI | codex CLI | examples |

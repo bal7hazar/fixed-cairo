@@ -3,6 +3,7 @@
 //! See `docs/DESIGN.md` at the repository root for the number format, the rounding mode and the
 //! overflow policy.
 
+pub mod exp;
 pub mod fixed;
 mod internal;
 pub mod trig;

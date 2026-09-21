@@ -8,6 +8,7 @@ pub mod bvec3;
 pub mod bvec4;
 pub mod camera;
 pub mod euler;
+pub mod exp;
 pub mod fixed;
 pub mod ivec2;
 pub mod ivec3;

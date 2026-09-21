@@ -5,6 +5,7 @@ mod bench_bvec3;
 mod bench_bvec4;
 mod bench_camera;
 mod bench_euler;
+mod bench_exp;
 mod bench_fixed;
 mod bench_ivec2;
 mod bench_ivec3;
