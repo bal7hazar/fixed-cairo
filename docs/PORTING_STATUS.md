@@ -33,8 +33,8 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | P1c | `glamx::pose2` | inprogress | brief `docs/briefs/P1c-pose2.md` |
 | P1d | `glamx::sdp` | done | #23 |
 | P1e | `glamx::eigen3` | todo | |
-| X2 | `IVec*/UVec*::as_vec*` | todo | |
+| X2 | `IVec*/UVec*::as_vec*` | done | covered by the `Into<IVecN, VecN>` / `Into<UVecN, VecN>` impls (`docs/API_PARITY.md`: 0 missing) |
 | R1a | API parity table (`scripts/api_parity.py`, `docs/API_PARITY.md`) | done | #20 |
 | X3a | parity closure of `Vec2/3/4` (element-wise transcendentals, `step`/`smoothstep`/`saturate`, `From<BVec>`, homogeneous, `project`) | done | #25 |
-| X3b | parity closure of `Quat`, `Mat3/4`, `Affine2/3`, camera views | inprogress | |
+| X3b | parity closure of `Quat`, `Mat3/4`, `Affine2/3`, camera views | done | #26 |
 | R1 | audit, optimizer pass, `v0.1.0` | todo | |
