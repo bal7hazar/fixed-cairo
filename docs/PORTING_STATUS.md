@@ -38,4 +38,12 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | X3a | parity closure of `Vec2/3/4` (element-wise transcendentals, `step`/`smoothstep`/`saturate`, `From<BVec>`, homogeneous, `project`) | done | #25 |
 | X3b | parity closure of `Quat`, `Mat3/4`, `Affine2/3`, camera views | done | #26 |
 | R1b | generated gas tables in the READMEs (`scripts/gas_tables.py`, checked in CI) | done | #28 |
-| R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (see `docs/HANDOFF.md`) | todo | |
+| R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (see `docs/HANDOFF.md`, briefs `docs/briefs/R1-common.md` + `R1c`..`R1i`) | inprogress | |
+| R1c | optimizer pass on `glamx::eigen3` (values-only path, polish, rotation cost) | inprogress | |
+| R1d | optimizer pass on `quat` (shared `slerp` helper, `rotate_towards`, wide `is_normalized`); after R1e | todo | |
+| R1e | optimizer pass on `fixed::wide` + `Vec2/3/4` (non-panicking `is_normalized` kernel, single division, `slerp` / `rotate_towards`) | inprogress | |
+| R1f | `camera` / `Mat4::look_to_*` duplication; after R1i (bytecode evidence) | todo | |
+| R1g | faster bench job (one compile for the two snforge runs, CI and local gate) | inprogress | |
+| R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`) | inprogress | |
+| R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`) | inprogress | |
+| R1z | `v0.1.0`: changelog, tag, GitHub release, scarbs.xyz (owner's confirmation required) | todo | |
