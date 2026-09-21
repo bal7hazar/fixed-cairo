@@ -3,6 +3,7 @@
 //! `gas/vec2.snap`). The library ships the cheapest formulation; the others stay here so that
 //! the comparison is reproducible across compiler upgrades.
 
+use fixed::exp::ExpTrait;
 use fixed::fixed::{Fixed, FixedTrait, PI};
 use fixed::trig::TrigTrait;
 use fixed::wide::{NormTrait, RecipTrait, dot2, norm2, norm2_squared, norm2_wide, normalize2};
@@ -153,6 +154,33 @@ pub fn is_negative_bitmask_felt(lhs: Vec2) -> u32 {
     m.try_into().unwrap()
 }
 
+/// Alternative to `Vec2::sin_cos`. `sin` and `cos` (two range reductions per element) instead of
+/// one shared `sin_cos`.
+#[inline(always)]
+pub fn sin_cos_two_calls(lhs: Vec2) -> (Vec2, Vec2) {
+    (Vec2Trait::sin(lhs), Vec2Trait::cos(lhs))
+}
+
+/// Alternative to `Vec2::from_bvec`. The `bool -> felt252 -> i64` cast instead of a jump per
+/// element.
+#[inline(always)]
+pub fn from_bvec_felt(lhs: BVec2) -> Vec2 {
+    Vec2 {
+        x: Fixed { raw: (Into::<bool, felt252>::into(lhs.x) * 0x100000000).try_into().unwrap() },
+        y: Fixed { raw: (Into::<bool, felt252>::into(lhs.y) * 0x100000000).try_into().unwrap() },
+    }
+}
+
+/// Alternative to `Vec2::smoothstep`. The literal glam-rs vector expression `t * t * (3 - 2 * t)`:
+/// one rescale per vector operation, and a truncated division per element.
+#[inline(always)]
+pub fn smoothstep_glam(lhs: Vec2, edge0: Vec2, edge1: Vec2) -> Vec2 {
+    let t = Vec2Trait::saturate((lhs - edge0) / (edge1 - edge0));
+    let three = Vec2Trait::splat(FixedTrait::from_int(3));
+    let two = Vec2Trait::splat(FixedTrait::from_int(2));
+    t * t * (three - two * t)
+}
+
 /// Alternative to `Vec2::perp_dot`. The literal glam-rs expression: two rescales.
 #[inline(always)]
 pub fn perp_dot_unfused(lhs: Vec2, rhs: Vec2) -> Fixed {
@@ -198,6 +226,34 @@ pub fn rotate_towards_noinline(lhs: Vec2, rhs: Vec2, max_angle: Fixed) -> Vec2 {
         angle
     };
     Vec2Trait::rotate(Vec2Trait::from_angle(angle), lhs)
+}
+
+/// Alternative to `Vec2::sqrt`. The same body behind a call boundary (`#[inline(never)]`): the
+/// library inlines it.
+#[inline(never)]
+pub fn sqrt_noinline(lhs: Vec2) -> Vec2 {
+    Vec2 { x: lhs.x.sqrt(), y: lhs.y.sqrt() }
+}
+
+/// Alternative to `Vec2::smoothstep`. The same body behind a call boundary (`#[inline(never)]`):
+/// the library inlines it.
+#[inline(never)]
+pub fn smoothstep_noinline(lhs: Vec2, edge0: Vec2, edge1: Vec2) -> Vec2 {
+    Vec2 { x: lhs.x.smoothstep(edge0.x, edge1.x), y: lhs.y.smoothstep(edge0.y, edge1.y) }
+}
+
+/// Alternative to `Vec2::sin`. The same body forced inline (`#[inline(always)]`): the wrapper adds
+/// no gas over the scalar calls (`gas/trig.snap`), so the library keeps the compiler's choice.
+#[inline(always)]
+pub fn sin_inline(lhs: Vec2) -> Vec2 {
+    Vec2 { x: lhs.x.sin(), y: lhs.y.sin() }
+}
+
+/// Alternative to `Vec2::powf`. The same body forced inline (`#[inline(always)]`), see
+/// `sin_inline`.
+#[inline(always)]
+pub fn powf_inline(lhs: Vec2, n: Fixed) -> Vec2 {
+    Vec2 { x: lhs.x.powf(n), y: lhs.y.powf(n) }
 }
 
 /// Alternative to `Vec2::min_element`. The `Fixed::min` chain of glam-rs instead of the nested

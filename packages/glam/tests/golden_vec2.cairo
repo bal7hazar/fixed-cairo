@@ -1283,6 +1283,155 @@ fn golden_vec2_rotate_towards() {
         case += 1;
     }
 }
+// vec2::sin_cos: 4 cases, tolerance 1 ULP - sin within 1.02 ULP and cos within 0.86 ULP over a
+// turn (`fixed::trig`), plus the half ULP of the oracle quantization: 1.52, floored. `sin` and
+// `cos` are bit-identical to the two outputs (tests/test_vec2.cairo).
+#[cairofmt::skip]
+const SIN_COS_CASES: [i64; 24] = [
+    0, 6746518852, 0, 4294967296, 4294967296, 0,
+    4294967296, -8589934592, 3614090360, -3905402711, 2320580734, -1787337053,
+    -23718426988, -4294967296, 2961411664, -3614090360, 3110753129, 2320580734,
+    -21474836480, 11863031958, 4118548399, 1591157780, 1218319810, -3989355962,
+];
+
+#[test]
+fn golden_vec2_sin_cos() {
+    let name: ByteArray = "vec2::sin_cos";
+    let mut d = SIN_COS_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let (r0, r1): (Vec2, Vec2) = a0.sin_cos();
+        check_vec2(r0, ref d, 1, @name, case);
+        check_vec2(r1, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// vec2::exp_exp2: 4 cases, tolerance 2 ULP - exp and exp2 round toward negative infinity within
+// 2.02 ULP of the exact value for results below 2^16 (`fixed::exp`, |x| <= 8 gives e^8 < 2^12),
+// plus the half ULP of the oracle quantization: 2.52, floored.
+#[cairofmt::skip]
+const EXP_EXP2_CASES: [i64; 24] = [
+    0, 4294967296, 4294967296, 11674931555, 4294967296, 8589934592,
+    2147483648, -18253611008, 7081203938, 61264418, 6074001000, 225726413,
+    -7326304997, 10908453256, 780091259, 54449089846, 1316638088, 24975979253,
+    14747237936, 12530265075, 133093626836, 79429800861, 46406534065, 32448431300,
+];
+
+#[test]
+fn golden_vec2_exp_exp2() {
+    let name: ByteArray = "vec2::exp_exp2";
+    let mut d = EXP_EXP2_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let (r0, r1): (Vec2, Vec2) = (a0.exp(), a0.exp2());
+        check_vec2(r0, ref d, 2, @name, case);
+        check_vec2(r1, ref d, 2, @name, case);
+        case += 1;
+    }
+}
+// vec2::ln_log2_sqrt: 4 cases, tolerance 1 ULP - ln within 0.66 ULP and log2 within 0.75 ULP
+// (`fixed::exp`), plus the half ULP of the oracle quantization: floored to 1. sqrt is the floor
+// of the exact root while the oracle rounds to nearest: |diff| <= 1.
+#[cairofmt::skip]
+const LN_LOG2_SQRT_CASES: [i64; 32] = [
+    4294967296, 8589934592, 0, 2977044472, 0, 4294967296, 4294967296, 6074001000,
+    1, 17179869184, -95265423098, 5954088944, -137438953472, 8589934592, 65536, 8589934592,
+    1923285911020, 2969175304933,
+        26217968466, 28083054166, 37824533088, 40515282978, 90887018263, 112927015505,
+    2342066993503, 2686437374380,
+        27064071589, 27653264006, 39045201868, 39895226846, 100295070378, 107415830610,
+];
+
+#[test]
+fn golden_vec2_ln_log2_sqrt() {
+    let name: ByteArray = "vec2::ln_log2_sqrt";
+    let mut d = LN_LOG2_SQRT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let (r0, r1, r2): (Vec2, Vec2, Vec2) = (a0.ln(), a0.log2(), a0.sqrt());
+        check_vec2(r0, ref d, 1, @name, case);
+        check_vec2(r1, ref d, 1, @name, case);
+        check_vec2(r2, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// vec2::powf: 5 cases, tolerance 7 ULP - powf is within max(2.05, 0.432 * 2^-30 relative = 1.73
+// |result| ULP) (`fixed::exp`, x in [2^-8, 2^8], n in [-4, 4]); the domain bounds |x^n| <= 2^2 =
+// 4: 6.92 ULP, plus the half ULP of the oracle quantization: 7.42, floored.
+#[cairofmt::skip]
+const POWF_CASES: [i64; 25] = [
+    2147483648, 8589934592, 8589934592, 1073741824, 17179869184,
+    8589934592, 2147483648, -8589934592, 1073741824, 17179869184,
+    4294967296, 4294967296, 2147483648, 4294967296, 4294967296,
+    6255517625, 3362486083, -7126533773, 2301412962, 6446734558,
+    4709922560, 4230096928, 2403758742, 4522481283, 4258539769,
+];
+
+#[test]
+fn golden_vec2_powf() {
+    let name: ByteArray = "vec2::powf";
+    let mut d = POWF_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let a1 = next_fixed(ref d);
+        let actual: Vec2 = a0.powf(a1);
+        check_vec2(actual, ref d, 7, @name, case);
+        case += 1;
+    }
+}
+// vec2::step_saturate: 4 cases, tolerance 0 ULP - exact: step is 0 where rhs < self and 1
+// otherwise (equal counts as 1), saturate clamps to [0, 1].
+#[cairofmt::skip]
+const STEP_SATURATE_CASES: [i64; 32] = [
+    2147483648, 4294967296, 2147483648, 0, 4294967296, 0, 2147483648, 4294967296,
+    1, -1, 0, 0, 0, 4294967296, 1, 0,
+    -4294967296, -1631440, 533770621, 2992738119, 4294967296, 4294967296, 0, 0,
+    -6629418429, 1749423, -1, -185, 4294967296, 0, 0, 1749423,
+];
+
+#[test]
+fn golden_vec2_step_saturate() {
+    let name: ByteArray = "vec2::step_saturate";
+    let mut d = STEP_SATURATE_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let a1 = next_vec2(ref d);
+        let (r0, r1): (Vec2, Vec2) = (a0.step(a1), a0.saturate());
+        check_vec2(r0, ref d, 0, @name, case);
+        check_vec2(r1, ref d, 0, @name, case);
+        case += 1;
+    }
+}
+// vec2::smoothstep: 3 cases, tolerance 3 ULP - t = trunc((x - e0) / (e1 - e0)) is within 1 ULP
+// below the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then
+// one floor rescale (1) and the half ULP of the oracle quantization: 3.0.
+#[cairofmt::skip]
+const SMOOTHSTEP_CASES: [i64; 24] = [
+    2147483648, 6442450944, 0, -4294967296, 4294967296, 4294967296, 2147483648, 4294967296,
+    4109664296, 0, -855030462, -4294967296, 6442450944, 6646611484, 3258877703, 1465814725,
+    -2147483648, 11083366515, -7714837522, -4393353590, 5890426834, 6735532340,
+        1568976137, 4294967296,
+];
+
+#[test]
+fn golden_vec2_smoothstep() {
+    let name: ByteArray = "vec2::smoothstep";
+    let mut d = SMOOTHSTEP_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let a1 = next_vec2(ref d);
+        let a2 = next_vec2(ref d);
+        let actual: Vec2 = a0.smoothstep(a1, a2);
+        check_vec2(actual, ref d, 3, @name, case);
+        case += 1;
+    }
+}
 // vec2::as_ivec2: 7 cases, tolerance 0 ULP - exact: truncation toward zero, which is what the
 // Rust `as` cast does in range.
 #[cairofmt::skip]

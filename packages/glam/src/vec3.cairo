@@ -13,6 +13,7 @@
 
 use core::ops::index::IndexView;
 use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};
+use fixed::exp::ExpTrait;
 use fixed::fixed::{Fixed, FixedTrait, PI};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
@@ -37,9 +38,8 @@ use crate::vec4::Vec4;
 /// * Not ported: `map` (a closure parameter cannot be force-inlined, E2143), `from_slice` /
 ///   `write_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait to
 ///   implement), `IndexMut`, the by-reference operator overloads, the scalar-on-the-left
-///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
-///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
-///   exist in glam.cairo (`as_dvec3`, `as_i8vec3`, ...).
+///   operators (`2.0 * v`) and the casts to types that do not exist in glam.cairo
+///   (`as_dvec3`, `as_i8vec3`, ...).
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct Vec3 {
     pub x: Fixed,
@@ -192,6 +192,28 @@ pub trait Vec3Trait {
     /// #### Deviations
     /// * None.
     fn with_z(self: Vec3, z: Fixed) -> Vec3;
+    /// Creates a 3D vector from `v` divided by its `w` component: the perspective divide
+    /// of a homogeneous coordinate.
+    ///
+    /// Mirrors `glam::Vec3::from_homogeneous`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if `w` is zero (`glam_assert!` in glam-rs, which
+    ///   otherwise returns infinity or NaN).
+    /// * `'Fixed: overflow'` if a quotient does not fit the scalar range.
+    /// #### Deviations
+    /// * One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one
+    ///   fused product per component, instead of three truncated `Fixed / Fixed`: it pays
+    ///   off from two divisions on (`alt_from_homogeneous_div` in `gas/vec3.snap`). A
+    ///   result may differ by 1 ULP from the truncated division.
+    fn from_homogeneous(v: Vec4) -> Vec3;
+    /// Creates a homogeneous coordinate from `self`, equivalent to `self.extend(1.0)`.
+    ///
+    /// Mirrors `glam::Vec3::to_homogeneous`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * None.
+    fn to_homogeneous(self: Vec3) -> Vec4;
     /// Computes the dot product of `self` and `rhs`.
     ///
     /// Mirrors `glam::Vec3::dot`.
@@ -495,6 +517,166 @@ pub trait Vec3Trait {
     /// #### Deviations
     /// * There is no NaN nor infinity: the operation panics instead of producing one.
     fn recip(self: Vec3) -> Vec3;
+    /// Returns a vector containing the sine for each element of `self` (in radians).
+    ///
+    /// Mirrors `glam::Vec3::sin`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Element-wise `TrigTrait::sin`: within 1.02 ULP of the exact sine over a turn
+    ///   (2.03 at the extremes of the range), `sin(0) = 0` exactly and `sin(-x) =
+    ///   -sin(x)`.
+    /// * 3 independent scalar calls: no work is shared between the elements. The wrapper
+    ///   adds no gas to the scalar calls and is not force-inlined (`alt_sin_inline` in
+    ///   `gas/vec3.snap`).
+    fn sin(self: Vec3) -> Vec3;
+    /// Returns a vector containing the cosine for each element of `self` (in radians).
+    ///
+    /// Mirrors `glam::Vec3::cos`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Element-wise `TrigTrait::cos`: within 0.86 ULP of the exact cosine over a turn
+    ///   (1.71 at the extremes of the range), `cos(0) = 1` exactly and `cos(-x) = cos(x)`.
+    /// * 3 independent scalar calls: no work is shared between the elements.
+    fn cos(self: Vec3) -> Vec3;
+    /// Returns a tuple of two vectors containing the sine and cosine for each element of
+    /// `self`.
+    ///
+    /// Mirrors `glam::Vec3::sin_cos`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Bit-identical to `(self.sin(), self.cos())`, one shared range reduction per
+    ///   element (`TrigTrait::sin_cos`, 1.4x the cost of `sin` alone instead of 2x).
+    /// * 3 independent scalar calls: no work is shared between the elements.
+    fn sin_cos(self: Vec3) -> (Vec3, Vec3);
+    /// Returns a vector containing `e^self` for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec3::exp`.
+    /// #### Panics
+    /// * `'Fixed: exp overflow'` if an element is `>= 21.487` (`31 ln 2`), where the
+    ///   result no longer fits the scalar range.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Element-wise `ExpTrait::exp`: an element below `-22.873` gives `0`; the result is
+    ///   within 2.02 ULP below the exact value (below `2^16`), `exp(0) = 1` exactly and
+    ///   each element is non-decreasing.
+    /// * 3 independent scalar calls: no work is shared between the elements.
+    fn exp(self: Vec3) -> Vec3;
+    /// Returns a vector containing `2^self` for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec3::exp2`.
+    /// #### Panics
+    /// * `'Fixed: exp overflow'` if an element is `>= 31`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Element-wise `ExpTrait::exp2`: an element below `-33` gives `0`; within 2.02 ULP
+    ///   below the exact value (below `2^16`), exact for an integer element in `[-32,
+    ///   30]`.
+    /// * 3 independent scalar calls: no work is shared between the elements.
+    fn exp2(self: Vec3) -> Vec3;
+    /// Returns a vector containing the natural logarithm for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec3::ln`.
+    /// #### Panics
+    /// * `'Fixed: ln domain'` if an element is `<= 0`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Panics where glam-rs returns NaN (negative element) or negative infinity (zero
+    ///   element).
+    /// * Element-wise `ExpTrait::ln`: within 0.66 ULP of the exact value, `ln(1) = 0`
+    ///   exactly.
+    /// * 3 independent scalar calls: no work is shared between the elements.
+    fn ln(self: Vec3) -> Vec3;
+    /// Returns a vector containing the base 2 logarithm for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec3::log2`.
+    /// #### Panics
+    /// * `'Fixed: ln domain'` if an element is `<= 0`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Panics where glam-rs returns NaN (negative element) or negative infinity (zero
+    ///   element).
+    /// * Element-wise `ExpTrait::log2`: within 0.75 ULP of the exact value, `log2(2^k) =
+    ///   k` exactly for `k` in `[-32, 30]`.
+    /// * 3 independent scalar calls: no work is shared between the elements.
+    fn log2(self: Vec3) -> Vec3;
+    /// Returns a vector containing each element of `self` raised to the power of `n`.
+    ///
+    /// Mirrors `glam::Vec3::powf`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if a result does not fit the scalar range.
+    /// * `'Fixed: division by zero'` if an element is zero and `n` is negative.
+    /// * `'Fixed: powf domain'` if an element is negative and `n` is not an integer.
+    /// * `'i64_neg Underflow'` if an element is `Fixed::MIN`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Element-wise `ExpTrait::powf` (`exp2(n * log2(x))` with the product kept at 88
+    ///   fractional bits): panics where glam-rs returns infinity or NaN; within 2.05 ULP
+    ///   below 1 and `0.44 * 2^-30` relative above (`x` in `[2^-8, 2^8]`, `n` in `[-4,
+    ///   4]`); `powf(x, 1)` is not bit-identical to `x`.
+    /// * 3 independent scalar calls: no work is shared between the elements. The wrapper
+    ///   adds no gas to the scalar calls and is not force-inlined (`alt_powf_inline` in
+    ///   `gas/vec3.snap`).
+    fn powf(self: Vec3, n: Fixed) -> Vec3;
+    /// Returns a vector containing the square root for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec3::sqrt`.
+    /// #### Panics
+    /// * `'Fixed: sqrt negative'` if an element is negative.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Panics where glam-rs returns NaN.
+    /// * Element-wise `FixedTrait::sqrt`: the floor of the exact root (integer square root
+    ///   of `raw * 2^32`), bit-exact. Inlined: cheaper than the call (`alt_sqrt_noinline`
+    ///   in `gas/vec3.snap`).
+    fn sqrt(self: Vec3) -> Vec3;
+    /// Returns a vector containing `0.0` if `rhs < self` and `1.0` otherwise, per element.
+    ///
+    /// Similar to glsl's step(edge, x), which translates into edge.step(x).
+    ///
+    /// Mirrors `glam::Vec3::step`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Exact: `Fixed::step` on each pair (`1` when the elements are equal).
+    fn step(self: Vec3, rhs: Vec3) -> Vec3;
+    /// Performs Hermite interpolation between `0.0` and `1.0` using `x` normalized to
+    /// `[edge0, edge1]`.
+    ///
+    /// This is equivalent to `t * t * (3.0 - 2.0 * t)`, where `t` is clamped to `[0.0,
+    /// 1.0]`. Results are undefined if any element of `edge0` is greater than or equal to
+    /// the corresponding element of `edge1`.
+    ///
+    /// Mirrors `glam::Vec3::smoothstep`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if an element of `edge0` equals the one of `edge1`.
+    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` / `'Fixed: overflow'` if `self -
+    ///   edge0`, `edge1 - edge0` or their quotient does not fit the scalar range.
+    /// #### Deviations
+    /// * The `edge0 < edge1` precondition (`glam_assert!`) is only checked for equality,
+    ///   by the division; the result for `edge0 > edge1` is the one of the formula.
+    /// * Element-wise `Fixed::smoothstep`: `t = saturate(trunc((x - edge0) / (edge1 -
+    ///   edge0)))`, then the polynomial is evaluated exactly and rescaled once (floored),
+    ///   instead of the three rescaled vector operations of glam-rs (`alt_smoothstep_glam`
+    ///   in `gas/vec3.snap`). Inlined: cheaper than the call (`alt_smoothstep_noinline`).
+    fn smoothstep(self: Vec3, edge0: Vec3, edge1: Vec3) -> Vec3;
+    /// Returns a vector containing all elements of `self` clamped to the range of `[0,
+    /// 1]`.
+    ///
+    /// Mirrors `glam::Vec3::saturate`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Exact.
+    fn saturate(self: Vec3) -> Vec3;
     /// Computes the length of `self`.
     ///
     /// Mirrors `glam::Vec3::length`.
@@ -1223,6 +1405,17 @@ pub impl Vec3Impl of Vec3Trait {
     }
 
     #[inline(always)]
+    fn from_homogeneous(v: Vec4) -> Vec3 {
+        let r = RecipTrait::new(v.w);
+        Vec3 { x: r.mul(v.x), y: r.mul(v.y), z: r.mul(v.z) }
+    }
+
+    #[inline(always)]
+    fn to_homogeneous(self: Vec3) -> Vec4 {
+        Self::extend(self, F_ONE)
+    }
+
+    #[inline(always)]
     fn dot(self: Vec3, rhs: Vec3) -> Fixed {
         dot3(self.x, rhs.x, self.y, rhs.y, self.z, rhs.z)
     }
@@ -1467,6 +1660,65 @@ pub impl Vec3Impl of Vec3Trait {
     #[inline(always)]
     fn recip(self: Vec3) -> Vec3 {
         Vec3 { x: self.x.recip(), y: self.y.recip(), z: self.z.recip() }
+    }
+
+    fn sin(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.sin(), y: self.y.sin(), z: self.z.sin() }
+    }
+
+    fn cos(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.cos(), y: self.y.cos(), z: self.z.cos() }
+    }
+
+    fn sin_cos(self: Vec3) -> (Vec3, Vec3) {
+        let (sx, cx) = self.x.sin_cos();
+        let (sy, cy) = self.y.sin_cos();
+        let (sz, cz) = self.z.sin_cos();
+        (Vec3 { x: sx, y: sy, z: sz }, Vec3 { x: cx, y: cy, z: cz })
+    }
+
+    fn exp(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.exp(), y: self.y.exp(), z: self.z.exp() }
+    }
+
+    fn exp2(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.exp2(), y: self.y.exp2(), z: self.z.exp2() }
+    }
+
+    fn ln(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.ln(), y: self.y.ln(), z: self.z.ln() }
+    }
+
+    fn log2(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.log2(), y: self.y.log2(), z: self.z.log2() }
+    }
+
+    fn powf(self: Vec3, n: Fixed) -> Vec3 {
+        Vec3 { x: self.x.powf(n), y: self.y.powf(n), z: self.z.powf(n) }
+    }
+
+    #[inline(always)]
+    fn sqrt(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.sqrt(), y: self.y.sqrt(), z: self.z.sqrt() }
+    }
+
+    #[inline(always)]
+    fn step(self: Vec3, rhs: Vec3) -> Vec3 {
+        Vec3 { x: self.x.step(rhs.x), y: self.y.step(rhs.y), z: self.z.step(rhs.z) }
+    }
+
+    #[inline(always)]
+    fn smoothstep(self: Vec3, edge0: Vec3, edge1: Vec3) -> Vec3 {
+        Vec3 {
+            x: self.x.smoothstep(edge0.x, edge1.x),
+            y: self.y.smoothstep(edge0.y, edge1.y),
+            z: self.z.smoothstep(edge0.z, edge1.z),
+        }
+    }
+
+    #[inline(always)]
+    fn saturate(self: Vec3) -> Vec3 {
+        Vec3 { x: self.x.saturate(), y: self.y.saturate(), z: self.z.saturate() }
     }
 
     #[inline(always)]
@@ -2067,6 +2319,32 @@ pub impl Vec2FixedIntoVec3 of Into<(Vec2, Fixed), Vec3> {
     fn into(self: (Vec2, Fixed)) -> Vec3 {
         let (v, z) = self;
         Vec3 { x: v.x, y: v.y, z }
+    }
+}
+
+/// `true` becomes `1` and `false` becomes `0`.
+///
+/// Mirrors `impl From<glam::BVec3> for glam::Vec3`.
+pub impl BVec3IntoVec3 of Into<BVec3, Vec3> {
+    #[inline(always)]
+    fn into(self: BVec3) -> Vec3 {
+        Vec3 {
+            x: if self.x {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+            y: if self.y {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+            z: if self.z {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+        }
     }
 }
 

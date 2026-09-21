@@ -638,6 +638,71 @@ fn test_recip() {
         assert_eq!(vc(r, 0).recip(), vc(r, 2));
     }
 }
+#[cairofmt::skip]
+const TRIG: [[i64; 6]; 6] = [
+    [0, 1, 0, 1, 4294967296, 4294967296],
+    [-1, 429497, -1, 429497, 4294967296, 4294967275],
+    [2147483648, -4294967296, 2059117009, -3614090360, 3769188403, 2320580734],
+    [6746518852, -3373259426, 4294967296, -3037000500, 0, 3037000500],
+    [8589934592, -12884901888, 3905402711, -606105819, -1787337053, -4251985396],
+    [13485000000, -2147483648, 8037700, -2059117009, -4294959775, 3769188403],
+];
+
+#[test]
+fn test_trig() {
+    for row in TRIG.span() {
+        let r = row.span();
+        let (s, c) = vc(r, 0).sin_cos();
+        assert_eq!(s, vc(r, 0).sin());
+        assert_eq!(c, vc(r, 0).cos());
+        assert!(s.abs_diff_eq(vc(r, 2), f(1)));
+        assert!(c.abs_diff_eq(vc(r, 4), f(1)));
+    }
+}
+#[cairofmt::skip]
+const MATH: [[i64; 18]; 5] = [
+    [4294967296, 8589934592, 11674931555, 31735754293, 8589934592, 17179869184, 0, 2977044472, 0, 4294967296, 4294967296, 6074000999, 2147483648, 4294967296, 8589934592, 1073741824, 4294967296, 2],
+    [2147483648, 1431655765, 7081203938, 5994109723, 6074001000, 5411319705, -2977044472, -4718503852, -4294967296, -6807362107, 3037000499, 2479700524, 2147483648, 3221225472, -8589934592, 17179869184, 7635497415, 7],
+    [1, 4194304, 4294967297, 4299163649, 4294967297, 4297875550, -95265423098, -29770444718, -137438953472, -42949672960, 65536, 134217728, 2147483648, 4294967296, 6442450944, 1518500250, 4294967296, 2],
+    [1073741824, 10737418240, 5514847172, 52323413145, 5107605667, 24296004000, -5954088944, 3935438727, -8589934592, 5677637935, 2147483648, 6790939565, 2147483648, 3221225472, -2147483648, 6074001000, 4959401049, 2],
+    [30064771072, 858993459, 4710003551159, 5245884901, 549755813888, 4933621868, 8357620451, -6912483200, 12057497579, -9972605233, 11363415354, 1920767766, 2147483648, 4294967296, 0, 4294967296, 4294967296, 2],
+];
+
+#[test]
+fn test_math() {
+    for row in MATH.span() {
+        let r = row.span();
+        assert!(vc(r, 0).exp().abs_diff_eq(vc(r, 2), f(2)));
+        assert!(vc(r, 0).exp2().abs_diff_eq(vc(r, 4), f(2)));
+        assert!(vc(r, 0).ln().abs_diff_eq(vc(r, 6), f(1)));
+        assert!(vc(r, 0).log2().abs_diff_eq(vc(r, 8), f(1)));
+        assert_eq!(vc(r, 0).sqrt(), vc(r, 10));
+        assert!(vc(r, 12).powf(fx(r, 14)).abs_diff_eq(vc(r, 15), fx(r, 17)));
+    }
+}
+#[cairofmt::skip]
+const STEP_SMOOTHSTEP: [[i64; 14]; 4] = [
+    [2147483648, 6442450944, 2147483648, 4294967296, 0, -4294967296, 4294967296, 4294967296, 4294967296, 0, 2147483648, 4294967296, 2147483648, 4294967296],
+    [0, 4294967296, 1, 4294967296, 0, -4294967296, 4294967296, 4294967296, 4294967296, 4294967296, 0, 4294967296, 0, 4294967296],
+    [12884901888, -12884901888, -12884901888, 12884901888, 0, -17179869184, 17179869184, 17179869184, 0, 4294967296, 4294967296, 0, 3623878656, 184549376],
+    [536870912, 3758096384, 536870912, 3221225472, 0, 0, 4294967296, 4294967296, 4294967296, 0, 536870912, 3758096384, 184549376, 4110417920],
+];
+
+#[test]
+fn test_step_smoothstep() {
+    for row in STEP_SMOOTHSTEP.span() {
+        let r = row.span();
+        assert_eq!(vc(r, 0).step(vc(r, 2)), vc(r, 8));
+        assert_eq!(vc(r, 0).saturate(), vc(r, 10));
+        assert_eq!(vc(r, 0).smoothstep(vc(r, 4), vc(r, 6)), vc(r, 12));
+    }
+}
+
+#[test]
+fn test_from_bvec() {
+    assert_eq!(Into::<BVec2, Vec2>::into(BVec2Trait::new(true, false)), vec2(f(4294967296), f(0)));
+    assert_eq!(Into::<BVec2, Vec2>::into(BVec2Trait::new(false, true)), vec2(f(0), f(4294967296)));
+}
 
 #[test]
 #[should_panic(expected: 'Vec2: normalize zero')]
@@ -811,6 +876,48 @@ fn test_clamp_length_min_zero() {
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_is_normalized_overflow() {
     let _ = Vec2Trait::MAX.is_normalized();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: exp overflow')]
+fn test_exp_overflow() {
+    let _ = Vec2Trait::splat(f(94489280512)).exp();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: exp overflow')]
+fn test_exp2_overflow() {
+    let _ = Vec2Trait::splat(f(133143986176)).exp2();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: ln domain')]
+fn test_ln_domain() {
+    let _ = Vec2Trait::ZERO.ln();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: ln domain')]
+fn test_log2_domain() {
+    let _ = Vec2Trait::NEG_ONE.log2();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: sqrt negative')]
+fn test_sqrt_negative() {
+    let _ = Vec2Trait::NEG_ONE.sqrt();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: powf domain')]
+fn test_powf_domain() {
+    let _ = Vec2Trait::NEG_ONE.powf(f(2147483648));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_smoothstep_equal_edges() {
+    let _ = Vec2Trait::ONE.smoothstep(Vec2Trait::ONE, Vec2Trait::ONE);
 }
 
 #[test]

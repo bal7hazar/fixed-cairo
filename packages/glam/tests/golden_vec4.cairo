@@ -7,6 +7,7 @@ use fixed::Fixed;
 use glam::bvec4::BVec4;
 use glam::ivec4::IVec4;
 use glam::uvec4::UVec4;
+use glam::vec3::Vec3;
 use glam::vec4::{Vec4, Vec4Trait};
 
 fn next_i64(ref d: Span<i64>) -> i64 {
@@ -55,6 +56,12 @@ fn check_bool(actual: bool, ref d: Span<i64>, name: @ByteArray, case: usize) {
         0
     };
     check_raw(value, ref d, 0, name, case);
+}
+
+fn check_vec3(actual: Vec3, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
+    check_fixed(actual.x, ref d, tol, name, case);
+    check_fixed(actual.y, ref d, tol, name, case);
+    check_fixed(actual.z, ref d, tol, name, case);
 }
 
 fn check_vec4(actual: Vec4, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
@@ -1245,6 +1252,212 @@ fn golden_vec4_clamp_length() {
         let a2 = next_fixed(ref d);
         let actual: Vec4 = a0.clamp_length(a1, a2);
         check_vec4(actual, ref d, 24, @name, case);
+        case += 1;
+    }
+}
+// vec4::sin_cos: 4 cases, tolerance 1 ULP - sin within 1.02 ULP and cos within 0.86 ULP over a
+// turn (`fixed::trig`), plus the half ULP of the oracle quantization: 1.52, floored. `sin` and
+// `cos` are bit-identical to the two outputs (tests/test_vec4.cairo).
+#[cairofmt::skip]
+const SIN_COS_CASES: [i64; 48] = [
+    0, 6746518852, -13493037705, 2147483648,
+        0, 4294967296, 0, 2059117009, 4294967296, 0, -4294967296, 3769188403,
+    4294967296, -8589934592, 12884901888, -1073741824,
+        3614090360, -3905402711, 606105819, -1062591914, 2320580734, -1787337053, -4251985396,
+        4161447164,
+    -15290087, 7426867499, -3, -4294967296,
+        -15290055, 4241194220, -3, -3614090360, 4294940080, -677506944, 4294967296, 2320580734,
+    20362311668, -16420270306, 17576517865, 27279704,
+        -4293213174, 2705816852, -3495488986, 27279521, 122738399, -3335460873, -2495656391,
+        4294880662,
+];
+
+#[test]
+fn golden_vec4_sin_cos() {
+    let name: ByteArray = "vec4::sin_cos";
+    let mut d = SIN_COS_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let (r0, r1): (Vec4, Vec4) = a0.sin_cos();
+        check_vec4(r0, ref d, 1, @name, case);
+        check_vec4(r1, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// vec4::exp_exp2: 4 cases, tolerance 2 ULP - exp and exp2 round toward negative infinity within
+// 2.02 ULP of the exact value for results below 2^16 (`fixed::exp`, |x| <= 8 gives e^8 < 2^12),
+// plus the half ULP of the oracle quantization: 2.52, floored.
+#[cairofmt::skip]
+const EXP_EXP2_CASES: [i64; 48] = [
+    0, 4294967296, -4294967296, 32212254720,
+        4294967296, 11674931555, 1580030169, 7765483039870, 4294967296, 8589934592, 2147483648,
+        777472127994,
+    2147483648, -18253611008, 8589934592, -34359738368,
+        7081203938, 61264418, 31735754293, 1440801, 6074001000, 225726413, 17179869184, 16777216,
+    -17727829297, 27697460806, 17312772417, -4294967296,
+        69242672, 2714224532037, 241866975318, 1580030169, 245716261, 375186673120, 70209341476,
+        2147483648,
+    27580178079, 23622320128, -1, -1,
+        2641109981180, 1050943846670, 4294967295, 4294967295, 368152008021, 194368031998,
+        4294967295, 4294967295,
+];
+
+#[test]
+fn golden_vec4_exp_exp2() {
+    let name: ByteArray = "vec4::exp_exp2";
+    let mut d = EXP_EXP2_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let (r0, r1): (Vec4, Vec4) = (a0.exp(), a0.exp2());
+        check_vec4(r0, ref d, 2, @name, case);
+        check_vec4(r1, ref d, 2, @name, case);
+        case += 1;
+    }
+}
+// vec4::ln_log2_sqrt: 4 cases, tolerance 1 ULP - ln within 0.66 ULP and log2 within 0.75 ULP
+// (`fixed::exp`), plus the half ULP of the oracle quantization: floored to 1. sqrt is the floor
+// of the exact root while the oracle rounds to nearest: |diff| <= 1.
+#[cairofmt::skip]
+const LN_LOG2_SQRT_CASES: [i64; 64] = [
+    4294967296, 8589934592, 2147483648, 4294967296000,
+        0, 2977044472, -2977044472, 29668583012, 0, 4294967296, -4294967296, 42802717582,
+        4294967296, 6074001000, 3037000500, 135818791313,
+    1, 17179869184, 1073741824, 38654705664,
+        -95265423098, 5954088944, -5954088944, 9437007702, -137438953472, 8589934592, -8589934592,
+        13614724212, 65536, 8589934592, 2147483648, 12884901888,
+    4071848130837, 4222905882710, 489626271744, 2871185637376,
+        29439459570, 29595910224, 20341817443, 27938918582, 42472162329, 42697872910, 29347039148,
+        40307339287, 132243920678, 134674580602, 45857701909, 111047955466,
+    2837897295524, 4198907858693, 2068026753024, 6700456,
+        27888832093, 29571433072, 26529610254, -27758475151, 40235079757, 42662559844, 38274137150,
+        -40047014442, 110402337265, 134291369537, 94244932339, 169641503,
+];
+
+#[test]
+fn golden_vec4_ln_log2_sqrt() {
+    let name: ByteArray = "vec4::ln_log2_sqrt";
+    let mut d = LN_LOG2_SQRT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let (r0, r1, r2): (Vec4, Vec4, Vec4) = (a0.ln(), a0.log2(), a0.sqrt());
+        check_vec4(r0, ref d, 1, @name, case);
+        check_vec4(r1, ref d, 1, @name, case);
+        check_vec4(r2, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// vec4::powf: 5 cases, tolerance 7 ULP - powf is within max(2.05, 0.432 * 2^-30 relative = 1.73
+// |result| ULP) (`fixed::exp`, x in [2^-8, 2^8], n in [-4, 4]); the domain bounds |x^n| <= 2^2 =
+// 4: 6.92 ULP, plus the half ULP of the oracle quantization: 7.42, floored.
+#[cairofmt::skip]
+const POWF_CASES: [i64; 45] = [
+    2147483648, 8589934592, 4294967296, 6442450944, 8589934592,
+        1073741824, 17179869184, 4294967296, 9663676416,
+    8589934592, 2147483648, 6442450944, 4294967296, -8589934592,
+        1073741824, 17179869184, 1908874354, 4294967296,
+    4294967296, 4294967296, 4294967296, 4294967296, 2147483648,
+        4294967296, 4294967296, 4294967296, 4294967296,
+    3464560299, 7385361566, 5070376695, 2552994711, 0,
+        4294967296, 4294967296, 4294967296, 4294967296,
+    3688145280, 4268475880, 7950371095, 7680233040, 7431259374,
+        3299911542, 4249234469, 12464350398, 11740694257,
+];
+
+#[test]
+fn golden_vec4_powf() {
+    let name: ByteArray = "vec4::powf";
+    let mut d = POWF_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let a1 = next_fixed(ref d);
+        let actual: Vec4 = a0.powf(a1);
+        check_vec4(actual, ref d, 7, @name, case);
+        case += 1;
+    }
+}
+// vec4::step_saturate: 4 cases, tolerance 0 ULP - exact: step is 0 where rhs < self and 1
+// otherwise (equal counts as 1), saturate clamps to [0, 1].
+#[cairofmt::skip]
+const STEP_SATURATE_CASES: [i64; 64] = [
+    2147483648, 4294967296, 0, -4294967296, 2147483648, 0, 4294967296, -4294967296,
+        4294967296, 0, 4294967296, 4294967296, 2147483648, 4294967296, 0, 0,
+    1, -1, 6442450944, 1073741824, 0, 0, 6442450944, 1,
+        0, 4294967296, 4294967296, 0, 1, 0, 4294967296, 1073741824,
+    1319405672, -126, -865391766, -217485204, -143, 655, -2147483648, -8589934592,
+        0, 4294967296, 0, 0, 1319405672, 0, 0, 0,
+    -6374599113, 3598739263, 5140997396, 7118871989, -2147483648, -373412824, -4380315838, 3340740,
+        4294967296, 0, 0, 0, 0, 3598739263, 4294967296, 4294967296,
+];
+
+#[test]
+fn golden_vec4_step_saturate() {
+    let name: ByteArray = "vec4::step_saturate";
+    let mut d = STEP_SATURATE_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let a1 = next_vec4(ref d);
+        let (r0, r1): (Vec4, Vec4) = (a0.step(a1), a0.saturate());
+        check_vec4(r0, ref d, 0, @name, case);
+        check_vec4(r1, ref d, 0, @name, case);
+        case += 1;
+    }
+}
+// vec4::smoothstep: 3 cases, tolerance 3 ULP - t = trunc((x - e0) / (e1 - e0)) is within 1 ULP
+// below the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then
+// one floor rescale (1) and the half ULP of the oracle quantization: 3.0.
+#[cairofmt::skip]
+const SMOOTHSTEP_CASES: [i64; 48] = [
+    2147483648, 6442450944, -4294967296, 12884901888, 0, -4294967296, -8589934592, 0, 4294967296,
+        4294967296, 8589934592, 12884901888,
+        2147483648, 4294967296, 671088640, 4294967296,
+    -10348688334, 12884901888, -4294967296, -10737418240, -4294967296, -51, -1920959945,
+        -4294967296, 4674630105, 9509786695, 6442450944, 4293188466,
+        0, 4294967296, 0, 0,
+    -1, -4999324857, -12884901888, -584972, -1064084896, -3, -2080955163, -7678460946, 3012579025,
+        4294967296, 10949993958, 10908995089,
+        725099155, 0, 0, 1593069288,
+];
+
+#[test]
+fn golden_vec4_smoothstep() {
+    let name: ByteArray = "vec4::smoothstep";
+    let mut d = SMOOTHSTEP_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let a1 = next_vec4(ref d);
+        let a2 = next_vec4(ref d);
+        let actual: Vec4 = a0.smoothstep(a1, a2);
+        check_vec4(actual, ref d, 3, @name, case);
+        case += 1;
+    }
+}
+// vec4::project: 5 cases, tolerance 1 ULP - one shared wide reciprocal of w and one product
+// rounded to nearest per component, vs the oracle's division rounded to nearest at quantization:
+// |diff| <= 1 (ties).
+#[cairofmt::skip]
+const PROJECT_CASES: [i64; 35] = [
+    4294967296, 8589934592, 12884901888, 8589934592, 2147483648, 4294967296, 6442450944,
+    12884901888, -25769803776, 38654705664, -12884901888, -4294967296, 8589934592, -12884901888,
+    2147483648, -2147483648, 34359738368, 1073741824, 8589934592, -8589934592, 137438953472,
+    21116777773, 8589934592, 33083514101, -14701614508, -6169109514, -2509485480, -9665102498,
+    8128329830, -33398826073, -9410111476, 4379400291, 7971619051, -32754910759, -9228688486,
+];
+
+#[test]
+fn golden_vec4_project() {
+    let name: ByteArray = "vec4::project";
+    let mut d = PROJECT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let actual: Vec3 = a0.project();
+        check_vec3(actual, ref d, 1, @name, case);
         case += 1;
     }
 }

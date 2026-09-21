@@ -13,7 +13,9 @@
 
 use core::ops::index::IndexView;
 use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};
+use fixed::exp::ExpTrait;
 use fixed::fixed::{Fixed, FixedTrait};
+use fixed::trig::TrigTrait;
 use fixed::wide::{
     Norm, NormTrait, RecipTrait, WideLift, WideMul, WideNarrow, WideSub, distance4,
     distance4_squared, dot4, mul_add, mul_sub, norm4, norm4_squared, norm4_wide, wide_from,
@@ -23,7 +25,7 @@ use crate::bvec4::{BVec4, BVec4Trait};
 use crate::ivec4::IVec4;
 use crate::uvec4::UVec4;
 use crate::vec2::Vec2;
-use crate::vec3::Vec3;
+use crate::vec3::{Vec3, Vec3Trait};
 
 /// A 4-dimensional vector of Q32.32 fixed-point scalars.
 ///
@@ -35,10 +37,8 @@ use crate::vec3::Vec3;
 /// * Not ported: `map` (a closure parameter cannot be force-inlined, E2143), `from_slice` /
 ///   `write_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait to
 ///   implement), `IndexMut`, the by-reference operator overloads, the scalar-on-the-left
-///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
-///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
-///   exist in glam.cairo (`as_dvec4`, `as_i8vec4`, ...).
-/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.
+///   operators (`2.0 * v`) and the casts to types that do not exist in glam.cairo
+///   (`as_dvec4`, `as_i8vec4`, ...).
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct Vec4 {
     pub x: Fixed,
@@ -200,6 +200,20 @@ pub trait Vec4Trait {
     /// #### Deviations
     /// * None.
     fn with_w(self: Vec4, w: Fixed) -> Vec4;
+    /// Projects a homogeneous coordinate to a 3D vector: `xyz / w`,
+    /// `Vec3::from_homogeneous(self)`.
+    ///
+    /// Mirrors `glam::Vec4::project`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if `w` is zero (`glam_assert!` in glam-rs, which
+    ///   otherwise returns infinity or NaN).
+    /// * `'Fixed: overflow'` if a quotient does not fit the scalar range.
+    /// #### Deviations
+    /// * One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one
+    ///   fused product per component, instead of three truncated `Fixed / Fixed`: it pays
+    ///   off from two divisions on (`alt_project_div` in `gas/vec4.snap`). A result may
+    ///   differ by 1 ULP from the truncated division.
+    fn project(self: Vec4) -> Vec3;
     /// Computes the dot product of `self` and `rhs`.
     ///
     /// Mirrors `glam::Vec4::dot`.
@@ -495,6 +509,166 @@ pub trait Vec4Trait {
     /// #### Deviations
     /// * There is no NaN nor infinity: the operation panics instead of producing one.
     fn recip(self: Vec4) -> Vec4;
+    /// Returns a vector containing the sine for each element of `self` (in radians).
+    ///
+    /// Mirrors `glam::Vec4::sin`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Element-wise `TrigTrait::sin`: within 1.02 ULP of the exact sine over a turn
+    ///   (2.03 at the extremes of the range), `sin(0) = 0` exactly and `sin(-x) =
+    ///   -sin(x)`.
+    /// * 4 independent scalar calls: no work is shared between the elements. The wrapper
+    ///   adds no gas to the scalar calls and is not force-inlined (`alt_sin_inline` in
+    ///   `gas/vec4.snap`).
+    fn sin(self: Vec4) -> Vec4;
+    /// Returns a vector containing the cosine for each element of `self` (in radians).
+    ///
+    /// Mirrors `glam::Vec4::cos`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Element-wise `TrigTrait::cos`: within 0.86 ULP of the exact cosine over a turn
+    ///   (1.71 at the extremes of the range), `cos(0) = 1` exactly and `cos(-x) = cos(x)`.
+    /// * 4 independent scalar calls: no work is shared between the elements.
+    fn cos(self: Vec4) -> Vec4;
+    /// Returns a tuple of two vectors containing the sine and cosine for each element of
+    /// `self`.
+    ///
+    /// Mirrors `glam::Vec4::sin_cos`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Bit-identical to `(self.sin(), self.cos())`, one shared range reduction per
+    ///   element (`TrigTrait::sin_cos`, 1.4x the cost of `sin` alone instead of 2x).
+    /// * 4 independent scalar calls: no work is shared between the elements.
+    fn sin_cos(self: Vec4) -> (Vec4, Vec4);
+    /// Returns a vector containing `e^self` for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec4::exp`.
+    /// #### Panics
+    /// * `'Fixed: exp overflow'` if an element is `>= 21.487` (`31 ln 2`), where the
+    ///   result no longer fits the scalar range.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Element-wise `ExpTrait::exp`: an element below `-22.873` gives `0`; the result is
+    ///   within 2.02 ULP below the exact value (below `2^16`), `exp(0) = 1` exactly and
+    ///   each element is non-decreasing.
+    /// * 4 independent scalar calls: no work is shared between the elements.
+    fn exp(self: Vec4) -> Vec4;
+    /// Returns a vector containing `2^self` for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec4::exp2`.
+    /// #### Panics
+    /// * `'Fixed: exp overflow'` if an element is `>= 31`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Element-wise `ExpTrait::exp2`: an element below `-33` gives `0`; within 2.02 ULP
+    ///   below the exact value (below `2^16`), exact for an integer element in `[-32,
+    ///   30]`.
+    /// * 4 independent scalar calls: no work is shared between the elements.
+    fn exp2(self: Vec4) -> Vec4;
+    /// Returns a vector containing the natural logarithm for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec4::ln`.
+    /// #### Panics
+    /// * `'Fixed: ln domain'` if an element is `<= 0`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Panics where glam-rs returns NaN (negative element) or negative infinity (zero
+    ///   element).
+    /// * Element-wise `ExpTrait::ln`: within 0.66 ULP of the exact value, `ln(1) = 0`
+    ///   exactly.
+    /// * 4 independent scalar calls: no work is shared between the elements.
+    fn ln(self: Vec4) -> Vec4;
+    /// Returns a vector containing the base 2 logarithm for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec4::log2`.
+    /// #### Panics
+    /// * `'Fixed: ln domain'` if an element is `<= 0`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Panics where glam-rs returns NaN (negative element) or negative infinity (zero
+    ///   element).
+    /// * Element-wise `ExpTrait::log2`: within 0.75 ULP of the exact value, `log2(2^k) =
+    ///   k` exactly for `k` in `[-32, 30]`.
+    /// * 4 independent scalar calls: no work is shared between the elements.
+    fn log2(self: Vec4) -> Vec4;
+    /// Returns a vector containing each element of `self` raised to the power of `n`.
+    ///
+    /// Mirrors `glam::Vec4::powf`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if a result does not fit the scalar range.
+    /// * `'Fixed: division by zero'` if an element is zero and `n` is negative.
+    /// * `'Fixed: powf domain'` if an element is negative and `n` is not an integer.
+    /// * `'i64_neg Underflow'` if an element is `Fixed::MIN`.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Element-wise `ExpTrait::powf` (`exp2(n * log2(x))` with the product kept at 88
+    ///   fractional bits): panics where glam-rs returns infinity or NaN; within 2.05 ULP
+    ///   below 1 and `0.44 * 2^-30` relative above (`x` in `[2^-8, 2^8]`, `n` in `[-4,
+    ///   4]`); `powf(x, 1)` is not bit-identical to `x`.
+    /// * 4 independent scalar calls: no work is shared between the elements. The wrapper
+    ///   adds no gas to the scalar calls and is not force-inlined (`alt_powf_inline` in
+    ///   `gas/vec4.snap`).
+    fn powf(self: Vec4, n: Fixed) -> Vec4;
+    /// Returns a vector containing the square root for each element of `self`.
+    ///
+    /// Mirrors `glam::Vec4::sqrt`.
+    /// #### Panics
+    /// * `'Fixed: sqrt negative'` if an element is negative.
+    /// * The elements are evaluated in order (`x` first): the panic is the one of the
+    ///   first offending element.
+    /// #### Deviations
+    /// * Panics where glam-rs returns NaN.
+    /// * Element-wise `FixedTrait::sqrt`: the floor of the exact root (integer square root
+    ///   of `raw * 2^32`), bit-exact. Inlined: cheaper than the call (`alt_sqrt_noinline`
+    ///   in `gas/vec4.snap`).
+    fn sqrt(self: Vec4) -> Vec4;
+    /// Returns a vector containing `0.0` if `rhs < self` and `1.0` otherwise, per element.
+    ///
+    /// Similar to glsl's step(edge, x), which translates into edge.step(x).
+    ///
+    /// Mirrors `glam::Vec4::step`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Exact: `Fixed::step` on each pair (`1` when the elements are equal).
+    fn step(self: Vec4, rhs: Vec4) -> Vec4;
+    /// Performs Hermite interpolation between `0.0` and `1.0` using `x` normalized to
+    /// `[edge0, edge1]`.
+    ///
+    /// This is equivalent to `t * t * (3.0 - 2.0 * t)`, where `t` is clamped to `[0.0,
+    /// 1.0]`. Results are undefined if any element of `edge0` is greater than or equal to
+    /// the corresponding element of `edge1`.
+    ///
+    /// Mirrors `glam::Vec4::smoothstep`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if an element of `edge0` equals the one of `edge1`.
+    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` / `'Fixed: overflow'` if `self -
+    ///   edge0`, `edge1 - edge0` or their quotient does not fit the scalar range.
+    /// #### Deviations
+    /// * The `edge0 < edge1` precondition (`glam_assert!`) is only checked for equality,
+    ///   by the division; the result for `edge0 > edge1` is the one of the formula.
+    /// * Element-wise `Fixed::smoothstep`: `t = saturate(trunc((x - edge0) / (edge1 -
+    ///   edge0)))`, then the polynomial is evaluated exactly and rescaled once (floored),
+    ///   instead of the three rescaled vector operations of glam-rs (`alt_smoothstep_glam`
+    ///   in `gas/vec4.snap`). Inlined: cheaper than the call (`alt_smoothstep_noinline`).
+    fn smoothstep(self: Vec4, edge0: Vec4, edge1: Vec4) -> Vec4;
+    /// Returns a vector containing all elements of `self` clamped to the range of `[0,
+    /// 1]`.
+    ///
+    /// Mirrors `glam::Vec4::saturate`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Exact.
+    fn saturate(self: Vec4) -> Vec4;
     /// Computes the length of `self`.
     ///
     /// Mirrors `glam::Vec4::length`.
@@ -1094,6 +1268,11 @@ pub impl Vec4Impl of Vec4Trait {
     }
 
     #[inline(always)]
+    fn project(self: Vec4) -> Vec3 {
+        Vec3Trait::from_homogeneous(self)
+    }
+
+    #[inline(always)]
     fn dot(self: Vec4, rhs: Vec4) -> Fixed {
         dot4(self.x, rhs.x, self.y, rhs.y, self.z, rhs.z, self.w, rhs.w)
     }
@@ -1377,6 +1556,74 @@ pub impl Vec4Impl of Vec4Trait {
     #[inline(always)]
     fn recip(self: Vec4) -> Vec4 {
         Vec4 { x: self.x.recip(), y: self.y.recip(), z: self.z.recip(), w: self.w.recip() }
+    }
+
+    fn sin(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.sin(), y: self.y.sin(), z: self.z.sin(), w: self.w.sin() }
+    }
+
+    fn cos(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.cos(), y: self.y.cos(), z: self.z.cos(), w: self.w.cos() }
+    }
+
+    fn sin_cos(self: Vec4) -> (Vec4, Vec4) {
+        let (sx, cx) = self.x.sin_cos();
+        let (sy, cy) = self.y.sin_cos();
+        let (sz, cz) = self.z.sin_cos();
+        let (sw, cw) = self.w.sin_cos();
+        (Vec4 { x: sx, y: sy, z: sz, w: sw }, Vec4 { x: cx, y: cy, z: cz, w: cw })
+    }
+
+    fn exp(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.exp(), y: self.y.exp(), z: self.z.exp(), w: self.w.exp() }
+    }
+
+    fn exp2(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.exp2(), y: self.y.exp2(), z: self.z.exp2(), w: self.w.exp2() }
+    }
+
+    fn ln(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.ln(), y: self.y.ln(), z: self.z.ln(), w: self.w.ln() }
+    }
+
+    fn log2(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.log2(), y: self.y.log2(), z: self.z.log2(), w: self.w.log2() }
+    }
+
+    fn powf(self: Vec4, n: Fixed) -> Vec4 {
+        Vec4 { x: self.x.powf(n), y: self.y.powf(n), z: self.z.powf(n), w: self.w.powf(n) }
+    }
+
+    #[inline(always)]
+    fn sqrt(self: Vec4) -> Vec4 {
+        Vec4 { x: self.x.sqrt(), y: self.y.sqrt(), z: self.z.sqrt(), w: self.w.sqrt() }
+    }
+
+    #[inline(always)]
+    fn step(self: Vec4, rhs: Vec4) -> Vec4 {
+        Vec4 {
+            x: self.x.step(rhs.x),
+            y: self.y.step(rhs.y),
+            z: self.z.step(rhs.z),
+            w: self.w.step(rhs.w),
+        }
+    }
+
+    #[inline(always)]
+    fn smoothstep(self: Vec4, edge0: Vec4, edge1: Vec4) -> Vec4 {
+        Vec4 {
+            x: self.x.smoothstep(edge0.x, edge1.x),
+            y: self.y.smoothstep(edge0.y, edge1.y),
+            z: self.z.smoothstep(edge0.z, edge1.z),
+            w: self.w.smoothstep(edge0.w, edge1.w),
+        }
+    }
+
+    #[inline(always)]
+    fn saturate(self: Vec4) -> Vec4 {
+        Vec4 {
+            x: self.x.saturate(), y: self.y.saturate(), z: self.z.saturate(), w: self.w.saturate(),
+        }
     }
 
     #[inline(always)]
@@ -1899,6 +2146,37 @@ pub impl Vec2Vec2IntoVec4 of Into<(Vec2, Vec2), Vec4> {
     fn into(self: (Vec2, Vec2)) -> Vec4 {
         let (v, u) = self;
         Vec4 { x: v.x, y: v.y, z: u.x, w: u.y }
+    }
+}
+
+/// `true` becomes `1` and `false` becomes `0`.
+///
+/// Mirrors `impl From<glam::BVec4> for glam::Vec4`.
+pub impl BVec4IntoVec4 of Into<BVec4, Vec4> {
+    #[inline(always)]
+    fn into(self: BVec4) -> Vec4 {
+        Vec4 {
+            x: if self.x {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+            y: if self.y {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+            z: if self.z {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+            w: if self.w {
+                F_ONE
+            } else {
+                F_ZERO
+            },
+        }
     }
 }
 

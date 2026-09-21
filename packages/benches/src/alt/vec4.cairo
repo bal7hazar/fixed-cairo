@@ -3,9 +3,12 @@
 //! `gas/vec4.snap`). The library ships the cheapest formulation; the others stay here so that
 //! the comparison is reproducible across compiler upgrades.
 
+use fixed::exp::ExpTrait;
 use fixed::fixed::{Fixed, FixedTrait};
+use fixed::trig::TrigTrait;
 use fixed::wide::{NormTrait, RecipTrait, dot4, norm4, norm4_squared, norm4_wide, normalize4};
 use glam::bvec4::{BVec4, BVec4Trait};
+use glam::vec3::Vec3;
 use glam::vec4::{Vec4, Vec4Trait};
 
 /// Alternative to `Vec4::element_product`. The literal chain of `Fixed * Fixed` (one rescale per
@@ -202,6 +205,74 @@ pub fn is_negative_bitmask_felt(lhs: Vec4) -> u32 {
             0
         });
     m.try_into().unwrap()
+}
+
+/// Alternative to `Vec4::sin_cos`. `sin` and `cos` (two range reductions per element) instead of
+/// one shared `sin_cos`.
+#[inline(always)]
+pub fn sin_cos_two_calls(lhs: Vec4) -> (Vec4, Vec4) {
+    (Vec4Trait::sin(lhs), Vec4Trait::cos(lhs))
+}
+
+/// Alternative to `Vec4::from_bvec`. The `bool -> felt252 -> i64` cast instead of a jump per
+/// element.
+#[inline(always)]
+pub fn from_bvec_felt(lhs: BVec4) -> Vec4 {
+    Vec4 {
+        x: Fixed { raw: (Into::<bool, felt252>::into(lhs.x) * 0x100000000).try_into().unwrap() },
+        y: Fixed { raw: (Into::<bool, felt252>::into(lhs.y) * 0x100000000).try_into().unwrap() },
+        z: Fixed { raw: (Into::<bool, felt252>::into(lhs.z) * 0x100000000).try_into().unwrap() },
+        w: Fixed { raw: (Into::<bool, felt252>::into(lhs.w) * 0x100000000).try_into().unwrap() },
+    }
+}
+
+/// Alternative to `Vec4::smoothstep`. The literal glam-rs vector expression `t * t * (3 - 2 * t)`:
+/// one rescale per vector operation, and a truncated division per element.
+#[inline(always)]
+pub fn smoothstep_glam(lhs: Vec4, edge0: Vec4, edge1: Vec4) -> Vec4 {
+    let t = Vec4Trait::saturate((lhs - edge0) / (edge1 - edge0));
+    let three = Vec4Trait::splat(FixedTrait::from_int(3));
+    let two = Vec4Trait::splat(FixedTrait::from_int(2));
+    t * t * (three - two * t)
+}
+
+/// Alternative to `Vec4::project`. Three truncated `Fixed / Fixed` instead of one shared `Recip`.
+#[inline(always)]
+pub fn project_div(lhs: Vec4) -> Vec3 {
+    Vec3 { x: lhs.x / lhs.w, y: lhs.y / lhs.w, z: lhs.z / lhs.w }
+}
+
+/// Alternative to `Vec4::sqrt`. The same body behind a call boundary (`#[inline(never)]`): the
+/// library inlines it.
+#[inline(never)]
+pub fn sqrt_noinline(lhs: Vec4) -> Vec4 {
+    Vec4 { x: lhs.x.sqrt(), y: lhs.y.sqrt(), z: lhs.z.sqrt(), w: lhs.w.sqrt() }
+}
+
+/// Alternative to `Vec4::smoothstep`. The same body behind a call boundary (`#[inline(never)]`):
+/// the library inlines it.
+#[inline(never)]
+pub fn smoothstep_noinline(lhs: Vec4, edge0: Vec4, edge1: Vec4) -> Vec4 {
+    Vec4 {
+        x: lhs.x.smoothstep(edge0.x, edge1.x),
+        y: lhs.y.smoothstep(edge0.y, edge1.y),
+        z: lhs.z.smoothstep(edge0.z, edge1.z),
+        w: lhs.w.smoothstep(edge0.w, edge1.w),
+    }
+}
+
+/// Alternative to `Vec4::sin`. The same body forced inline (`#[inline(always)]`): the wrapper adds
+/// no gas over the scalar calls (`gas/trig.snap`), so the library keeps the compiler's choice.
+#[inline(always)]
+pub fn sin_inline(lhs: Vec4) -> Vec4 {
+    Vec4 { x: lhs.x.sin(), y: lhs.y.sin(), z: lhs.z.sin(), w: lhs.w.sin() }
+}
+
+/// Alternative to `Vec4::powf`. The same body forced inline (`#[inline(always)]`), see
+/// `sin_inline`.
+#[inline(always)]
+pub fn powf_inline(lhs: Vec4, n: Fixed) -> Vec4 {
+    Vec4 { x: lhs.x.powf(n), y: lhs.y.powf(n), z: lhs.z.powf(n), w: lhs.w.powf(n) }
 }
 
 /// Alternative to `Vec4::min_element`. The `Fixed::min` chain of glam-rs instead of the nested

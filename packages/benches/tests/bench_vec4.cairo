@@ -13,6 +13,7 @@ use fixed::fixed::Fixed;
 use glam::bvec4::BVec4;
 use glam::ivec4::IVec4;
 use glam::uvec4::UVec4;
+use glam::vec3::Vec3;
 use glam::vec4::{Vec4, Vec4Trait};
 
 const A: Vec4 = Vec4 {
@@ -106,6 +107,9 @@ const K_1_64: Fixed = Fixed { raw: 0x4000000 };
 const K_1_1024: Fixed = Fixed { raw: 0x400000 };
 const M_ALL: BVec4 = BVec4 { x: true, y: true, z: true, w: true };
 const M_NONE: BVec4 = BVec4 { x: false, y: false, z: false, w: false };
+const A3: Vec3 = Vec3 {
+    x: Fixed { raw: 0x180000000 }, y: Fixed { raw: -0x1c0000000 }, z: Fixed { raw: 0x160000000 },
+};
 const IV: IVec4 = IVec4 { x: 3, y: 3, z: 3, w: 3 };
 const UV: UVec4 = UVec4 { x: 3, y: 3, z: 3, w: 3 };
 
@@ -855,6 +859,268 @@ fn recip__op() {
     let a = bb(A);
     let _r = bb(A);
     sink(a.recip());
+}
+
+#[test]
+fn sin__base() {
+    let _a = bb(A);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn sin__op() {
+    let a = bb(A);
+    let _r = bb(A);
+    sink(a.sin());
+}
+
+#[test]
+fn cos__base() {
+    let _a = bb(A);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn cos__op() {
+    let a = bb(A);
+    let _r = bb(A);
+    sink(a.cos());
+}
+
+#[test]
+fn sin_cos__base() {
+    let _a = bb(A);
+    let r = bb((A, A));
+    sink(r);
+}
+
+#[test]
+fn sin_cos__op() {
+    let a = bb(A);
+    let _r = bb((A, A));
+    sink(a.sin_cos());
+}
+
+#[test]
+fn exp__base() {
+    let _a = bb(A);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn exp__op() {
+    let a = bb(A);
+    let _r = bb(A);
+    sink(a.exp());
+}
+
+#[test]
+fn exp2__base() {
+    let _a = bb(A);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn exp2__op() {
+    let a = bb(A);
+    let _r = bb(A);
+    sink(a.exp2());
+}
+
+#[test]
+fn ln__base() {
+    let _a = bb(POS);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn ln__op() {
+    let a = bb(POS);
+    let _r = bb(A);
+    sink(a.ln());
+}
+
+#[test]
+fn log2__base() {
+    let _a = bb(POS);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn log2__op() {
+    let a = bb(POS);
+    let _r = bb(A);
+    sink(a.log2());
+}
+
+#[test]
+fn powf__base() {
+    let _a = bb(POS);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn powf__op() {
+    let a = bb(POS);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(a.powf(k));
+}
+
+#[test]
+fn sqrt__base() {
+    let _a = bb(POS);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn sqrt__op() {
+    let a = bb(POS);
+    let _r = bb(A);
+    sink(a.sqrt());
+}
+
+#[test]
+fn step_below__base() {
+    let _a = bb(HI);
+    let _b = bb(LO);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn step_below__op() {
+    let a = bb(HI);
+    let b = bb(LO);
+    let _r = bb(A);
+    sink(a.step(b));
+}
+
+#[test]
+fn step_above__base() {
+    let _a = bb(LO);
+    let _b = bb(HI);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn step_above__op() {
+    let a = bb(LO);
+    let b = bb(HI);
+    let _r = bb(A);
+    sink(a.step(b));
+}
+
+#[test]
+fn smoothstep__base() {
+    let _a = bb(INSIDE);
+    let _e0 = bb(LO);
+    let _e1 = bb(HI);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn smoothstep__op() {
+    let a = bb(INSIDE);
+    let e0 = bb(LO);
+    let e1 = bb(HI);
+    let _r = bb(A);
+    sink(a.smoothstep(e0, e1));
+}
+
+#[test]
+fn saturate_below__base() {
+    let _a = bb(NEG);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn saturate_below__op() {
+    let a = bb(NEG);
+    let _r = bb(A);
+    sink(a.saturate());
+}
+
+#[test]
+fn saturate_inside__base() {
+    let _a = bb(UNIT);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn saturate_inside__op() {
+    let a = bb(UNIT);
+    let _r = bb(A);
+    sink(a.saturate());
+}
+
+#[test]
+fn saturate_above__base() {
+    let _a = bb(HI);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn saturate_above__op() {
+    let a = bb(HI);
+    let _r = bb(A);
+    sink(a.saturate());
+}
+
+#[test]
+fn from_bvec_true__base() {
+    let _m = bb(M_ALL);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_bvec_true__op() {
+    let m = bb(M_ALL);
+    let _r = bb(A);
+    sink(Into::<BVec4, Vec4>::into(m));
+}
+
+#[test]
+fn from_bvec_false__base() {
+    let _m = bb(M_NONE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_bvec_false__op() {
+    let m = bb(M_NONE);
+    let _r = bb(A);
+    sink(Into::<BVec4, Vec4>::into(m));
+}
+
+#[test]
+fn project__base() {
+    let _a = bb(A);
+    let r = bb(A3);
+    sink(r);
+}
+
+#[test]
+fn project__op() {
+    let a = bb(A);
+    let _r = bb(A3);
+    sink(a.project());
 }
 
 #[test]
@@ -2269,6 +2535,142 @@ fn alt_is_negative_bitmask_felt_neg__op() {
     let a = bb(NEG);
     let _r = bb(1_u32);
     sink(alt::is_negative_bitmask_felt(a));
+}
+
+#[test]
+fn alt_sin_cos_two_calls__base() {
+    let _a = bb(A);
+    let r = bb((A, A));
+    sink(r);
+}
+
+#[test]
+fn alt_sin_cos_two_calls__op() {
+    let a = bb(A);
+    let _r = bb((A, A));
+    sink(alt::sin_cos_two_calls(a));
+}
+
+#[test]
+fn alt_from_bvec_felt_true__base() {
+    let _m = bb(M_ALL);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_bvec_felt_true__op() {
+    let m = bb(M_ALL);
+    let _r = bb(A);
+    sink(alt::from_bvec_felt(m));
+}
+
+#[test]
+fn alt_from_bvec_felt_false__base() {
+    let _m = bb(M_NONE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_bvec_felt_false__op() {
+    let m = bb(M_NONE);
+    let _r = bb(A);
+    sink(alt::from_bvec_felt(m));
+}
+
+#[test]
+fn alt_smoothstep_glam__base() {
+    let _a = bb(INSIDE);
+    let _e0 = bb(LO);
+    let _e1 = bb(HI);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_smoothstep_glam__op() {
+    let a = bb(INSIDE);
+    let e0 = bb(LO);
+    let e1 = bb(HI);
+    let _r = bb(A);
+    sink(alt::smoothstep_glam(a, e0, e1));
+}
+
+#[test]
+fn alt_project_div__base() {
+    let _a = bb(A);
+    let r = bb(A3);
+    sink(r);
+}
+
+#[test]
+fn alt_project_div__op() {
+    let a = bb(A);
+    let _r = bb(A3);
+    sink(alt::project_div(a));
+}
+
+#[test]
+fn alt_sqrt_noinline__base() {
+    let _a = bb(POS);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_sqrt_noinline__op() {
+    let a = bb(POS);
+    let _r = bb(A);
+    sink(alt::sqrt_noinline(a));
+}
+
+#[test]
+fn alt_smoothstep_noinline__base() {
+    let _a = bb(INSIDE);
+    let _e0 = bb(LO);
+    let _e1 = bb(HI);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_smoothstep_noinline__op() {
+    let a = bb(INSIDE);
+    let e0 = bb(LO);
+    let e1 = bb(HI);
+    let _r = bb(A);
+    sink(alt::smoothstep_noinline(a, e0, e1));
+}
+
+#[test]
+fn alt_sin_inline__base() {
+    let _a = bb(A);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_sin_inline__op() {
+    let a = bb(A);
+    let _r = bb(A);
+    sink(alt::sin_inline(a));
+}
+
+#[test]
+fn alt_powf_inline__base() {
+    let _a = bb(POS);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_powf_inline__op() {
+    let a = bb(POS);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::powf_inline(a, k));
 }
 
 #[test]

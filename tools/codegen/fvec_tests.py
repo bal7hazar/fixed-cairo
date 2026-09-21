@@ -291,6 +291,25 @@ LENGTHS = [
     [(1, 1024), (1, 2048), (-1, 4096), (1, 8192)],
 ]
 MASKS = {2: [0, 1, 2, 3], 3: list(range(8)), 4: [0, 15, 1, 2, 4, 8, 5, 10]}
+# Element-wise math: `x` in (0, 10] (`exp(10) < 2^16`, the range of the absolute ULP bound), the
+# bases `p` and exponents `k` of `powf` (`p^k <= 4`).
+MATH_X = [[1, 2, 3, 4], [(1, 2), (1, 3), (7, 4), 9], [("raw", 1), (1, 1024), 10, (3, 7)],
+          [(1, 4), (5, 2), 6, (1, 8)], [7, (1, 5), (11, 3), (1, 64)]]
+MATH_P = [[(1, 2), 1, (3, 2), 2], [(1, 2), (3, 4), (5, 4), 2], [(1, 2), 1, (3, 2), 2],
+          [(1, 2), (3, 4), (5, 4), 2], [(1, 2), 1, (3, 2), 2]]
+MATH_K = [2, -2, (3, 2), (-1, 2), 0]
+# `step` / `saturate` / `smoothstep`: `x`, the `step` operand `y`, the edges (`e0 < e1`).
+STEP_ROWS = [
+    ([(1, 2), (3, 2), (-1, 2), 2], [(1, 2), 1, (-1, 2), 3], [0, -1, (1, 4), -2], [1, 1, (5, 4), 2]),
+    ([0, 1, ("raw", 1), ("raw", -1)], [("raw", 1), 1, ("raw", -1), 0], [0, -1, (1, 4), -2],
+     [1, 1, (5, 4), 2]),
+    ([3, -3, (1, 3), (-2, 3)], [-3, 3, (1, 3), 5], [0, -4, 0, -1], [4, 4, 1, 1]),
+    ([(1, 8), (7, 8), (3, 8), (5, 8)], [(1, 8), (6, 8), (4, 8), (5, 8)], [0, 0, 0, 0],
+     [1, 1, 1, 1]),
+]
+# `Vec4::project` / `Vec3::from_homogeneous`: `xyz` and `w != 0`.
+HOM = [[1, 2, 3, 2], [(3, 2), (-7, 4), (11, 8), (-13, 16)], [8, -8, 8, -2],
+       [(1, 3), (2, 3), (-1, 3), (1, 7)], [2, -3, 5, ("raw", 1 << 20)]]
 
 
 # --------------------------------------------------------------------------------------------
@@ -320,6 +339,18 @@ def sin_cos_ref(a):
 def atan2_ref(y, x):
     """`atan2` of two raw values (the ratio is scale free), quantized."""
     return qr(math.atan2(y, x))
+
+
+def sqrt_(x):
+    """`FixedTrait::sqrt`: the floor of the exact root of `raw * 2^32`."""
+    return isqrt(x << 32)
+
+
+def smoothstep_(x, e0, e1):
+    """`FixedTrait::smoothstep`: `t = saturate(trunc((x - e0) / (e1 - e0)))`, then the floor of
+    `t^2 (3 - 2 t)` at the Q96.96 scale."""
+    t = min(max(div(x - e0, e1 - e0), 0), ONE)
+    return (t * t * (3 * ONE - 2 * t)) >> 64
 
 
 def det3(a, b, c):
@@ -783,6 +814,73 @@ def gen_tests(t):
                      rawv([-1, 1, -1, 1], n), rawv([1000, -1000, (1, 1024), (-1, 1024)], n)]],
           lambda c: [eq(f"{c['x']}.recip()", c["e"])])
 
+    # ------------------------------------------------- element-wise math and conversions
+    # `sin` / `cos` (1.02 / 0.86 ULP over a turn: tolerance `floor(e + 1/2)` = 1), `sin_cos` is
+    # bit-identical to the pair.
+    angles = [ANGLES[i] for i in (0, 1, 2, 3, 5, 8, 9, 12, 13, 16, 17, 6)]
+    turn = [angles[i:i + n] for i in range(0, len(angles), n)]
+    table("trig", [("a", "v"), ("es", "v"), ("ec", "v")],
+          [{"a": a, "es": [qr(math.sin(k / ONE)) for k in a],
+            "ec": [qr(math.cos(k / ONE)) for k in a]} for a in turn],
+          lambda c: [f"let (s, c) = {c['a']}.sin_cos();",
+                     eq("s", f"{c['a']}.sin()"), eq("c", f"{c['a']}.cos()"),
+                     f"assert!(s.abs_diff_eq({c['es']}, f(1)));",
+                     f"assert!(c.abs_diff_eq({c['ec']}, f(1)));"])
+    # `exp` / `exp2` (2.02 ULP below 2^16: 2), `ln` (0.66) / `log2` (0.75): 1, `sqrt` is the exact
+    # floor of the root, `powf` is `max(2.05, 1.73 |p^k|)` ULP (`0.432 * 2^-30` relative).
+    mrows = []
+    for x, p, k in zip(MATH_X, MATH_P, MATH_K):
+        xs, ps, kk = rawv(x, n), rawv(p, n), raw(k)
+        pw = [(q / ONE) ** (kk / ONE) for q in ps]
+        mrows.append({"x": xs, "ee": [qr(math.exp(v / ONE)) for v in xs],
+                      "e2": [qr(2 ** (v / ONE)) for v in xs],
+                      "el": [qr(math.log(v / ONE)) for v in xs],
+                      "eg": [qr(math.log2(v / ONE)) for v in xs],
+                      "er": [sqrt_(v) for v in xs], "p": ps, "k": kk,
+                      "ep": [qr(v) for v in pw],
+                      "tol": math.floor(max(2.05, 1.73 * max(pw)) + 0.5)})
+    table("math", [("x", "v"), ("ee", "v"), ("e2", "v"), ("el", "v"), ("eg", "v"), ("er", "v"),
+                   ("p", "v"), ("k", "s"), ("ep", "v"), ("tol", "s")], mrows,
+          lambda c: [f"assert!({c['x']}.exp().abs_diff_eq({c['ee']}, f(2)));",
+                     f"assert!({c['x']}.exp2().abs_diff_eq({c['e2']}, f(2)));",
+                     f"assert!({c['x']}.ln().abs_diff_eq({c['el']}, f(1)));",
+                     f"assert!({c['x']}.log2().abs_diff_eq({c['eg']}, f(1)));",
+                     eq(f"{c['x']}.sqrt()", c["er"]),
+                     f"assert!({c['p']}.powf({c['k']}).abs_diff_eq({c['ep']}, {c['tol']}));"])
+    srows = [{"x": rawv(x, n), "y": rawv(y, n), "e0": rawv(a, n), "e1": rawv(b, n),
+              "est": [0 if q < r else ONE for r, q in zip(rawv(x, n), rawv(y, n))],
+              "esat": [min(max(r, 0), ONE) for r in rawv(x, n)],
+              "esm": [smoothstep_(r, u, w) for r, u, w in zip(rawv(x, n), rawv(a, n), rawv(b, n))]}
+             for x, y, a, b in STEP_ROWS]
+    table("step_smoothstep", [("x", "v"), ("y", "v"), ("e0", "v"), ("e1", "v"), ("est", "v"),
+                              ("esat", "v"), ("esm", "v")], srows,
+          lambda c: [eq(f"{c['x']}.step({c['y']})", c["est"]),
+                     eq(f"{c['x']}.saturate()", c["esat"]),
+                     eq(f"{c['x']}.smoothstep({c['e0']}, {c['e1']})", c["esm"])])
+    alt = ", ".join("true" if i % 2 == 0 else "false" for i in range(n))
+    inv = ", ".join("false" if i % 2 == 0 else "true" for i in range(n))
+    test("test_from_bvec", [
+        eq(f"Into::<{t.B}, {T}>::into({t.B}Trait::new({alt}))",
+           V([1 if i % 2 == 0 else 0 for i in range(4)])),
+        eq(f"Into::<{t.B}, {T}>::into({t.B}Trait::new({inv}))",
+           V([0 if i % 2 == 0 else 1 for i in range(4)]))])
+    if n >= 3:
+        hom = [rawv(h, 4) for h in HOM]
+        e3 = lambda h: [recip_mul(recip_wide(h[3]), k) for k in h[:3]]
+        if n == 3:
+            table("homogeneous", [("u", "v"), ("w", "s"), ("e", "v")],
+                  [{"u": h[:3], "w": h[3], "e": e3(h)} for h in hom],
+                  lambda c: [f"let u = {c['u']};", f"let h = vec4(u.x, u.y, u.z, {c['w']});",
+                             eq(f"{Tt}::from_homogeneous(h)", c["e"]),
+                             eq("u.to_homogeneous()", f"vec4(u.x, u.y, u.z, f({ONE}))"),
+                             eq(f"{Tt}::from_homogeneous(u.to_homogeneous())", "u")])
+        else:
+            table("homogeneous", [("v", "v"), ("e0", "s"), ("e1", "s"), ("e2", "s")],
+                  [{"v": h, "e0": e3(h)[0], "e1": e3(h)[1], "e2": e3(h)[2]} for h in hom],
+                  lambda c: [f"let e = vec3({c['e0']}, {c['e1']}, {c['e2']});",
+                             eq(f"{c['v']}.project()", "e"),
+                             eq(f"Vec3Trait::from_homogeneous({c['v']})", "e")])
+
     # ------------------------------------------------------------------------------- panics
     sp = lambda name, msg, expr: panic(name, msg, [f"let _ = {expr};"])
     zero = f"{Tt}::ZERO"
@@ -817,6 +915,19 @@ def gen_tests(t):
     sp("test_clamp_length_min_zero", "'Fixed: division by zero'",
        f"{zero}.clamp_length_min(f({ONE}))")
     sp("test_is_normalized_overflow", "'Fixed: overflow'", f"{Tt}::MAX.is_normalized()")
+    sp("test_exp_overflow", "'Fixed: exp overflow'", f"{Tt}::splat(f({22 * ONE})).exp()")
+    sp("test_exp2_overflow", "'Fixed: exp overflow'", f"{Tt}::splat(f({31 * ONE})).exp2()")
+    sp("test_ln_domain", "'Fixed: ln domain'", f"{zero}.ln()")
+    sp("test_log2_domain", "'Fixed: ln domain'", f"{Tt}::NEG_ONE.log2()")
+    sp("test_sqrt_negative", "'Fixed: sqrt negative'", f"{Tt}::NEG_ONE.sqrt()")
+    sp("test_powf_domain", "'Fixed: powf domain'", f"{Tt}::NEG_ONE.powf(f({ONE // 2}))")
+    sp("test_smoothstep_equal_edges", "'Fixed: division by zero'",
+       f"{Tt}::ONE.smoothstep({Tt}::ONE, {Tt}::ONE)")
+    if n == 3:
+        sp("test_from_homogeneous_zero_w", "'Fixed: division by zero'",
+           f"{Tt}::from_homogeneous(vec4(f({ONE}), f({ONE}), f({ONE}), f(0)))")
+    if n == 4:
+        sp("test_project_zero_w", "'Fixed: division by zero'", f"{Tt}::X.project()")
     big = f"{Tt}::X.mul_scalar(f({MAX_RAW}))"
     sp("test_clamp_length_min_overflow", "'Fixed: overflow'",
        f"{Tt}::X.mul_scalar(f(1)).clamp_length_min(f({ONE}))")
@@ -1155,7 +1266,7 @@ def gen_tests(t):
         neighbours += f"use glam::{d.mod}::{{{', '.join(items)}}};\n"
     consts = [c for c in ("FRAC_PI_2", "FRAC_PI_4", "PI") if re.search(r"\b" + c + r"\b", body)]
     fixed_uses = "use fixed::fixed::{" + ", ".join(sorted(["Fixed", "FixedTrait"] + consts)) + "};\n"
-    if ".sin_cos()" in body:
+    if n == 2 and ".sin_cos()" in body:  # the scalar `sin_cos` of the `from_angle` table
         fixed_uses += "use fixed::trig::TrigTrait;\n"
     prelude = f"""{g.HEADER}//! Tests of `glam::{t.mod}`: the glam-rs vector test macros of `tests/vec{n}.rs`, tables over pools
 //! of edge values (expected values computed by the generator with an exact Q32.32 Python oracle,

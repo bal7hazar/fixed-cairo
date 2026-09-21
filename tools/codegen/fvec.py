@@ -284,6 +284,47 @@ def body_angle_between(t, fused):
     return ("(Self::dot(self, rhs) / (Self::length(self) * Self::length(rhs))).acos_clamped()")
 
 
+def body_sin_cos(t, fused):
+    """One `sin_cos` per element (shared reduction) instead of `sin` and `cos` (two reductions)."""
+    if fused:
+        return ("\n".join(f"let (s{c}, c{c}) = self.{c}.sin_cos();" for c in t.c) + "\n("
+                + t.cw(lambda c: f"s{c}") + ", " + t.cw(lambda c: f"c{c}") + ")")
+    return "(Self::sin(self), Self::cos(self))"
+
+
+def body_from_bvec(t, fused):
+    """`true -> 1`, `false -> 0`: a jump per element, or the `bool -> felt252 -> i64` cast."""
+    if fused:
+        return t.cw(lambda c: f"if self.{c} {{ F_ONE }} else {{ F_ZERO }}")
+    return t.cw(lambda c: f"Fixed {{ raw: (Into::<bool, felt252>::into(self.{c}) * "
+                          f"{hex(ONE_RAW)}).try_into().unwrap() }}")
+
+
+def body_from_homogeneous(t, fused):
+    """Vec3: `xyz / w`. One shared `Recip` (three divisions), or three `Fixed / Fixed`."""
+    if fused:
+        return "let r = RecipTrait::new(v.w);\n" + "Vec3 { x: r.mul(v.x), y: r.mul(v.y), z: r.mul(v.z) }"
+    return "Vec3 { x: v.x / v.w, y: v.y / v.w, z: v.z / v.w }"
+
+
+def body_project(t, fused):
+    """Vec4: `Vec3::from_homogeneous(self)`, or the three plain divisions."""
+    if fused:
+        return "Vec3Trait::from_homogeneous(self)"
+    return "Vec3 { x: self.x / self.w, y: self.y / self.w, z: self.z / self.w }"
+
+
+def body_smoothstep(t, fused):
+    """Per element `Fixed::smoothstep` (the polynomial evaluated exactly, one rescale), or the
+    literal glam-rs vector expression."""
+    if fused:
+        return t.cw(lambda c: f"self.{c}.smoothstep(edge0.{c}, edge1.{c})")
+    return ("let t = Self::saturate((self - edge0) / (edge1 - edge0));\n"
+            "let three = Self::splat(FixedTrait::from_int(3));\n"
+            "let two = Self::splat(FixedTrait::from_int(2));\n"
+            "t * t * (three - two * t)")
+
+
 def body_rotate_axis_quat(t):
     """Vec3 `rotate_axis`: the glam-rs `Quat::from_axis_angle(axis, angle) * self`."""
     return "QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), self)"
@@ -526,6 +567,8 @@ FUSED_BODIES = {
     "reject_from_normalized": body_reject_from_normalized, "abs_diff_eq": body_abs_diff_eq, "select": body_select,
     "clamp": body_clamp, "is_negative_bitmask": body_is_negative_bitmask,
     "from_angle": body_from_angle, "angle_to": body_angle_to,
+    "sin_cos": body_sin_cos, "from_bvec": body_from_bvec, "smoothstep": body_smoothstep,
+    "from_homogeneous": body_from_homogeneous, "project": body_project,
     "angle_between": body_angle_between, "rotate_x": body_rotate_axis("x"),
     "rotate_y": body_rotate_axis("y"), "rotate_z": body_rotate_axis("z"),
 }
@@ -535,9 +578,13 @@ def fused_ops(t):
     """The formulations that exist on `t` as a (library, alternative) pair."""
     ops = ["element_product", "mul_add", "midpoint", "lerp", "div_scalar", "normalize",
            "distance", "length_recip", "project_onto", "reject_from", "reject_from_normalized",
-           "abs_diff_eq", "select", "clamp", "is_negative_bitmask"]
+           "abs_diff_eq", "select", "clamp", "is_negative_bitmask", "sin_cos", "from_bvec",
+           "smoothstep"]
+    if t.n == 4:
+        ops += ["project"]
     if t.n == 3:
-        ops += ["cross", "angle_between", "angle_to", "rotate_x", "rotate_y", "rotate_z"]
+        ops += ["from_homogeneous", "cross", "angle_between", "angle_to", "rotate_x", "rotate_y",
+                "rotate_z"]
     if t.n == 2:
         ops += ["perp_dot", "rotate", "from_angle", "angle_to"]
     return ops
@@ -587,6 +634,26 @@ def methods(t):
         add(f"with_{c}", f"(self: {T}, {c}: Fixed) -> {T}",
             f"Creates a {n}D vector from `self` with the given value of `{c}`.",
             t.cw(lambda k: c if k == c else f"self.{k}"))
+
+    hom_panics = ["`'Fixed: division by zero'` if `w` is zero (`glam_assert!` in glam-rs, which "
+                  "otherwise returns infinity or NaN).",
+                  "`'Fixed: overflow'` if a quotient does not fit the scalar range."]
+    hom_dev = ["One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one "
+               "fused product per component, instead of three truncated `Fixed / Fixed`: it "
+               "pays off from two divisions on (`alt_" + ("from_homogeneous" if n == 3 else "project")
+               + "_div` in `gas/" + t.mod + ".snap`). A result may differ by 1 ULP from the "
+               "truncated division."]
+    if n == 3:
+        add("from_homogeneous", f"(v: Vec4) -> {T}",
+            "Creates a 3D vector from `v` divided by its `w` component: the perspective divide "
+            "of a homogeneous coordinate.", fz("from_homogeneous"), hom_panics, hom_dev)
+        add("to_homogeneous", f"(self: {T}) -> Vec4",
+            "Creates a homogeneous coordinate from `self`, equivalent to `self.extend(1.0)`.",
+            "Self::extend(self, F_ONE)")
+    if n == 4:
+        add("project", f"(self: {T}) -> Vec3",
+            "Projects a homogeneous coordinate to a 3D vector: `xyz / w`, "
+            "`Vec3::from_homogeneous(self)`.", fz("project"), hom_panics, hom_dev)
 
     # ----------------------------------------------------------------------------- products
     add("dot", f"(self: {T}, rhs: {T}) -> Fixed",
@@ -719,6 +786,101 @@ def methods(t):
         ["`'Fixed: division by zero'` if an element is zero.",
          "`'Fixed: overflow'` if an element is `1` or `2` raw (the reciprocal does not fit)."],
         [NAN_DEV])
+
+    # ------------------------------------------------- element-wise math (`fixed::trig`, `exp`)
+    ew = lambda f, args="": t.cw(lambda c: f"self.{c}.{f}({args})")
+    first = ("The elements are evaluated in order (`x` first): the panic is the one of the first "
+             "offending element.")
+    cost = f"{n} independent scalar calls: no work is shared between the elements."
+    wrapper = lambda f: (" The wrapper adds no gas to the scalar calls and is not "
+                         f"force-inlined (`alt_{f}_inline` in `gas/{t.mod}.snap`).")
+    add("sin", f"(self: {T}) -> {T}",
+        "Returns a vector containing the sine for each element of `self` (in radians).",
+        ew("sin"), None,
+        ["Element-wise `TrigTrait::sin`: within 1.02 ULP of the exact sine over a turn (2.03 at "
+         "the extremes of the range), `sin(0) = 0` exactly and `sin(-x) = -sin(x)`.", cost + wrapper("sin")],
+        inline=False)
+    add("cos", f"(self: {T}) -> {T}",
+        "Returns a vector containing the cosine for each element of `self` (in radians).",
+        ew("cos"), None,
+        ["Element-wise `TrigTrait::cos`: within 0.86 ULP of the exact cosine over a turn (1.71 at "
+         "the extremes of the range), `cos(0) = 1` exactly and `cos(-x) = cos(x)`.", cost],
+        inline=False)
+    add("sin_cos", f"(self: {T}) -> ({T}, {T})",
+        "Returns a tuple of two vectors containing the sine and cosine for each element of "
+        "`self`.", fz("sin_cos"), None,
+        ["Bit-identical to `(self.sin(), self.cos())`, one shared range reduction per element "
+         "(`TrigTrait::sin_cos`, 1.4x the cost of `sin` alone instead of 2x).", cost],
+        inline=False)
+    add("exp", f"(self: {T}) -> {T}",
+        "Returns a vector containing `e^self` for each element of `self`.", ew("exp"),
+        ["`'Fixed: exp overflow'` if an element is `>= 21.487` (`31 ln 2`), where the result no "
+         "longer fits the scalar range.", first],
+        ["Element-wise `ExpTrait::exp`: an element below `-22.873` gives `0`; the result is "
+         "within 2.02 ULP below the exact value (below `2^16`), `exp(0) = 1` exactly and each "
+         "element is non-decreasing.", cost], inline=False)
+    add("exp2", f"(self: {T}) -> {T}",
+        "Returns a vector containing `2^self` for each element of `self`.", ew("exp2"),
+        ["`'Fixed: exp overflow'` if an element is `>= 31`.", first],
+        ["Element-wise `ExpTrait::exp2`: an element below `-33` gives `0`; within 2.02 ULP below "
+         "the exact value (below `2^16`), exact for an integer element in `[-32, 30]`.", cost],
+        inline=False)
+    add("ln", f"(self: {T}) -> {T}",
+        "Returns a vector containing the natural logarithm for each element of `self`.",
+        ew("ln"),
+        ["`'Fixed: ln domain'` if an element is `<= 0`.", first],
+        ["Panics where glam-rs returns NaN (negative element) or negative infinity (zero "
+         "element).", "Element-wise `ExpTrait::ln`: within 0.66 ULP of the exact value, "
+                       "`ln(1) = 0` exactly.", cost], inline=False)
+    add("log2", f"(self: {T}) -> {T}",
+        "Returns a vector containing the base 2 logarithm for each element of `self`.",
+        ew("log2"),
+        ["`'Fixed: ln domain'` if an element is `<= 0`.", first],
+        ["Panics where glam-rs returns NaN (negative element) or negative infinity (zero "
+         "element).", "Element-wise `ExpTrait::log2`: within 0.75 ULP of the exact value, "
+                       "`log2(2^k) = k` exactly for `k` in `[-32, 30]`.", cost], inline=False)
+    add("powf", f"(self: {T}, n: Fixed) -> {T}",
+        "Returns a vector containing each element of `self` raised to the power of `n`.",
+        ew("powf", "n"),
+        ["`'Fixed: overflow'` if a result does not fit the scalar range.",
+         "`'Fixed: division by zero'` if an element is zero and `n` is negative.",
+         "`'Fixed: powf domain'` if an element is negative and `n` is not an integer.",
+         "`'i64_neg Underflow'` if an element is `Fixed::MIN`.", first],
+        ["Element-wise `ExpTrait::powf` (`exp2(n * log2(x))` with the product kept at 88 "
+         "fractional bits): panics where glam-rs returns infinity or NaN; within 2.05 ULP below "
+         "1 and `0.44 * 2^-30` relative above (`x` in `[2^-8, 2^8]`, `n` in `[-4, 4]`); "
+         "`powf(x, 1)` is not bit-identical to `x`.", cost + wrapper("powf")],
+        inline=False)
+    add("sqrt", f"(self: {T}) -> {T}",
+        "Returns a vector containing the square root for each element of `self`.",
+        ew("sqrt"), ["`'Fixed: sqrt negative'` if an element is negative.", first],
+        ["Panics where glam-rs returns NaN.",
+         "Element-wise `FixedTrait::sqrt`: the floor of the exact root (integer square root of "
+         "`raw * 2^32`), bit-exact. Inlined: cheaper than the call (`alt_sqrt_noinline` in "
+         "`gas/" + t.mod + ".snap`)."])
+    add("step", f"(self: {T}, rhs: {T}) -> {T}",
+        "Returns a vector containing `0.0` if `rhs < self` and `1.0` otherwise, per element.\n\n"
+        "Similar to glsl's step(edge, x), which translates into edge.step(x).",
+        t.cw(lambda c: f"self.{c}.step(rhs.{c})"), None,
+        ["Exact: `Fixed::step` on each pair (`1` when the elements are equal)."])
+    add("smoothstep", f"(self: {T}, edge0: {T}, edge1: {T}) -> {T}",
+        "Performs Hermite interpolation between `0.0` and `1.0` using `x` normalized to "
+        "`[edge0, edge1]`.\n\nThis is equivalent to `t * t * (3.0 - 2.0 * t)`, where `t` is "
+        "clamped to `[0.0, 1.0]`. Results are undefined if any element of `edge0` is greater "
+        "than or equal to the corresponding element of `edge1`.",
+        fz("smoothstep"),
+        ["`'Fixed: division by zero'` if an element of `edge0` equals the one of `edge1`.",
+         "`'i64_sub Overflow'` / `'i64_sub Underflow'` / `'Fixed: overflow'` if `self - edge0`, "
+         "`edge1 - edge0` or their quotient does not fit the scalar range."],
+        ["The `edge0 < edge1` precondition (`glam_assert!`) is only checked for equality, by the "
+         "division; the result for `edge0 > edge1` is the one of the formula.",
+         "Element-wise `Fixed::smoothstep`: `t = saturate(trunc((x - edge0) / (edge1 - edge0)))`, "
+         "then the polynomial is evaluated exactly and rescaled once (floored), instead of the "
+         "three rescaled vector operations of glam-rs (`alt_smoothstep_glam` in `gas/" + t.mod
+         + ".snap`). Inlined: cheaper than the call (`alt_smoothstep_noinline`)."])
+    add("saturate", f"(self: {T}) -> {T}",
+        "Returns a vector containing all elements of `self` clamped to the range of `[0, 1]`.",
+        ew("saturate"), None, ["Exact."])
 
     # --------------------------------------------------------------------- length and distance
     add("length", f"(self: {T}) -> Fixed", "Computes the length of `self`.",
@@ -1245,6 +1407,11 @@ def used_helpers(code):
 # --------------------------------------------------------------------------------------------
 # Operator and conversion impls
 # --------------------------------------------------------------------------------------------
+def fused_body(op, t):
+    """The body of the library formulation of `op` (see `FUSED_BODIES`)."""
+    return FUSED_BODIES[op](t, is_fused(t, op))
+
+
 def operators(t):
     T, n = t.name, t.n
     out = []
@@ -1314,6 +1481,9 @@ def operators(t):
              f"({V2}, Fixed, Fixed)", T, f"let (v, z, w) = self;\n{T} {{ x: v.x, y: v.y, z, w }}")
         into(f"Mirrors `impl From<({V2}, {V2})> for glam::{T}`.", f"{V2}{V2}Into{T}",
              f"({V2}, {V2})", T, f"let (v, u) = self;\n{T} {{ x: v.x, y: v.y, z: u.x, w: u.y }}")
+    into(f"`true` becomes `1` and `false` becomes `0`.\n///\n"
+         f"/// Mirrors `impl From<glam::{t.B}> for glam::{T}`.",
+         f"{t.B}Into{T}", t.B, T, fused_body("from_bvec", t))
     into(f"The `{t.I} -> {T}` cast (exact: every `i32` is representable).\n///\n"
          f"/// Mirrors `glam::{t.I}::as_vec{n}` and `impl From<glam::{t.I}> for glam::{T}`.",
          f"{t.I}Into{T}", t.I, T, t.cw(lambda c: f"FixedTrait::from_int(self.{c})"))
@@ -1340,6 +1510,7 @@ WIDE_TRAITS = {"NormTrait": [".is_zero()", ".to_fixed()", ".try_recip()"],
 
 
 TRIG_TOKENS = [".sin_cos()", ".atan2(", ".acos_clamped(", ".cos()", ".sin()"]
+EXP_TOKENS = [".exp()", ".exp2()", ".ln()", ".log2()", ".powf("]
 
 
 def uses_pi(code):
@@ -1349,6 +1520,10 @@ def uses_pi(code):
 
 def uses_trig(code):
     return any(tok in code for tok in TRIG_TOKENS)
+
+
+def uses_exp(code):
+    return any(tok in code for tok in EXP_TOKENS)
 
 
 def wide_imports(code):
@@ -1392,6 +1567,8 @@ def gen_module(t):
             "use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};",
             "use fixed::fixed::{Fixed, FixedTrait" + (", PI" if uses_pi(code) else "")
             + "};"]
+    if uses_exp(code):
+        uses.append("use fixed::exp::ExpTrait;")
     if uses_trig(code):
         uses.append("use fixed::trig::TrigTrait;")
     wide = wide_imports(code)
@@ -1406,14 +1583,11 @@ def gen_module(t):
                                       t.dim(n + 1) if n < 4 else None,
                                       t.dim(2) if n == 4 else None) if x})
     for name in others:
-        uses.append(f"use crate::{name.lower()}::{name};")
+        trait = f", {name}Trait" if f"{name}Trait::" in code else ""
+        uses.append(f"use crate::{name.lower()}::{{{name}{trait}}};" if trait
+                    else f"use crate::{name.lower()}::{name};")
     uses.append(f"use crate::{t.umod}::{t.U};")
 
-    trig_note = {
-        2: "",
-        3: "",
-        4: "/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.\n",
-    }[n]
     head = f"""{HEADER}//! Port of glam-rs `f32/{t.mod}.rs` @ 0.33.8 on the Q32.32 scalar: a {n}-dimensional
 //! `fixed::Fixed` vector.
 //!
@@ -1438,10 +1612,9 @@ def gen_module(t):
 /// * Not ported: `map` (a closure parameter cannot be force-inlined, E2143), `from_slice` /
 ///   `write_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait to
 ///   implement), `IndexMut`, the by-reference operator overloads, the scalar-on-the-left
-///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
-///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
-///   exist in glam.cairo (`as_dvec{n}`, `as_i8vec{n}`, ...).
-{trig_note}#[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
+///   operators (`2.0 * v`) and the casts to types that do not exist in glam.cairo
+///   (`as_dvec{n}`, `as_i8vec{n}`, ...).
+#[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct {T} {{
 {chr(10).join(f"    pub {c}: Fixed," for c in t.c)}
 }}
@@ -1546,6 +1719,10 @@ def bench_consts(t):
         out[name] = ("Fixed", fixed_lit(raw_of(v)))
     for name, vals in MASKS.items():
         out[name] = (t.B, bvec_const(t, vals))
+    if t.n == 3:
+        out["HOM"] = ("Vec4", vec_const(t.dim(4), [(3, 2), (-7, 4), (11, 8), (5, 4)]))
+    if t.n == 4:
+        out["A3"] = ("Vec3", vec_const(t.dim(3), VECS["A"]))
     out["IV"] = (t.I, t.cw(lambda c: "3", t.I))
     out["UV"] = (t.U, t.cw(lambda c: "3", t.U))
     return out
@@ -1557,7 +1734,7 @@ def lib_benches(t):
     out = []
     R = {"T": "A", "S": "K_ONE", "u32": "1_u32", "usize": "1_usize", "B": "M_ALL",
          "OT": "Some(A)", "I": "IV", "U": "UV", "TS": "(A, K_ONE)", "TT": "(A, A)",
-         "bool": "true"}
+         "bool": "true", "V3": "A" if n == 3 else "A3", "V4": "HOM"}
 
     def b(name, inputs, res, op, pre=""):
         out.append(Bench(name, inputs, R[res], op, pre))
@@ -1601,6 +1778,28 @@ def lib_benches(t):
         b(f"{f}_pos", [("a", "A")], "T", f"a.{f}()")
         b(f"{f}_neg", [("a", "NEG_FRAC")], "T", f"a.{f}()")
     b("recip", [("a", "A")], "T", "a.recip()")
+    # Element-wise math: inputs in the domain of each function.
+    b("sin", [("a", "A")], "T", "a.sin()")
+    b("cos", [("a", "A")], "T", "a.cos()")
+    b("sin_cos", [("a", "A")], "TT", "a.sin_cos()")
+    b("exp", [("a", "A")], "T", "a.exp()")
+    b("exp2", [("a", "A")], "T", "a.exp2()")
+    b("ln", [("a", "POS")], "T", "a.ln()")
+    b("log2", [("a", "POS")], "T", "a.log2()")
+    b("powf", [("a", "POS"), ("k", "K_HALF")], "T", "a.powf(k)")
+    b("sqrt", [("a", "POS")], "T", "a.sqrt()")
+    b("step_below", [("a", "HI"), ("b", "LO")], "T", "a.step(b)")
+    b("step_above", [("a", "LO"), ("b", "HI")], "T", "a.step(b)")
+    b("smoothstep", [("a", "INSIDE"), ("e0", "LO"), ("e1", "HI")], "T", "a.smoothstep(e0, e1)")
+    for name, v in [("below", "NEG"), ("inside", "UNIT"), ("above", "HI")]:
+        b(f"saturate_{name}", [("a", v)], "T", "a.saturate()")
+    b("from_bvec_true", [("m", "M_ALL")], "T", f"Into::<{t.B}, {T}>::into(m)")
+    b("from_bvec_false", [("m", "M_NONE")], "T", f"Into::<{t.B}, {T}>::into(m)")
+    if n == 3:
+        b("from_homogeneous", [("a", "HOM")], "V3", "Vec3Trait::from_homogeneous(a)")
+        b("to_homogeneous", [("a", "A")], "V4", "a.to_homogeneous()")
+    if n == 4:
+        b("project", [("a", "A")], "V3", "a.project()")
     b("length", [("a", "A")], "S", "a.length()")
     b("length_squared", [("a", "A")], "S", "a.length_squared()")
     b("length_recip", [("a", "A")], "S", "a.length_recip()")
@@ -1722,6 +1921,9 @@ ALT_NAMES = {
     "from_angle": "from_angle_cos_sin", "angle_to": "angle_to_glam",
     "angle_between": "angle_between_acos", "rotate_x": "rotate_x_unfused",
     "rotate_y": "rotate_y_unfused", "rotate_z": "rotate_z_unfused",
+    "sin_cos": "sin_cos_two_calls", "from_bvec": "from_bvec_felt",
+    "smoothstep": "smoothstep_glam", "from_homogeneous": "from_homogeneous_div",
+    "project": "project_div",
 }
 
 
@@ -1756,6 +1958,11 @@ def alts(t):
         "rotate_x": f"(lhs: {T}, angle: Fixed) -> {T}",
         "rotate_y": f"(lhs: {T}, angle: Fixed) -> {T}",
         "rotate_z": f"(lhs: {T}, angle: Fixed) -> {T}",
+        "sin_cos": f"(lhs: {T}) -> ({T}, {T})",
+        "from_bvec": f"(lhs: {t.B}) -> {T}",
+        "smoothstep": f"(lhs: {T}, edge0: {T}, edge1: {T}) -> {T}",
+        "from_homogeneous": "(v: Vec4) -> Vec3",
+        "project": "(lhs: Vec4) -> Vec3",
     }
     notes = {
         "element_product": "The literal chain of `Fixed * Fixed` (one rescale per product).",
@@ -1793,6 +2000,13 @@ def alts(t):
         "rotate_x": "The literal glam-rs expressions: two rescales per component.",
         "rotate_y": "The literal glam-rs expressions: two rescales per component.",
         "rotate_z": "The literal glam-rs expressions: two rescales per component.",
+        "sin_cos": "`sin` and `cos` (two range reductions per element) instead of one shared "
+                   "`sin_cos`.",
+        "from_bvec": "The `bool -> felt252 -> i64` cast instead of a jump per element.",
+        "smoothstep": "The literal glam-rs vector expression `t * t * (3 - 2 * t)`: one rescale "
+                      "per vector operation, and a truncated division per element.",
+        "from_homogeneous": "Three truncated `Fixed / Fixed` instead of one shared `Recip`.",
+        "project": "Three truncated `Fixed / Fixed` instead of one shared `Recip`.",
     }
     for op in fused_ops(t):
         body = to_free(t, FUSED_BODIES[op](t, not is_fused(t, op)))
@@ -1803,6 +2017,18 @@ def alts(t):
             f"(lhs: {T}, rhs: {T}, max_angle: Fixed) -> {T}", to_free(t, body_rotate_towards(t)),
             "The same body behind a call boundary (`#[inline(never)]`): the large body is not "
             "cheaper to call than to inline.", inline="never")
+    add("sqrt_noinline", "sqrt", f"(lhs: {T}) -> {T}", t.cw(lambda c: f"lhs.{c}.sqrt()"),
+        "The same body behind a call boundary (`#[inline(never)]`): the library inlines it.",
+        inline="never")
+    add("smoothstep_noinline", "smoothstep", f"(lhs: {T}, edge0: {T}, edge1: {T}) -> {T}",
+        to_free(t, body_smoothstep(t, True)),
+        "The same body behind a call boundary (`#[inline(never)]`): the library inlines it.",
+        inline="never")
+    add("sin_inline", "sin", f"(lhs: {T}) -> {T}", t.cw(lambda c: f"lhs.{c}.sin()"),
+        "The same body forced inline (`#[inline(always)]`): the wrapper adds no gas over the "
+        "scalar calls (`gas/trig.snap`), so the library keeps the compiler's choice.")
+    add("powf_inline", "powf", f"(lhs: {T}, n: Fixed) -> {T}", t.cw(lambda c: f"lhs.{c}.powf(n)"),
+        "The same body forced inline (`#[inline(always)]`), see `sin_inline`.")
     add("min_element_fixed", "min_element", f"(lhs: {T}) -> Fixed",
         to_free(t, min_chain(t, "<", False)),
         "The `Fixed::min` chain of glam-rs instead of the nested `if`s.")
@@ -1854,6 +2080,8 @@ def gen_alt(t):
 
     uses = ["use fixed::fixed::{Fixed, FixedTrait" + (", PI" if uses_pi(code) else "")
             + "};"]
+    if uses_exp(code):
+        uses.append("use fixed::exp::ExpTrait;")
     if uses_trig(code):
         uses.append("use fixed::trig::TrigTrait;")
     wide = wide_imports(code)
@@ -1866,6 +2094,9 @@ def gen_alt(t):
     if "Mat3Trait::" in code:
         uses.append("use glam::mat3::Mat3Trait;")
     uses.append(f"use glam::{t.mod}::{{{t.name}, {t.name}Trait}};")
+    for d in (t.dim(3), t.dim(4)):
+        if d.name != t.name and re.search(rf"\b{d.name}\b", code):
+            uses.append(f"use glam::{d.mod}::{d.name};")
     return (f"{HEADER}//! Alternative implementations benchmarked against `glam::{t.mod}` "
             f"(the `alt_*` rows of\n//! `gas/{t.mod}.snap`). The library ships the cheapest "
             "formulation; the others stay here so that\n//! the comparison is reproducible "
@@ -1911,6 +2142,9 @@ def gen_bench(t):
     uses.append(f"use glam::{t.imod}::{t.I};")
     uses.append(f"use glam::{t.mod}::{{{t.name}, {t.name}Trait}};")
     uses.append(f"use glam::{t.umod}::{t.U};")
+    for d in (t.dim(3), t.dim(4)):
+        if d.name != t.name and re.search(rf"\b{d.name}\b", decls + body):
+            uses.append(f"use glam::{d.mod}::{d.name};")
     return (f"{HEADER}//! Gas benchmarks of `glam::{t.mod}` and of the alternatives kept in "
             f"`benches::alt::{t.mod}`\n//! (the `alt_*` benches).\n//!\n"
             "//! Sierra gas is charged at the most expensive sibling branch, but steps depend "

@@ -139,6 +139,22 @@ pub fn register(r: &mut Registry) {
         }
         v.rotate_towards(w, m).into()
     });
+    // Element-wise math: the glam-rs methods of the same names.
+    r.add("sin_cos", |a| a[0].dvec2().sin_cos());
+    r.add("exp_exp2", |a| {
+        let v = a[0].dvec2();
+        (v.exp(), v.exp2())
+    });
+    r.add("ln_log2_sqrt", |a| {
+        let v = a[0].dvec2();
+        (v.ln(), v.log2(), v.sqrt())
+    });
+    r.add("powf", |a| a[0].dvec2().powf(a[1].f()));
+    r.add("step_saturate", |a| {
+        let v = a[0].dvec2();
+        (v.step(a[1].dvec2()), v.saturate())
+    });
+    r.add("smoothstep", |a| a[0].dvec2().smoothstep(a[1].dvec2(), a[2].dvec2()));
     r.add("as_ivec2", |a| a[0].dvec2().as_ivec2());
     r.add("as_uvec2", |a| a[0].dvec2().as_uvec2());
 }

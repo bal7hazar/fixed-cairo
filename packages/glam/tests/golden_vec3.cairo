@@ -8,6 +8,7 @@ use glam::bvec3::BVec3;
 use glam::ivec3::IVec3;
 use glam::uvec3::UVec3;
 use glam::vec3::{Vec3, Vec3Trait};
+use glam::vec4::Vec4;
 
 fn next_i64(ref d: Span<i64>) -> i64 {
     *d.pop_front().unwrap()
@@ -22,6 +23,14 @@ fn next_vec3(ref d: Span<i64>) -> Vec3 {
     let y = next_fixed(ref d);
     let z = next_fixed(ref d);
     Vec3 { x, y, z }
+}
+
+fn next_vec4(ref d: Span<i64>) -> Vec4 {
+    let x = next_fixed(ref d);
+    let y = next_fixed(ref d);
+    let z = next_fixed(ref d);
+    let w = next_fixed(ref d);
+    Vec4 { x, y, z, w }
 }
 
 fn check_raw(actual: i64, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
@@ -1401,6 +1410,198 @@ fn golden_vec3_rotate_xyz() {
         check_vec3(r0, ref d, 18, @name, case);
         check_vec3(r1, ref d, 18, @name, case);
         check_vec3(r2, ref d, 18, @name, case);
+        case += 1;
+    }
+}
+// vec3::sin_cos: 4 cases, tolerance 1 ULP - sin within 1.02 ULP and cos within 0.86 ULP over a
+// turn (`fixed::trig`), plus the half ULP of the oracle quantization: 1.52, floored. `sin` and
+// `cos` are bit-identical to the two outputs (tests/test_vec3.cairo).
+#[cairofmt::skip]
+const SIN_COS_CASES: [i64; 36] = [
+    0, 6746518852, -13493037705, 0, 4294967296, 0, 4294967296, 0, -4294967296,
+    4294967296, -8589934592, 12884901888,
+        3614090360, -3905402711, 606105819, 2320580734, -1787337053, -4251985396,
+    17658211958, 4648782463, -14634503543,
+        -3542323420, 3792785144, 1128075737, -2428721652, 2015322536, -4144175335,
+    -989403978, -25769803776, 4, -980676323, 1200080427, 4, 4181509061, 4123899980, 4294967296,
+];
+
+#[test]
+fn golden_vec3_sin_cos() {
+    let name: ByteArray = "vec3::sin_cos";
+    let mut d = SIN_COS_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let (r0, r1): (Vec3, Vec3) = a0.sin_cos();
+        check_vec3(r0, ref d, 1, @name, case);
+        check_vec3(r1, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// vec3::exp_exp2: 4 cases, tolerance 2 ULP - exp and exp2 round toward negative infinity within
+// 2.02 ULP of the exact value for results below 2^16 (`fixed::exp`, |x| <= 8 gives e^8 < 2^12),
+// plus the half ULP of the oracle quantization: 2.52, floored.
+#[cairofmt::skip]
+const EXP_EXP2_CASES: [i64; 36] = [
+    0, 4294967296, -4294967296,
+        4294967296, 11674931555, 1580030169, 4294967296, 8589934592, 2147483648,
+    2147483648, -18253611008, 8589934592,
+        7081203938, 61264418, 31735754293, 6074001000, 225726413, 17179869184,
+    849087733, 17179869184, 122,
+        5233799962, 234497268814, 4294967418, 4925741061, 68719476736, 4294967381,
+    -16901537041, -4294967296, -19497004259,
+        83931708, 1580030169, 45864856, 280768190, 2147483648, 184686087,
+];
+
+#[test]
+fn golden_vec3_exp_exp2() {
+    let name: ByteArray = "vec3::exp_exp2";
+    let mut d = EXP_EXP2_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let (r0, r1): (Vec3, Vec3) = (a0.exp(), a0.exp2());
+        check_vec3(r0, ref d, 2, @name, case);
+        check_vec3(r1, ref d, 2, @name, case);
+        case += 1;
+    }
+}
+// vec3::ln_log2_sqrt: 4 cases, tolerance 1 ULP - ln within 0.66 ULP and log2 within 0.75 ULP
+// (`fixed::exp`), plus the half ULP of the oracle quantization: floored to 1. sqrt is the floor
+// of the exact root while the oracle rounds to nearest: |diff| <= 1.
+#[cairofmt::skip]
+const LN_LOG2_SQRT_CASES: [i64; 48] = [
+    4294967296, 8589934592, 2147483648,
+        0, 2977044472, -2977044472, 0, 4294967296, -4294967296, 4294967296, 6074001000, 3037000500,
+    1, 17179869184, 1073741824,
+        -95265423098, 5954088944, -5954088944, -137438953472, 8589934592, -8589934592, 65536,
+        8589934592, 2147483648,
+    1330496680494, 2956432230037, 4193859054588,
+        24635346810, 28064581402, 29566265658, 35541292674, 40488632413, 42655104842, 75593913314,
+        112684425458, 134210608685,
+    1829656068096, 2099199308278, 2735894167552,
+        26003618988, 26593867676, 27731614508, 37515292159, 38366841014, 40008262727, 88647126154,
+        94952579622, 108400073685,
+];
+
+#[test]
+fn golden_vec3_ln_log2_sqrt() {
+    let name: ByteArray = "vec3::ln_log2_sqrt";
+    let mut d = LN_LOG2_SQRT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let (r0, r1, r2): (Vec3, Vec3, Vec3) = (a0.ln(), a0.log2(), a0.sqrt());
+        check_vec3(r0, ref d, 1, @name, case);
+        check_vec3(r1, ref d, 1, @name, case);
+        check_vec3(r2, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// vec3::powf: 5 cases, tolerance 7 ULP - powf is within max(2.05, 0.432 * 2^-30 relative = 1.73
+// |result| ULP) (`fixed::exp`, x in [2^-8, 2^8], n in [-4, 4]); the domain bounds |x^n| <= 2^2 =
+// 4: 6.92 ULP, plus the half ULP of the oracle quantization: 7.42, floored.
+#[cairofmt::skip]
+const POWF_CASES: [i64; 35] = [
+    2147483648, 8589934592, 4294967296, 8589934592, 1073741824, 17179869184, 4294967296,
+    8589934592, 2147483648, 6442450944, -8589934592, 1073741824, 17179869184, 1908874354,
+    4294967296, 4294967296, 4294967296, 2147483648, 4294967296, 4294967296, 4294967296,
+    8012543070, 3826235427, 4294967296, -3361930097, 2636210756, 4701594534, 4294967296,
+    2465558841, 4036324198, 6442450944, 1827840821, 3391382579, 4182928243, 5103878338,
+];
+
+#[test]
+fn golden_vec3_powf() {
+    let name: ByteArray = "vec3::powf";
+    let mut d = POWF_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_fixed(ref d);
+        let actual: Vec3 = a0.powf(a1);
+        check_vec3(actual, ref d, 7, @name, case);
+        case += 1;
+    }
+}
+// vec3::step_saturate: 4 cases, tolerance 0 ULP - exact: step is 0 where rhs < self and 1
+// otherwise (equal counts as 1), saturate clamps to [0, 1].
+#[cairofmt::skip]
+const STEP_SATURATE_CASES: [i64; 48] = [
+    2147483648, 4294967296, 0, 2147483648, 0, 4294967296,
+        4294967296, 0, 4294967296, 2147483648, 4294967296, 0,
+    1, -1, 6442450944, 0, 0, 6442450944, 0, 4294967296, 4294967296, 1, 0, 4294967296,
+    5952725774, -8589934592, 7455026226, -7118237443, 4294967296, -7632810914,
+        0, 4294967296, 0, 4294967296, 0, 4294967296,
+    4294967296, -1, 1427921923, -1180796420, -8589934592, 1320619,
+        0, 0, 0, 4294967296, 0, 1427921923,
+];
+
+#[test]
+fn golden_vec3_step_saturate() {
+    let name: ByteArray = "vec3::step_saturate";
+    let mut d = STEP_SATURATE_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let (r0, r1): (Vec3, Vec3) = (a0.step(a1), a0.saturate());
+        check_vec3(r0, ref d, 0, @name, case);
+        check_vec3(r1, ref d, 0, @name, case);
+        case += 1;
+    }
+}
+// vec3::smoothstep: 3 cases, tolerance 3 ULP - t = trunc((x - e0) / (e1 - e0)) is within 1 ULP
+// below the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then
+// one floor rescale (1) and the half ULP of the oracle quantization: 3.0.
+#[cairofmt::skip]
+const SMOOTHSTEP_CASES: [i64; 36] = [
+    2147483648, 6442450944, -4294967296, 0, -4294967296, -8589934592, 4294967296, 4294967296,
+        8589934592,
+        2147483648, 4294967296, 671088640,
+    7035140473, -8195491879, 153191, -8589934592, -7036321498, -2423776577, 8589934592, 4294967296,
+        3004783874,
+        4195801769, 0, 1804218856,
+    -8390380502, 16469486921, -8521404480, -7804308592, -3639901113, -2253405693, 12462501883,
+        4294967296, 12368196452,
+        0, 4294967296, 0,
+];
+
+#[test]
+fn golden_vec3_smoothstep() {
+    let name: ByteArray = "vec3::smoothstep";
+    let mut d = SMOOTHSTEP_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Vec3 = a0.smoothstep(a1, a2);
+        check_vec3(actual, ref d, 3, @name, case);
+        case += 1;
+    }
+}
+// vec3::from_homogeneous: 5 cases, tolerance 1 ULP - one shared wide reciprocal of w and one
+// product rounded to nearest per component, vs the oracle's division rounded to nearest at
+// quantization: |diff| <= 1 (ties).
+#[cairofmt::skip]
+const FROM_HOMOGENEOUS_CASES: [i64; 35] = [
+    4294967296, 8589934592, 12884901888, 8589934592, 2147483648, 4294967296, 6442450944,
+    12884901888, -25769803776, 38654705664, -12884901888, -4294967296, 8589934592, -12884901888,
+    2147483648, -2147483648, 34359738368, 1073741824, 8589934592, -8589934592, 137438953472,
+    -4755721243, -18563740653, -13585132672, 11188960686, -1825519615, -7125832437, -5214756060,
+    4294967296, 26564061219, -17989119032, -12625097252, -1461116988, -9036902600, 6119768932,
+];
+
+#[test]
+fn golden_vec3_from_homogeneous() {
+    let name: ByteArray = "vec3::from_homogeneous";
+    let mut d = FROM_HOMOGENEOUS_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec4(ref d);
+        let actual: Vec3 = Vec3Trait::from_homogeneous(a0);
+        check_vec3(actual, ref d, 1, @name, case);
         case += 1;
     }
 }

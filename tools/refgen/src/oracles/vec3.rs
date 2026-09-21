@@ -113,6 +113,23 @@ pub fn register(r: &mut Registry) {
         }
         v.clamp_length(min, max).into()
     });
+    // Element-wise math: the glam-rs methods of the same names.
+    r.add("sin_cos", |a| a[0].dvec3().sin_cos());
+    r.add("exp_exp2", |a| {
+        let v = a[0].dvec3();
+        (v.exp(), v.exp2())
+    });
+    r.add("ln_log2_sqrt", |a| {
+        let v = a[0].dvec3();
+        (v.ln(), v.log2(), v.sqrt())
+    });
+    r.add("powf", |a| a[0].dvec3().powf(a[1].f()));
+    r.add("step_saturate", |a| {
+        let v = a[0].dvec3();
+        (v.step(a[1].dvec3()), v.saturate())
+    });
+    r.add("smoothstep", |a| a[0].dvec3().smoothstep(a[1].dvec3(), a[2].dvec3()));
+    r.add("from_homogeneous", |a| DVec3::from_homogeneous(a[0].dvec4()));
     r.add("as_ivec3", |a| a[0].dvec3().as_ivec3());
     r.add("as_uvec3", |a| a[0].dvec3().as_uvec3());
     // Tuple results.

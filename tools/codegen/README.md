@@ -66,6 +66,16 @@ What differs from the integer generator:
   the bench pair and the `alt` function are then emitted automatically;
 - the dimension-specific numerics (`cross`, `perp` / `perp_dot` / `rotate`, `any_orthonormal_*`)
   are per-type snippets guarded by `if n == ...` in `methods`, never `if n` inside a body;
+- the element-wise wrappers of `fixed::trig` / `fixed::exp` (`sin`, `cos`, `sin_cos`, `exp`,
+  `exp2`, `ln`, `log2`, `powf`) are `ew(f)` bodies in `methods` (N scalar calls, no attribute:
+  the wrapper adds no gas, measured by `alt_sin_inline` / `alt_powf_inline`); `sqrt`, `step`,
+  `smoothstep` and `saturate` are `#[inline(always)]` (`alt_sqrt_noinline`,
+  `alt_smoothstep_noinline`). The new measured pairs are `sin_cos` (vs `sin` + `cos`), `smoothstep`
+  (vs the glam-rs vector expression), `from_bvec` (`if` vs the `bool -> felt252 -> i64` cast) and,
+  for the homogeneous divide, `from_homogeneous` (Vec3) / `project` (Vec4): a shared `Recip` vs
+  three `Fixed / Fixed`. `Into<BVecN, VecN>` is emitted by `operators`; the imports of
+  `fixed::exp::ExpTrait` / `fixed::trig::TrigTrait` and of the neighbouring vector trait are
+  derived from the emitted code (`uses_exp`, `uses_trig`);
 - the bench file declares its operands as `const`s (`A`, `B`, `UNIT`, `K_HALF`, ...) instead of
   inlining `Vec3Trait::new(FixedTrait::from_raw(..), ..)` at every call site: the inline form
   wraps over three lines per input and made the file 2.6x longer;

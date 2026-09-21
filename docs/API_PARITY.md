@@ -26,9 +26,9 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [UVec2](#uvec2) | 106 | 69 | 10 | 0 | 9 | 62.7% |
 | [UVec3](#uvec3) | 206 | 71 | 10 | 0 | 9 | 75.3% |
 | [UVec4](#uvec4) | 458 | 70 | 10 | 0 | 9 | 87.0% |
-| [Vec2](#vec2) | 134 | 37 | 7 | 13 | 8 | 73.8% |
-| [Vec3](#vec3) | 238 | 39 | 7 | 15 | 9 | 81.9% |
-| [Vec4](#vec4) | 481 | 40 | 7 | 14 | 8 | 90.0% |
+| [Vec2](#vec2) | 147 | 37 | 7 | 0 | 8 | 80.6% |
+| [Vec3](#vec3) | 253 | 39 | 7 | 0 | 9 | 87.0% |
+| [Vec4](#vec4) | 495 | 40 | 7 | 0 | 8 | 92.6% |
 | [camera::lh::proj::directx](#camera-lh-proj-directx) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::lh::proj::opengl](#camera-lh-proj-opengl) | 3 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::lh::proj::vulkan](#camera-lh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
@@ -38,7 +38,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [camera::rh::proj::vulkan](#camera-rh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::view](#camera-rh-view) | 4 | 0 | 4 | 4 | 0 | 66.7% |
 | [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 34 | 100.0% |
-| **Total** | **2811** | **655** | **120** | **62** | **241** | **80.3%** |
+| **Total** | **2853** | **655** | **120** | **20** | **241** | **81.5%** |
 
 ## Affine2
 
@@ -3001,7 +3001,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `DivAssign<Fixed>` | ported | Same public name. |
 | impl `DivAssign<Vec2>` | ported | Same public name. |
 | impl `From<(Fixed,Fixed)> for Vec2` | ported | Same public name. |
-| impl `From<BVec2> for Vec2` | missing | Not found in the Cairo public surface. |
+| impl `From<BVec2> for Vec2` | ported | Same public name. |
 | impl `From<Vec2> for (Fixed,Fixed)` | ported | Same public name. |
 | impl `From<Vec2> for [Fixed;2]` | ported | Same public name. |
 | impl `From<[Fixed;2]> for Vec2` | ported | Same public name. |
@@ -3053,7 +3053,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `cmplt` | ported | Same public name. |
 | method `cmpne` | ported | Same public name. |
 | method `copysign` | ported | Same public name. |
-| method `cos` | missing | Not found in the Cairo public surface. |
+| method `cos` | ported | Same public name. |
 | method `distance` | ported | Same public name. |
 | method `distance_squared` | ported | Same public name. |
 | method `div_euclid` | ported | Same public name. |
@@ -3061,8 +3061,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `dot_into_vec` | ported | Same public name. |
 | method `element_product` | ported | Same public name. |
 | method `element_sum` | ported | Same public name. |
-| method `exp` | missing | Not found in the Cairo public surface. |
-| method `exp2` | missing | Not found in the Cairo public surface. |
+| method `exp` | ported | Same public name. |
+| method `exp2` | ported | Same public name. |
 | method `extend` | ported | Same public name. |
 | method `floor` | ported | Same public name. |
 | method `fract` | ported | Same public name. |
@@ -3081,8 +3081,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `length_recip` | ported | Same public name. |
 | method `length_squared` | ported | Same public name. |
 | method `lerp` | ported | Same public name. |
-| method `ln` | missing | Not found in the Cairo public surface. |
-| method `log2` | missing | Not found in the Cairo public surface. |
+| method `ln` | ported | Same public name. |
+| method `log2` | ported | Same public name. |
 | method `map` | dropped | Generic callback mapping is omitted from the monomorphic Cairo API. |
 | method `max` | ported | Same public name. |
 | method `max_element` | ported | Same public name. |
@@ -3100,7 +3100,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `normalize_or_zero` | ported | Same public name. |
 | method `perp` | ported | Same public name. |
 | method `perp_dot` | ported | Same public name. |
-| method `powf` | missing | Not found in the Cairo public surface. |
+| method `powf` | ported | Same public name. |
 | method `project_onto` | ported | Same public name. |
 | method `project_onto_normalized` | ported | Same public name. |
 | method `recip` | ported | Same public name. |
@@ -3113,15 +3113,15 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `rotate_angle` | ported | Same public name. |
 | method `rotate_towards` | ported | Same public name. |
 | method `round` | ported | Same public name. |
-| method `saturate` | missing | Not found in the Cairo public surface. |
+| method `saturate` | ported | Same public name. |
 | method `select` | ported | Same public name. |
 | method `signum` | ported | Same public name. |
-| method `sin` | missing | Not found in the Cairo public surface. |
-| method `sin_cos` | missing | Not found in the Cairo public surface. |
-| method `smoothstep` | missing | Not found in the Cairo public surface. |
+| method `sin` | ported | Same public name. |
+| method `sin_cos` | ported | Same public name. |
+| method `smoothstep` | ported | Same public name. |
 | method `splat` | ported | Same public name. |
-| method `sqrt` | missing | Not found in the Cairo public surface. |
-| method `step` | missing | Not found in the Cairo public surface. |
+| method `sqrt` | ported | Same public name. |
+| method `step` | ported | Same public name. |
 | method `to_angle` | ported | Same public name. |
 | method `to_array` | ported | Same public name. |
 | method `trunc` | ported | Same public name. |
@@ -3213,7 +3213,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `DivAssign<Vec3>` | ported | Same public name. |
 | impl `From<(Fixed,Fixed,Fixed)> for Vec3` | ported | Same public name. |
 | impl `From<(Vec2,Fixed)> for Vec3` | ported | Same public name. |
-| impl `From<BVec3> for Vec3` | missing | Not found in the Cairo public surface. |
+| impl `From<BVec3> for Vec3` | ported | Same public name. |
 | impl `From<BVec3A> for Vec3` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
 | impl `From<Vec3> for (Fixed,Fixed,Fixed)` | ported | Same public name. |
 | impl `From<Vec3> for [Fixed;3]` | ported | Same public name. |
@@ -3270,7 +3270,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `cmplt` | ported | Same public name. |
 | method `cmpne` | ported | Same public name. |
 | method `copysign` | ported | Same public name. |
-| method `cos` | missing | Not found in the Cairo public surface. |
+| method `cos` | ported | Same public name. |
 | method `cross` | ported | Same public name. |
 | method `distance` | ported | Same public name. |
 | method `distance_squared` | ported | Same public name. |
@@ -3279,14 +3279,14 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `dot_into_vec` | ported | Same public name. |
 | method `element_product` | ported | Same public name. |
 | method `element_sum` | ported | Same public name. |
-| method `exp` | missing | Not found in the Cairo public surface. |
-| method `exp2` | missing | Not found in the Cairo public surface. |
+| method `exp` | ported | Same public name. |
+| method `exp2` | ported | Same public name. |
 | method `extend` | ported | Same public name. |
 | method `floor` | ported | Same public name. |
 | method `fract` | ported | Same public name. |
 | method `fract_gl` | ported | Same public name. |
 | method `from_array` | ported | Same public name. |
-| method `from_homogeneous` | missing | Not found in the Cairo public surface. |
+| method `from_homogeneous` | ported | Same public name. |
 | method `from_slice` | dropped | Slice APIs are deliberately omitted from fixed-size Cairo math types. |
 | method `is_finite` | dropped | Fixed values are always finite and never NaN. |
 | method `is_finite_mask` | dropped | Fixed values are always finite and never NaN. |
@@ -3299,8 +3299,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `length_recip` | ported | Same public name. |
 | method `length_squared` | ported | Same public name. |
 | method `lerp` | ported | Same public name. |
-| method `ln` | missing | Not found in the Cairo public surface. |
-| method `log2` | missing | Not found in the Cairo public surface. |
+| method `ln` | ported | Same public name. |
+| method `log2` | ported | Same public name. |
 | method `map` | dropped | Generic callback mapping is omitted from the monomorphic Cairo API. |
 | method `max` | ported | Same public name. |
 | method `max_element` | ported | Same public name. |
@@ -3316,7 +3316,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `normalize_and_length` | ported | Same public name. |
 | method `normalize_or` | ported | Same public name. |
 | method `normalize_or_zero` | ported | Same public name. |
-| method `powf` | missing | Not found in the Cairo public surface. |
+| method `powf` | ported | Same public name. |
 | method `project_onto` | ported | Same public name. |
 | method `project_onto_normalized` | ported | Same public name. |
 | method `recip` | ported | Same public name. |
@@ -3331,18 +3331,18 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `rotate_y` | ported | Same public name. |
 | method `rotate_z` | ported | Same public name. |
 | method `round` | ported | Same public name. |
-| method `saturate` | missing | Not found in the Cairo public surface. |
+| method `saturate` | ported | Same public name. |
 | method `select` | ported | Same public name. |
 | method `signum` | ported | Same public name. |
-| method `sin` | missing | Not found in the Cairo public surface. |
-| method `sin_cos` | missing | Not found in the Cairo public surface. |
+| method `sin` | ported | Same public name. |
+| method `sin_cos` | ported | Same public name. |
 | method `slerp` | ported | Same public name. |
-| method `smoothstep` | missing | Not found in the Cairo public surface. |
+| method `smoothstep` | ported | Same public name. |
 | method `splat` | ported | Same public name. |
-| method `sqrt` | missing | Not found in the Cairo public surface. |
-| method `step` | missing | Not found in the Cairo public surface. |
+| method `sqrt` | ported | Same public name. |
+| method `step` | ported | Same public name. |
 | method `to_array` | ported | Same public name. |
-| method `to_homogeneous` | missing | Not found in the Cairo public surface. |
+| method `to_homogeneous` | ported | Same public name. |
 | method `to_vec3a` | dropped | Aligned Mat3A/Vec3A APIs collapse into Mat3/Vec3. |
 | method `trunc` | ported | Same public name. |
 | method `truncate` | ported | Same public name. |
@@ -3538,7 +3538,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `From<(Vec2,Vec2)> for Vec4` | ported | Same public name. |
 | impl `From<(Vec3,Fixed)> for Vec4` | ported | Same public name. |
 | impl `From<(Vec3A,Fixed)> for Vec4` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
-| impl `From<BVec4> for Vec4` | missing | Not found in the Cairo public surface. |
+| impl `From<BVec4> for Vec4` | ported | Same public name. |
 | impl `From<BVec4A> for Vec4` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
 | impl `From<Quat> for Vec4` | ported | Same public name. |
 | impl `From<Vec4> for (Fixed,Fixed,Fixed,Fixed)` | ported | Same public name. |
@@ -3591,7 +3591,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `cmplt` | ported | Same public name. |
 | method `cmpne` | ported | Same public name. |
 | method `copysign` | ported | Same public name. |
-| method `cos` | missing | Not found in the Cairo public surface. |
+| method `cos` | ported | Same public name. |
 | method `distance` | ported | Same public name. |
 | method `distance_squared` | ported | Same public name. |
 | method `div_euclid` | ported | Same public name. |
@@ -3599,8 +3599,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `dot_into_vec` | ported | Same public name. |
 | method `element_product` | ported | Same public name. |
 | method `element_sum` | ported | Same public name. |
-| method `exp` | missing | Not found in the Cairo public surface. |
-| method `exp2` | missing | Not found in the Cairo public surface. |
+| method `exp` | ported | Same public name. |
+| method `exp2` | ported | Same public name. |
 | method `floor` | ported | Same public name. |
 | method `fract` | ported | Same public name. |
 | method `fract_gl` | ported | Same public name. |
@@ -3617,8 +3617,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `length_recip` | ported | Same public name. |
 | method `length_squared` | ported | Same public name. |
 | method `lerp` | ported | Same public name. |
-| method `ln` | missing | Not found in the Cairo public surface. |
-| method `log2` | missing | Not found in the Cairo public surface. |
+| method `ln` | ported | Same public name. |
+| method `log2` | ported | Same public name. |
 | method `map` | dropped | Generic callback mapping is omitted from the monomorphic Cairo API. |
 | method `max` | ported | Same public name. |
 | method `max_element` | ported | Same public name. |
@@ -3634,8 +3634,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `normalize_and_length` | ported | Same public name. |
 | method `normalize_or` | ported | Same public name. |
 | method `normalize_or_zero` | ported | Same public name. |
-| method `powf` | missing | Not found in the Cairo public surface. |
-| method `project` | missing | Not found in the Cairo public surface. |
+| method `powf` | ported | Same public name. |
+| method `project` | ported | Same public name. |
 | method `project_onto` | ported | Same public name. |
 | method `project_onto_normalized` | ported | Same public name. |
 | method `recip` | ported | Same public name. |
@@ -3645,15 +3645,15 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `reject_from_normalized` | ported | Same public name. |
 | method `rem_euclid` | ported | Same public name. |
 | method `round` | ported | Same public name. |
-| method `saturate` | missing | Not found in the Cairo public surface. |
+| method `saturate` | ported | Same public name. |
 | method `select` | ported | Same public name. |
 | method `signum` | ported | Same public name. |
-| method `sin` | missing | Not found in the Cairo public surface. |
-| method `sin_cos` | missing | Not found in the Cairo public surface. |
-| method `smoothstep` | missing | Not found in the Cairo public surface. |
+| method `sin` | ported | Same public name. |
+| method `sin_cos` | ported | Same public name. |
+| method `smoothstep` | ported | Same public name. |
 | method `splat` | ported | Same public name. |
-| method `sqrt` | missing | Not found in the Cairo public surface. |
-| method `step` | missing | Not found in the Cairo public surface. |
+| method `sqrt` | ported | Same public name. |
+| method `step` | ported | Same public name. |
 | method `to_array` | ported | Same public name. |
 | method `trunc` | ported | Same public name. |
 | method `truncate` | ported | Same public name. |
