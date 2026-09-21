@@ -37,3 +37,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glamx`: `Pose2` (fused composition, `inv_mul`, point / vector transforms) (#27).
 - `glamx`: `SymmetricEigen3` by scaled cyclic Jacobi with Rayleigh refinement (eigenvalues within 0.62 ULP * |A| on 7 513 test matrices; the closed form of upstream loses 5 orders of magnitude near repeated eigenvalues and stays in `benches::alt`) (#29).
 - Generated gas tables in the READMEs (`scripts/gas_tables.py`) (#28).
+- Deviation audit before `v0.1.0` (`docs/audits/R1-deviations.md`, `scripts/deviations.py`): 1 179 documented items classified against `docs/DESIGN.md` section 3, which gains 8 rows (reassociation, interpolation, `move_towards` snap, camera validation, integer overflow, alternative algorithms, API surface, degenerate inputs) (#30).

@@ -44,6 +44,9 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1e | optimizer pass on `fixed::wide` + `Vec2/3/4` (non-panicking `is_normalized` kernel, single division, `slerp` / `rotate_towards`) | inprogress | |
 | R1f | `camera` / `Mat4::look_to_*` duplication; after R1i (bytecode evidence) | todo | |
 | R1g | faster bench job (one compile for the two snforge runs, CI and local gate) | inprogress | |
-| R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`) | inprogress | |
+| R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`); 8 rows added to DESIGN section 3 | done | #30 |
+| R1j | `glamx::rot2`: `lerp` aligned with upstream (not normalised), `is_normalized` added (audit P0); after R1e (wide kernel) | todo | |
+| R1k | panic coverage: item/branch -> `should_panic` test manifest and checker, doc template on the nine `IndexView` impls (audit P0) | todo | |
+| R1l | doc-only deviation fixes, one PR per package: `Deviations: None.` on items that panic where upstream continues, stale camera module doc, non-semantic bullets moved out of `Deviations` (audit P1/P2); after the optimizer PRs | todo | |
 | R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`) | inprogress | |
 | R1z | `v0.1.0`: changelog, tag, GitHub release, scarbs.xyz (owner's confirmation required) | todo | |

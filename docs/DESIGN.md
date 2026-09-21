@@ -131,6 +131,19 @@ Every deviation is also documented on the item under `#### Deviations`.
 | `as_*` casts | saturating | `Fixed -> i32/u32` panics when out of range |
 | `glam_assert!` (opt-in debug asserts) | feature flag | not checked (document the precondition) unless the check is free |
 | `acos_approx` | degree-7 approximation | the precise `fixed::trig::acos` (7.6e-10) |
+| algebraic reassociation | rounds after each f32 operation | products are accumulated by `fixed::wide` and rescaled once per output: an equivalent formula may differ bitwise from a line-by-line float port |
+| interpolation | `lerp` is `a*(1-t) + b*t`; glamx `Rot2::lerp` is not normalised | `Fixed` / vector `lerp` is `a + (b-a)*t` (exact at both ends, one rescale). A same-name rotation `lerp` keeps the upstream semantics: normalisation is spelled `lerp(..).normalize()` or `nlerp` where upstream has it |
+| small-distance snap | `move_towards` snaps below `1e-4` | only a distance of exactly zero raw is snapped: every non-zero Q32.32 distance is resolved |
+| camera validation | `glam_assert!` on positive near / far; other invalid inputs flow to IEEE values | projection constructors always check positive near / far, `0 < fov < PI`, non-zero aspect and non-zero denominators, and panic with the documented messages (no NaN to return; the checks are cheap next to a `sin_cos`) |
+| integer-vector overflow | depends on debug / release and on the operation order | plain operators panic; fused helpers range-check the final result only, so an out-of-range intermediate is accepted when the result fits |
+| alternative algorithms | platform libm, glamx closed forms | the deterministic transcendentals of `fixed` and the scaled Jacobi solver of `glamx::eigen3` are public numeric choices; the measured error bounds live on the items |
+| API surface | inherent methods, reference / iterator / `Display` / `Deref` glue | extension traits to import, named heterogeneous operations, pass by value, derived `Debug`; every omission or addition is listed on the type |
+| unchecked preconditions and degenerate inputs | feature-gated assertions | out-of-contract results are unspecified but deterministic: a degenerate input either flows through (`Affine2::to_scale_angle_translation` returns a zero scale) or reaches a mandatory division and panics (`Mat4` / `Affine3::to_scale_rotation_translation`); the item says which |
+
+The `#### Deviations` section of an item is semantic only: gas notes, inlining choices and
+"exact" parity statements do not belong there. The audit of all 1 179 documented items before
+`v0.1.0` is `docs/audits/R1-deviations.md` (inventory: `python3 scripts/deviations.py`; the
+appendix of the audit is a snapshot of its date, it is deliberately not part of the gate).
 
 ## 4. Code conventions
 
