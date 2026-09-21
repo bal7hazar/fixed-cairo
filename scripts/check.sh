@@ -9,6 +9,7 @@ scarb build --workspace
 snforge test --workspace
 python3 scripts/bench.py check
 python3 scripts/api_parity.py --check
+python3 scripts/gas_tables.py --check
 # Golden vectors are up to date with tools/refgen (skipped when the Rust toolchain is absent; CI
 # always runs it in the `golden` job).
 if command -v cargo >/dev/null 2>&1; then
