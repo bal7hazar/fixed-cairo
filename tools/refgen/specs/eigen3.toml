@@ -1,0 +1,123 @@
+# Golden vectors of `glamx::eigen3` (symmetric 3x3 eigen-decomposition, glamx 0.3.1 `eigen3.rs` and
+# the `Mat3` part of `matrix_ext.rs`). Oracles: tools/refgen/src/oracles/eigen3.rs.
+# Format: tools/refgen/README.md. Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen eigen3
+#
+# The `Mat3` argument is an arbitrary matrix: the Cairo module and the oracles both read its
+# upper triangle (and ignore the lower one, which these vectors therefore also check).
+#
+# Eigenvalues only: eigenvectors are defined up to their sign and, for a repeated eigenvalue, up
+# to a rotation of the eigenspace, so they are checked through `A v = lambda v`, orthonormality
+# handedness and the reconstruction `V diag(lambda) V^T = A` in `tests/test_eigen3.cairo` (the
+# reconstruction call does not fit the 100-column golden line).
+#
+# Accuracy of the module (measured by `scripts/gen_eigen3.py study` on a bit-exact mirror, 7 513
+# matrices): eigenvalues within `0.62 ULP * |A|`, `|A| = max(1, max |a_ij|)`, the worst case being
+# two eigenvalues about `1 ULP * |A|` apart. For
+# eigenvalues separated by at least 1 % of the spectrum width the error is the final rounding:
+# the Rayleigh quotient is off by `|dv|^2 * width` with `|dv| <= 2^-22` (eigenvector resolution
+# `8 * 2^-32` amplified by `|A| / gap <= 100`), i.e. `2^-44 * 48 < 0.01 ULP` for `|a_ij| <= 16`.
+
+module = "eigen3"
+package = "glamx"
+imports = [
+    "glamx::eigen3::SymmetricEigen3Trait as E",
+    "glamx::eigen3::Mat3ExtTrait",
+    "glamx::sdp::SdpMatrix3Trait as S3",
+]
+
+# ------------------------------------------------------------------------------------------------
+# Parity with glamx: the f64 closed form of `DSymmetricEigen3`, separated eigenvalues.
+
+[[function]]
+name = "eigenvalues"
+oracle = "eigenvalues_glamx"
+call = "E::eigenvalues({0})"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Vec3"
+cases = 24
+tolerance = 1
+justification = "separated eigenvalues (gaps >= 1 % of the width, |a| <= 16): the refined Rayleigh quotient is within 0.01 ULP of the exact eigenvalue and is rounded to nearest, like the oracle (itself within 0.01 ULP): two roundings of values 0.02 ULP apart differ by at most 1."
+edges = [
+    [[[2, 7, 8], [7, 6, 3], [8, 3, 0]]],
+    [[[2, 0, 0], [0, 5, 0], [0, 0, 3]]],
+    [[[-3, 0.5, -0.25], [0.5, 1, 0.875], [-0.25, 0.875, 2]]],
+]
+
+[[function]]
+name = "symmetric_eigenvalues"
+oracle = "eigenvalues_glamx"
+call = "{0}.symmetric_eigenvalues()"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 1
+justification = "same code path as `eigenvalues`: separated eigenvalues, one rounding on each side."
+
+# ------------------------------------------------------------------------------------------------
+# Any gap, degenerate edges included: f64 Jacobi oracle (accurate to a few 2^-53 |A|).
+
+[[function]]
+name = "new_eigenvalues"
+oracle = "eigenvalues_jacobi"
+call = "E::new({0}).eigenvalues"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Vec3"
+cases = 24
+tolerance = 11
+justification = "documented worst case of the module, 0.62 ULP * |A| with |A| <= 16 (reached only by eigenvalues ~1 ULP * |A| apart), + 1/2 ULP of oracle quantization. The degenerate edges are exact on the Cairo side."
+edges = [
+    [[[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
+    [[[5, 0, 0], [0, 5, 0], [0, 0, 5]]],
+    [[[2, 1, 1], [1, 2, 1], [1, 1, 2]]],
+    [[[1, 2, 3], [2, 4, 6], [3, 6, 9]]],
+    [[[0, 0, 0], [0, 0, 0], [0, 0, 0]]],
+    [[[0, "raw:1", 0], ["raw:1", 0, 0], [0, 0, 0]]],
+    [[[-4, 0, 0], [0, -4, 0], [0, 0, 7]]],
+]
+
+[[function.panics]]
+name = "eigenvalue_overflow"
+args = [[[1073741824, 1073741824, 1073741824], [1073741824, 1073741824, 1073741824], [1073741824, 1073741824, 1073741824]]]
+expected = "Fixed: overflow"
+
+[[function]]
+name = "from_sdp_eigenvalues"
+oracle = "eigenvalues_jacobi"
+call = "E::from_sdp(S3::from_sdp_matrix({0})).eigenvalues"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 11
+justification = "same code path as `new`: 0.62 ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization."
+
+[[function]]
+name = "symmetric_eigen_eigenvalues"
+oracle = "eigenvalues_jacobi"
+call = "{0}.symmetric_eigen().eigenvalues"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 11
+justification = "same code path as `new`: 0.62 ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization."
+
+# Small matrices (the scale-up path: a thin rod or a light body has an inertia of 1e-3).
+[[function]]
+name = "new_eigenvalues_small"
+oracle = "eigenvalues_jacobi"
+call = "E::new({0}).eigenvalues"
+args = [{ type = "Mat3", min = -0.001, max = 0.001 }]
+ret = "Vec3"
+cases = 16
+tolerance = 2
+justification = "0.62 ULP * |A| with |A| = max(1, max |a_ij|) = 1, + 1/2 ULP of oracle quantization, rounded up: scaling up by 2^28 and more keeps small matrices as accurate as unit ones."
+
+# Larger matrices: the bound is proportional to |A|.
+[[function]]
+name = "new_eigenvalues_position"
+oracle = "eigenvalues_jacobi"
+call = "E::new({0}).eigenvalues"
+args = [{ type = "Mat3", min = -1000.0, max = 1000.0 }]
+ret = "Vec3"
+cases = 16
+tolerance = 621
+justification = "0.62 ULP * |A| with |A| <= 1000, + 1/2 ULP of oracle quantization."
