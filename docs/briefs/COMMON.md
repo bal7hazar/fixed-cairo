@@ -41,8 +41,9 @@ Appended to every task brief of `docs/briefs/`. The orchestrator launches a port
 - DONE = `scarb fmt --workspace`; `scripts/check.sh` green in the FOREGROUND (never leave a
   command running in the background and end your turn: in headless mode that ends the session);
   `scripts/bench.py snapshot bench_<module>` for each of your bench modules; generator `--check`
-  clean; conventional commits (`feat(<module>): ...`) each ending with the line
-  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`; `git push -u origin <branch>`;
+  clean; conventional commits (`feat(<module>): ...`) each ending with a `Co-Authored-By:` trailer
+  naming the model that actually did the work (e.g. `Co-Authored-By: Claude Opus 5
+  <noreply@anthropic.com>`); `git push -u origin <branch>`;
   `gh pr create --base main` following `.github/PULL_REQUEST_TEMPLATE.md` (gas table of headline
   ops), body ending with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`;
   `gh pr checks <n> --watch --interval 20` in the foreground until all green (fix failures). Do

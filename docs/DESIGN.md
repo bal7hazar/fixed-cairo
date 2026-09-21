@@ -58,7 +58,10 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
   quotient is representable (`normalize` of an axis-aligned vector is exactly `+-1`). Second
   exception: the **final** rescale of a transcendental polynomial (`fixed::trig`) rounds to
   nearest (symmetric error of about +-1 ULP instead of one-sided `[-2, 0]`, `cos(2^-32) = 1`,
-  <= 300 gas); intermediate rescales still floor. `sqrt` and `norm*` return the floor of the
+  <= 300 gas); intermediate rescales still floor. `exp2` / `exp` / `powf` (`fixed::exp`) keep
+  a floor final rescale: with round-to-nearest the generator found 1 ULP descents at segment
+  junctions, and monotonicity is worth more than the 1 ULP gained; the logarithms round to
+  nearest. `sqrt` and `norm*` return the floor of the
   exact root. Rounding is part of the API: results are bit-exact
   and any change is a MINOR version bump.
 - **Overflow**: panics (native `i64` checks and the final `downcast` of each kernel). Never wraps,

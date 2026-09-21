@@ -8,6 +8,7 @@ pub mod fixed;
 mod internal;
 pub mod trig;
 pub mod wide;
+pub use exp::{ExpImpl, ExpTrait};
 
 pub use fixed::{
     DEG_TO_RAD, E, EPSILON, FRAC_1_PI, FRAC_1_SQRT_2, FRAC_2_PI, FRAC_BITS, FRAC_PI_2,
