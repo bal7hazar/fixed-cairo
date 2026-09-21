@@ -35,5 +35,6 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | P1e | `glamx::eigen3` | todo | |
 | X2 | `IVec*/UVec*::as_vec*` | todo | |
 | R1a | API parity table (`scripts/api_parity.py`, `docs/API_PARITY.md`) | done | #20 |
-| X3 | parity closure: the items still `missing` in `docs/API_PARITY.md` | todo | |
+| X3a | parity closure of `Vec2/3/4` (element-wise transcendentals, `step`/`smoothstep`/`saturate`, `From<BVec>`, homogeneous, `project`) | done | #25 |
+| X3b | parity closure of `Quat`, `Mat3/4`, `Affine2/3`, camera views | inprogress | |
 | R1 | audit, optimizer pass, `v0.1.0` | todo | |
