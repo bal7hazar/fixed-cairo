@@ -34,4 +34,6 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | P1d | `glamx::sdp` | todo | |
 | P1e | `glamx::eigen3` | todo | |
 | X2 | `IVec*/UVec*::as_vec*` | todo | |
+| R1a | API parity table (`scripts/api_parity.py`, `docs/API_PARITY.md`) | done | #20 |
+| X3 | parity closure: the items still `missing` in `docs/API_PARITY.md` | todo | |
 | R1 | audit, optimizer pass, `v0.1.0` | todo | |

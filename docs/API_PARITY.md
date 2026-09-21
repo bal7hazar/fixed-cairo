@@ -10,18 +10,18 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | Type/module | Ported | Dropped | Renamed | Missing | Extra | Parity |
 |---|---:|---:|---:|---:|---:|---:|
 | [Affine2](#affine2) | 22 | 15 | 1 | 1 | 1 | 59.0% |
-| [Affine3](#affine3) | 0 | 11 | 0 | 32 | 0 | 0.0% |
+| [Affine3](#affine3) | 31 | 11 | 0 | 1 | 4 | 72.1% |
 | [BVec2](#bvec2) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [BVec3](#bvec3) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [BVec4](#bvec4) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [EulerRot](#eulerrot) | 1 | 0 | 0 | 0 | 1 | 100.0% |
-| [Fixed](#fixed) | 10 | 0 | 0 | 0 | 90 | 100.0% |
+| [Fixed](#fixed) | 10 | 0 | 0 | 0 | 99 | 100.0% |
 | [IVec2](#ivec2) | 123 | 71 | 10 | 0 | 9 | 65.2% |
 | [IVec3](#ivec3) | 221 | 73 | 10 | 0 | 9 | 76.0% |
 | [IVec4](#ivec4) | 474 | 72 | 10 | 0 | 9 | 87.1% |
 | [Mat2](#mat2) | 45 | 19 | 3 | 0 | 4 | 71.6% |
 | [Mat3](#mat3) | 58 | 20 | 8 | 1 | 4 | 75.9% |
-| [Mat4](#mat4) | 62 | 21 | 16 | 3 | 4 | 76.5% |
+| [Mat4](#mat4) | 63 | 21 | 16 | 2 | 4 | 77.5% |
 | [Quat](#quat) | 49 | 15 | 3 | 7 | 11 | 70.3% |
 | [UVec2](#uvec2) | 106 | 69 | 10 | 0 | 9 | 62.7% |
 | [UVec3](#uvec3) | 206 | 71 | 10 | 0 | 9 | 75.3% |
@@ -38,7 +38,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [camera::rh::proj::vulkan](#camera-rh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::view](#camera-rh-view) | 4 | 0 | 4 | 4 | 0 | 66.7% |
 | [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 34 | 100.0% |
-| **Total** | **2779** | **655** | **120** | **94** | **228** | **79.5%** |
+| **Total** | **2811** | **655** | **120** | **62** | **241** | **80.3%** |
 
 ## Affine2
 
@@ -96,53 +96,56 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 
 | Item | Status | Rule/detail |
 |---|---|---|
-| const `IDENTITY` | missing | Not found in the Cairo public surface. |
+| const `IDENTITY` | ported | Same public name. |
 | const `NAN` | dropped | NaN and infinity do not exist in the fixed-point scalar. |
-| const `ZERO` | missing | Not found in the Cairo public surface. |
-| impl `Default` | missing | Not found in the Cairo public surface. |
+| const `ZERO` | ported | Same public name. |
+| impl `Default` | ported | Same public name. |
 | impl `Deref` | dropped | Deref-based array views are deliberately omitted. |
 | impl `DerefMut` | dropped | Deref-based array views are deliberately omitted. |
 | impl `Display` | dropped | Display is deliberately omitted. |
 | impl `From<Affine3A> for Affine3` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
-| impl `Mul<Affine3>` | missing | Not found in the Cairo public surface. |
+| impl `Mul<Affine3>` | ported | Same public name. |
 | impl `Mul<Mat4>` | missing | Not found in the Cairo public surface. |
-| impl `MulAssign<Affine3>` | missing | Not found in the Cairo public surface. |
+| impl `MulAssign<Affine3>` | ported | Same public name. |
 | impl `Product<Affine3>` | dropped | Iterator Sum/Product traits are deliberately omitted. |
-| method `abs_diff_eq` | missing | Not found in the Cairo public surface. |
+| method `abs_diff_eq` | ported | Same public name. |
 | method `as_daffine3` | dropped | Only Fixed, i32 and u32 vector families are in scope. |
-| method `from_axis_angle` | missing | Not found in the Cairo public surface. |
-| method `from_cols` | missing | Not found in the Cairo public surface. |
-| method `from_cols_array` | missing | Not found in the Cairo public surface. |
-| method `from_cols_array_2d` | missing | Not found in the Cairo public surface. |
+| method `from_axis_angle` | ported | Same public name. |
+| method `from_cols` | ported | Same public name. |
+| method `from_cols_array` | ported | Same public name. |
+| method `from_cols_array_2d` | ported | Same public name. |
 | method `from_cols_slice` | dropped | Slice APIs are deliberately omitted from fixed-size Cairo math types. |
-| method `from_mat3` | missing | Not found in the Cairo public surface. |
-| method `from_mat3_translation` | missing | Not found in the Cairo public surface. |
-| method `from_mat4` | missing | Not found in the Cairo public surface. |
-| method `from_quat` | missing | Not found in the Cairo public surface. |
-| method `from_rotation_translation` | missing | Not found in the Cairo public surface. |
-| method `from_rotation_x` | missing | Not found in the Cairo public surface. |
-| method `from_rotation_y` | missing | Not found in the Cairo public surface. |
-| method `from_rotation_z` | missing | Not found in the Cairo public surface. |
-| method `from_scale` | missing | Not found in the Cairo public surface. |
-| method `from_scale_rotation_translation` | missing | Not found in the Cairo public surface. |
-| method `from_translation` | missing | Not found in the Cairo public surface. |
-| method `inverse` | missing | Not found in the Cairo public surface. |
+| method `from_mat3` | ported | Same public name. |
+| method `from_mat3_translation` | ported | Same public name. |
+| method `from_mat4` | ported | Same public name. |
+| method `from_quat` | ported | Same public name. |
+| method `from_rotation_translation` | ported | Same public name. |
+| method `from_rotation_x` | ported | Same public name. |
+| method `from_rotation_y` | ported | Same public name. |
+| method `from_rotation_z` | ported | Same public name. |
+| method `from_scale` | ported | Same public name. |
+| method `from_scale_rotation_translation` | ported | Same public name. |
+| method `from_translation` | ported | Same public name. |
+| method `inverse` | ported | Same public name. |
 | method `is_finite` | dropped | Fixed values are always finite and never NaN. |
 | method `is_nan` | dropped | Fixed values are always finite and never NaN. |
-| method `look_at_lh` | missing | Not found in the Cairo public surface. |
-| method `look_at_rh` | missing | Not found in the Cairo public surface. |
-| method `look_to_lh` | missing | Not found in the Cairo public surface. |
-| method `look_to_rh` | missing | Not found in the Cairo public surface. |
-| method `to_cols_array` | missing | Not found in the Cairo public surface. |
-| method `to_cols_array_2d` | missing | Not found in the Cairo public surface. |
-| method `to_scale_rotation_translation` | missing | Not found in the Cairo public surface. |
-| method `transform_point3` | missing | Not found in the Cairo public surface. |
-| method `transform_vector3` | missing | Not found in the Cairo public surface. |
+| method `look_at_lh` | ported | Same public name. |
+| method `look_at_rh` | ported | Same public name. |
+| method `look_to_lh` | ported | Same public name. |
+| method `look_to_rh` | ported | Same public name. |
+| method `to_cols_array` | ported | Same public name. |
+| method `to_cols_array_2d` | ported | Same public name. |
+| method `to_scale_rotation_translation` | ported | Same public name. |
+| method `transform_point3` | ported | Same public name. |
+| method `transform_vector3` | ported | Same public name. |
 | method `write_cols_to_slice` | dropped | Slice APIs are deliberately omitted from fixed-size Cairo math types. |
 
 ### Cairo-only items
 
-- None.
+- method `inv_mul`
+- method `inverse_rigid`
+- method `mul_mat4`
+- method `quat_from_affine3`
 
 ## BVec2
 
@@ -340,6 +343,9 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 - method `clamp`
 - method `copysign`
 - method `cos`
+- method `exp`
+- method `exp2`
+- method `exp_m1`
 - method `floor`
 - method `fract`
 - method `from_int`
@@ -349,9 +355,15 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 - method `is_positive`
 - method `is_sign_negative`
 - method `is_sign_positive`
+- method `ln`
+- method `ln_1p`
+- method `log`
+- method `log10`
+- method `log2`
 - method `max`
 - method `min`
 - method `mul_add`
+- method `powf`
 - method `powi`
 - method `recip`
 - method `round`
@@ -1689,7 +1701,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `Div<Fixed>` | renamed | Div_scalar — Heterogeneous scalar operators are named mul_scalar/div_scalar methods. |
 | impl `Div<Mat4> for Fixed` | dropped | Scalar-on-the-left matrix operators are deliberately omitted. |
 | impl `DivAssign<Fixed>` | ported | Same public name. |
-| impl `From<Affine3> for Mat4` | missing | Not found in the Cairo public surface. |
+| impl `From<Affine3> for Mat4` | ported | Same public name. |
 | impl `Mul<Affine3> for Mat4` | missing | Not found in the Cairo public surface. |
 | impl `Mul<Fixed>` | renamed | Mul_scalar — Heterogeneous scalar operators are named mul_scalar/div_scalar methods. |
 | impl `Mul<Mat4>` | ported | Same public name. |

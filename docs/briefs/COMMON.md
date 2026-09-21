@@ -50,4 +50,8 @@ Appended to every task brief of `docs/briefs/`. The orchestrator launches a port
   NOT merge. Finally write `REPORT.md` at the worktree root (do not `git add` it): summary,
   public API signatures, gas table (headline ops + winners/losers), thresholds/numeric choices,
   deviations, deferred items, requested `lib.cairo` re-exports, escalations, PR URL.
+- `docs/API_PARITY.md` is generated: when your task changes the public API of `glam` or `fixed`,
+  run `python3 scripts/api_parity.py` and commit the regenerated file (the only file under `docs/`
+  you may touch); `scripts/check.sh` and CI fail when it is stale. If an item you ported still
+  shows as `missing` because of a naming rule, add the rule at the top of the script and say so.
 - Work autonomously; do not ask questions; do not widen the scope.

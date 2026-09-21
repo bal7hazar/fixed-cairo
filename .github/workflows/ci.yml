@@ -21,6 +21,8 @@ jobs:
       - uses: software-mansion/setup-scarb@2a96b748888e3329ee44ac9ac073d930e692b3cd # v1.6.2
       - run: scarb fmt --check --workspace
       - run: scarb lint --workspace --test --deny-warnings
+      # docs/API_PARITY.md must match the Cairo sources (regenerate with scripts/api_parity.py).
+      - run: python3 scripts/api_parity.py --check
 
   test:
     name: Test ${{ matrix.package }}
