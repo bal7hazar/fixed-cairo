@@ -7,6 +7,7 @@ version = "0.1.0"
 dependencies = [
  "fixed",
  "glam",
+ "glamx",
  "snforge_std",
 ]
 
@@ -22,6 +23,15 @@ name = "glam"
 version = "0.1.0"
 dependencies = [
  "fixed",
+ "snforge_std",
+]
+
+[[package]]
+name = "glamx"
+version = "0.1.0"
+dependencies = [
+ "fixed",
+ "glam",
  "snforge_std",
 ]
 

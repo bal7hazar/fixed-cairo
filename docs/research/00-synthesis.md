@@ -77,3 +77,9 @@ rapier3d 0.35 / parry3d 0.31 now depend on Dimforge's `glamx` (glam + `Rot2`, `P
 symmetric eigen, SVD); parry has no direct nalgebra dependency any more. To be confirmed against
 their sources, but the `nalgebra.cairo` effort can probably shrink to a `glamx`-like extension on
 top of this repository plus dynamic-size matrices for multibody dynamics.
+
+**Update (report [06](06-glamx-scope.md), verified in source):** parry 0.31 has no nalgebra
+dependency at all; rapier 0.35 still uses nalgebra for its SIMD solver and multibody code. The
+`glamx` surface both actually use is `Pose2/3`, `Rot2` and (setup-time only) `SymmetricEigen3`;
+the per-step matrix hot spot (`SdpMatrix3`, world inertia `R D R^T`) is parry/rapier code, not
+glamx. It is ported in this repository as the `glamx` package.

@@ -1,0 +1,11 @@
+//! Port of Dimforge glamx 0.3.1 (https://github.com/dimforge/glamx) on top of `glam` and the
+//! `fixed` Q32.32 scalar: the rigid-body math used by parry and rapier.
+//!
+//! Scope and priorities: `docs/research/06-glamx-scope.md`.
+
+pub mod eigen3;
+pub mod pose2;
+pub mod pose3;
+pub mod rot2;
+pub mod rot3;
+pub mod sdp;

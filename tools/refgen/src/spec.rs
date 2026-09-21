@@ -157,9 +157,9 @@ impl Spec {
         if !is_ident(&self.module) {
             return Err(format!("invalid module name {:?}", self.module));
         }
-        if !matches!(self.package.as_str(), "fixed" | "glam") {
+        if !matches!(self.package.as_str(), "fixed" | "glam" | "glamx") {
             return Err(format!(
-                "package must be \"fixed\" or \"glam\", got {:?}",
+                "package must be \"fixed\", \"glam\" or \"glamx\", got {:?}",
                 self.package
             ));
         }

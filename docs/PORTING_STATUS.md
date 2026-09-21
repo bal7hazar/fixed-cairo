@@ -27,5 +27,11 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | C1 | `camera` | done | #16 |
 | S2 | swizzles (Vec4, integer) | done | #10 |
 | F4 | `fixed` tier C (`exp`, `ln`, `powf`) | done | #18 |
-| P1 | physics extensions (`Rot2`, `Pose2`, `Pose3`) | todo | |
+| P0 | `glamx` package bootstrap + scope research (`docs/research/06-glamx-scope.md`) | done | #19 |
+| P1a | `glamx::pose3`, `glamx::rot3` | todo | |
+| P1b | `glamx::rot2` | todo | |
+| P1c | `glamx::pose2` | todo | |
+| P1d | `glamx::sdp` | todo | |
+| P1e | `glamx::eigen3` | todo | |
+| X2 | `IVec*/UVec*::as_vec*` | todo | |
 | R1 | audit, optimizer pass, `v0.1.0` | todo | |

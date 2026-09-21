@@ -8,12 +8,13 @@ by the orchestrator, never by a porting sub-agent.
 
 `glam.cairo` ports [glam-rs](https://github.com/bitshifter/glam-rs) **0.33.8** to pure Cairo
 (no `starknet` dependency). It is the base layer of a provable game physics stack; the sibling
-repositories `nalgebra.cairo` and `rapier.cairo` consume the two published packages:
+repositories `nalgebra.cairo` and `rapier.cairo` consume the published packages:
 
 | package | role |
 |---|---|
 | `fixed` | the signed Q32.32 scalar, its fused kernels and its transcendental functions. Zero dependencies. |
 | `glam` | `Vec2/3/4`, `Mat2/3/4`, `Quat`, `Affine2/3`, `BVec*`, `IVec*`, `UVec*`, `EulerRot`, swizzles, camera |
+| `glamx` | physics-oriented extensions mirroring Dimforge's `glamx` 0.3.1 (what parry and rapier are written against): `Rot2`, `Rot3 = Quat`, `Pose2`, `Pose3`, `SdpMatrix2/3`, `SymmetricEigen3`. Separate package so that `glam` stays a clean glam-rs parity surface and `glam_tests` does not pay for it |
 | `benches` | unpublished: gas/step benchmarks and the losing alternative implementations |
 
 Type mapping from glam-rs (one scalar, so the f32/f64/SIMD/aligned variants collapse):

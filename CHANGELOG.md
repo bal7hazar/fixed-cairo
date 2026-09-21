@@ -26,3 +26,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glam`: `camera` module (`rh`/`lh` view and OpenGL / Vulkan / DirectX projection constructors) with glam-rs golden vectors (#16).
 - `glam`: cross-type methods: `Mat3/Mat4::from_quat`, `Quat::from_mat3/4`, TRS compose / decompose, `Vec3::rotate_towards`, `Vec3::slerp` (#17).
 - `fixed::exp`: loop-free `exp`, `exp2`, `exp_m1`, `ln`, `log2`, `log10`, `ln_1p`, `log`, `powf` (monotone, <= ~2 ULP, generator + mirror in `scripts/gen_exp.py`) (#18).
+- Research report 06 (scope of the glamx physics extensions) and bootstrap of the `glamx` package (#19).

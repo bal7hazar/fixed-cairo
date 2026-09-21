@@ -15,6 +15,7 @@ license = "MIT"
 # `scalar-math`: the code path that is ported. `libm`: platform-independent transcendentals, so
 # the generated files are byte-identical on every host.
 glam = { version = "=0.33.8", default-features = false, features = ["libm", "scalar-math", "f64", "i32", "u32"] }
+glamx = { version = "=0.3.1", default-features = false, features = ["f64", "libm", "std"] }
 libm = "0.2"
 serde = { version = "1", features = ["derive"] }
 toml = "1.1"

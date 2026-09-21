@@ -68,7 +68,13 @@ Research reports, workspace, toolchain pin, bench harness + snapshot script, CI,
 | C1 | `camera` module (`rh`/`lh` x `view` / `proj::{opengl,vulkan,directx}`), deprecated `Mat4::perspective_*`/`look_at_*` aliases skipped |
 | S2 | `Vec4` and integer swizzles |
 | F4 | `fixed` tier C: `exp exp2 ln log2 powf` and the element-wise vector wrappers |
-| P1 | physics extensions mirroring Dimforge's `glamx` (`Rot2`, `Pose2`, `Pose3`, `inv_mul`, rigid inverse) - confirm scope against rapier/parry sources first; candidate home for the start of `nalgebra.cairo` |
+| P0 | bootstrap of the `glamx` package (manifest, stubs, CI matrix, benches dependency, refgen `glamx =0.3.1` f64 oracle): done by the orchestrator. Scope and priorities: `docs/research/06-glamx-scope.md` |
+| P1a | `glamx::pose3` (+ `rot3` alias of `Quat`): `Pose3 { rotation: Quat, translation: Vec3 }`, fused `inv_mul`, `transform_point`... |
+| P1b | `glamx::rot2`: `Rot2 { re, im }` |
+| P1c | `glamx::pose2` (after P1b) |
+| P1d | `glamx::sdp`: parry's `SdpMatrix3` / `SdpMatrix2` and the fused world-inertia kernel `R D R^T` |
+| P1e | `glamx::eigen3`: `SymmetricEigen3` (setup-time only, low priority; `Svd*`, `SymmetricEigen2`, look-at are not ported: no consumer in parry / rapier) |
+| X2 | `IVec*/UVec*::as_vec*` casts (gap found by the P1 research; needed by voxel code) |
 | R1 | audit pass: API parity table vs glam-rs 0.33.8, optimizer pass over the top-20 hottest benches, README gas tables, `v0.1.0` tag, publish `fixed` then `glam` on scarbs.xyz |
 
 The physics-critical path is `F1 -> F2 -> V3 -> M3 + Q1 -> A3/P1`. The 2D track

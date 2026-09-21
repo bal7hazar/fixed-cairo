@@ -1,18 +1,16 @@
 [package]
-name = "benches"
-description = "Gas and step benchmarks for the fixed and glam packages (not published)"
+name = "glamx"
+description = "Physics-oriented extensions of glam (Rot2, Pose2, Pose3, SdpMatrix, symmetric eigen): port of Dimforge glamx on the fixed Q32.32 scalar"
 version.workspace = true
 edition.workspace = true
 cairo-version.workspace = true
 license.workspace = true
 repository.workspace = true
 readme = "README.md"
-publish = false
 
 [dependencies]
 fixed.workspace = true
 glam.workspace = true
-glamx.workspace = true
 
 [dev-dependencies]
 snforge_std.workspace = true
