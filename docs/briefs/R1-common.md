@@ -20,6 +20,12 @@ Read after your task brief and before `docs/briefs/COMMON.md` (which still appli
   `scripts/bench.py run bench_<module>`), and run the full gate exactly like this, in the
   foreground: `flock /tmp/glam-cairo-gate.lock scripts/check.sh` (it may wait for another agent's
   gate: that is expected, do not kill it, do not bypass the lock).
+- Headless session: **never** start a command in the background (no `run_in_background`, no
+  "I will continue when it finishes") and never end your turn before `REPORT.md` is written: no
+  notification ever arrives, the session just stops (observed again on R1g). Run everything in
+  the foreground with a long timeout; for a command longer than 10 minutes, `nohup` it to a file
+  and block on it with `while pgrep -f <pattern> >/dev/null; do sleep 20; done`, repeated as
+  needed.
 - Generated modules (`vec2/3/4`, `mat2/3/4`, integer vectors, swizzles) are edited through
   `tools/codegen/*.py` only, then regenerated (see `tools/codegen/README.md`); the generator
   and its output are both in your allowlist when the module is.
