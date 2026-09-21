@@ -12,3 +12,4 @@ pub mod sdp;
 
 pub use pose3::{Pose3, Pose3Trait, Rot3Pose3Trait};
 pub use rot3::Rot3;
+pub use sdp::{SdpMatrix2, SdpMatrix2Trait, SdpMatrix3, SdpMatrix3Trait};

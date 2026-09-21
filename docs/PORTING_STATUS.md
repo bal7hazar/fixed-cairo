@@ -31,7 +31,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | P1a | `glamx::pose3`, `glamx::rot3` | done | #22 |
 | P1b | `glamx::rot2` | todo | |
 | P1c | `glamx::pose2` | todo | |
-| P1d | `glamx::sdp` | todo | |
+| P1d | `glamx::sdp` | done | #23 |
 | P1e | `glamx::eigen3` | todo | |
 | X2 | `IVec*/UVec*::as_vec*` | todo | |
 | R1a | API parity table (`scripts/api_parity.py`, `docs/API_PARITY.md`) | done | #20 |

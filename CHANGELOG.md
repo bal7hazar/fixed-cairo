@@ -30,3 +30,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glam`: `Affine3` (fused composition, adjugate inverse) plus the physics-oriented `Affine3RigidTrait` (`inverse_rigid`, `inv_mul`) (#21).
 - `scripts/api_parity.py` and the generated `docs/API_PARITY.md`: item-by-item parity with glam-rs 0.33.8, checked in CI (#20).
 - `glamx`: `Pose3` (fused `inv_mul`, point / vector transforms, nlerp) and the `Rot3` alias (#22).
+- `glamx`: `SdpMatrix2`, `SdpMatrix3` and the fused world-inertia kernel `from_rotated_diagonal` (`R D R^T`) (#23).
