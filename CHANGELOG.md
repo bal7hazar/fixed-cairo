@@ -24,3 +24,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glam`: `Affine2` (fused composition, inverse with shared reciprocal) with glam-rs golden vectors (#14).
 - `glam`: `EulerRot` (24 orders) and Euler conversions of `Quat`, `Mat3`, `Mat4` as extension traits (#15).
 - `glam`: `camera` module (`rh`/`lh` view and OpenGL / Vulkan / DirectX projection constructors) with glam-rs golden vectors (#16).
+- `glam`: cross-type methods: `Mat3/Mat4::from_quat`, `Quat::from_mat3/4`, TRS compose / decompose, `Vec3::rotate_towards`, `Vec3::slerp` (#17).
