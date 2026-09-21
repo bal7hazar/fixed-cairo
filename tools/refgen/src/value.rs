@@ -10,7 +10,7 @@ use glam::{
     IVec2, IVec3, IVec4, UVec2, UVec3, UVec4,
 };
 
-use glamx::DPose3;
+use glamx::{DPose2, DPose3};
 
 use crate::types::Ty;
 
@@ -160,6 +160,15 @@ impl Value {
 
     pub fn daffine3(&self) -> DAffine3 {
         DAffine3::from_cols_array(&self.floats(Ty::Affine3))
+    }
+
+    /// A `glamx::Pose2` argument: rotation leaves `[re, im]`, then the translation.
+    pub fn dpose2(&self) -> DPose2 {
+        let l = self.floats::<4>(Ty::Pose2);
+        DPose2::from_parts(
+            DVec2::new(l[2], l[3]),
+            glamx::DRot2::from_cos_sin_unchecked(l[0], l[1]),
+        )
     }
 
     /// A `glamx::Pose3` argument: the rotation leaves `[x, y, z, w]`, then the translation.
@@ -353,6 +362,9 @@ out_from_floats! {
     DMat4 => Ty::Mat4, |v: DMat4| v.to_cols_array();
     DAffine2 => Ty::Affine2, |v: DAffine2| v.to_cols_array();
     DAffine3 => Ty::Affine3, |v: DAffine3| v.to_cols_array();
+    DPose2 => Ty::Pose2, |v: DPose2| {
+        [v.rotation.re, v.rotation.im, v.translation.x, v.translation.y]
+    };
     DPose3 => Ty::Pose3, |v: DPose3| {
         let (q, t) = (v.rotation.to_array(), v.translation.to_array());
         [q[0], q[1], q[2], q[3], t[0], t[1], t[2]]

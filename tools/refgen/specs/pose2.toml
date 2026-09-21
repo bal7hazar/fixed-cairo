@@ -1,0 +1,187 @@
+# Golden vectors of `glamx::pose2`, with glamx 0.3.1 `DPose2` as the f64 oracle.
+# Layout: `Pose2 { rotation: Rot2 { re, im }, translation: Vec2 }`.
+# Inputs are quantized before both implementations run; each fused two-product kernel floors once
+# while the f64 oracle is rounded to nearest, hence the 1-ULP arithmetic bounds below.
+
+module = "pose2"
+package = "glamx"
+imports = ["glamx::pose2::Pose2Trait", "glamx::pose2::Rot2Pose2Trait"]
+
+[types.Rot2]
+path = "glamx::rot2::Rot2"
+
+[types.Pose2]
+path = "glamx::pose2::Pose2"
+
+[[function]]
+name = "mul"
+call = "{0} * {1}"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Pose2", custom = "pose" }]
+ret = "Pose2"
+cases = 12
+tolerance = 1
+justification = "rotation and translated point are exact two-product sums, each floored once."
+edges = [
+    [[[1, 0], [0, 0]], [[1, 0], [0, 0]]],
+    [[[0, 1], [1, 2]], [[-1, 0], [-4, 5]]],
+]
+
+[[function]]
+name = "inv_mul"
+call = "{0}.inv_mul({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Pose2", custom = "pose" }]
+ret = "Pose2"
+cases = 12
+tolerance = 1
+justification = "the exact translation difference and conjugated two-product sums are floored once."
+edges = [
+    [[[1, 0], [1, 2]], [[1, 0], [1, 2]]],
+    [[[0, 1], [1, 2]], [[0, 1], [3, 4]]],
+]
+
+[[function]]
+name = "inverse"
+call = "{0}.inverse()"
+args = [{ type = "Pose2", custom = "pose" }]
+ret = "Pose2"
+cases = 10
+tolerance = 1
+justification = "the conjugate is exact and its translation is one exact two-product sum per component."
+edges = [[[[1, 0], [1, 2]]], [[[0, 1], [1, -2]]]]
+
+[[function]]
+name = "mul_rot2"
+call = "{0}.mul_rot2({1}.rotation)"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Pose2", custom = "pose" }]
+ret = "Pose2"
+cases = 8
+tolerance = 1
+justification = "the complex product is floored once and translation is copied."
+
+[[function]]
+name = "mul_pose2"
+call = "{0}.rotation.mul_pose2({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Pose2", custom = "pose" }]
+ret = "Pose2"
+cases = 8
+tolerance = 1
+justification = "the complex product and rotated translation each floor one exact two-product sum."
+
+[[function]]
+name = "transform_point"
+call = "{0}.transform_point({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Vec2"
+cases = 12
+tolerance = 1
+justification = "rotation and translation are one exact Q64.64 sum, floored once per component."
+edges = [[[[1, 0], [1, 2]], [0, 0]], [[[0, 1], [1, 2]], [1, 0]]]
+
+[[function]]
+name = "mul_vec2"
+call = "{0}.mul_vec2({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Vec2"
+cases = 6
+tolerance = 1
+justification = "the same fused kernel as `transform_point`."
+
+[[function]]
+name = "transform_vector"
+call = "{0}.transform_vector({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Vec2"
+cases = 8
+tolerance = 1
+justification = "one exact two-product sum floored once per component."
+
+[[function]]
+name = "inverse_transform_point"
+call = "{0}.inverse_transform_point({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Vec2"
+cases = 12
+tolerance = 1
+justification = "the exact point difference is conjugate-rotated and floored once per component."
+
+[[function]]
+name = "inverse_transform_vector"
+call = "{0}.inverse_transform_vector({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Vec2"
+cases = 8
+tolerance = 1
+justification = "the conjugate rotation is one exact two-product sum per component."
+
+[[function]]
+name = "prepend_translation"
+call = "{0}.prepend_translation({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Pose2"
+cases = 8
+tolerance = 1
+justification = "the translation is the fused transform-point kernel; rotation is copied."
+
+[[function]]
+name = "append_translation"
+call = "{0}.append_translation({1})"
+args = [{ type = "Pose2", custom = "pose" }, { type = "Vec2", min = -500.0, max = 500.0 }]
+ret = "Pose2"
+cases = 6
+tolerance = 0
+justification = "translations are added exactly and rotation is copied."
+
+[[function]]
+name = "new"
+call = "Pose2Trait::new({0}, {1})"
+args = [{ type = "Vec2", min = -500.0, max = 500.0 }, { type = "Fixed", domain = "angle" }]
+ret = "Pose2"
+cases = 8
+tolerance = 2
+justification = "the rotation uses `sin_cos` (1.02 ULP); translation is copied."
+edges = [[[1, 2], 0], [[1, 0], 1.5707963267948966]]
+
+[[function]]
+name = "rotation"
+call = "Pose2Trait::rotation({0})"
+args = [{ type = "Fixed", domain = "angle" }]
+ret = "Pose2"
+cases = 6
+tolerance = 2
+justification = "as `new`, with zero translation."
+edges = [[0], [-3.141592653589793]]
+
+[[function]]
+name = "lerp"
+call = "{0}.lerp({1}, {2})"
+args = [
+    { type = "Pose2", custom = "pose" },
+    { type = "Pose2", custom = "pose" },
+    { type = "Fixed", domain = "t" },
+]
+ret = "Pose2"
+cases = 10
+tolerance = 12
+justification = "rotation is `Rot2::slerp` (derived bound 12); translation lerp floors one product."
+
+[[function]]
+name = "to_mat3"
+call = "{0}.to_mat3()"
+args = [{ type = "Pose2", custom = "pose" }]
+ret = "Mat3"
+cases = 8
+tolerance = 0
+justification = "matrix entries copy or negate pose fields exactly."
+
+[[function]]
+name = "from_mat3"
+call = "Pose2Trait::from_mat3({0})"
+args = [{ type = "Mat3", custom = "rigid" }]
+ret = "Pose2"
+cases = 10
+tolerance = 4
+justification = "both normalize the quantized first column; fixed sqrt and reciprocal contribute at most 4 ULP."
+edges = [
+    [[[1, 0, 0], [0, 1, 0], [1, 2, 1]]],
+    [[[0, 1, 0], [-1, 0, 0], [0, 0, 1]]],
+]

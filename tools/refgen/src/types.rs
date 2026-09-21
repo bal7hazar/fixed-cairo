@@ -32,6 +32,11 @@ pub enum Ty {
     Mat4,
     Affine2,
     Affine3,
+    /// `glamx::Rot2` (`re`, `im`). A spec sets its non-glam import path.
+    Rot2,
+    /// `glamx::Pose2` (`rotation: Rot2`, `translation: Vec2`). No default import path under
+    /// `glam::`: a spec sets it with `[types.Pose2] path = "glamx::pose2::Pose2"`.
+    Pose2,
     /// `glamx::Pose3` (`rotation: Quat`, `translation: Vec3`). No default import path under
     /// `glam::`: a spec sets it with `[types.Pose3] path = "glamx::pose3::Pose3"`.
     Pose3,
@@ -99,6 +104,8 @@ impl Ty {
             "Mat4" => Ty::Mat4,
             "Affine2" => Ty::Affine2,
             "Affine3" => Ty::Affine3,
+            "Rot2" => Ty::Rot2,
+            "Pose2" => Ty::Pose2,
             "Pose3" => Ty::Pose3,
             "BVec2" => Ty::BVec2,
             "BVec3" => Ty::BVec3,
@@ -159,6 +166,8 @@ impl Ty {
             Ty::Mat4 => cols(4, Ty::Vec4),
             Ty::Affine2 => vec![("matrix2", Ty::Mat2), ("translation", Ty::Vec2)],
             Ty::Affine3 => vec![("matrix3", Ty::Mat3), ("translation", Ty::Vec3)],
+            Ty::Rot2 => vec![("re", Ty::Fixed), ("im", Ty::Fixed)],
+            Ty::Pose2 => vec![("rotation", Ty::Rot2), ("translation", Ty::Vec2)],
             Ty::Pose3 => vec![("rotation", Ty::Quat), ("translation", Ty::Vec3)],
             Ty::BVec2 => comps(2, Ty::Bool),
             Ty::BVec3 => comps(3, Ty::Bool),
@@ -292,6 +301,8 @@ mod tests {
         );
         assert_eq!(Ty::parse("(Vec3, Fixed)").unwrap().leaves().len(), 4);
         assert_eq!(Ty::Affine3.leaves().len(), 12);
+        assert_eq!(Ty::Rot2.leaves().len(), 2);
+        assert_eq!(Ty::Pose2.leaves().len(), 4);
         assert_eq!(Ty::Pose3.leaves().len(), 7);
         assert_eq!(Ty::Mat4.leaves().len(), 16);
         assert!(Ty::parse("((Fixed, Fixed), Fixed)").is_err());
