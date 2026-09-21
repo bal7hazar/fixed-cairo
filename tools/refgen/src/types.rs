@@ -32,6 +32,9 @@ pub enum Ty {
     Mat4,
     Affine2,
     Affine3,
+    /// `glamx::Pose3` (`rotation: Quat`, `translation: Vec3`). No default import path under
+    /// `glam::`: a spec sets it with `[types.Pose3] path = "glamx::pose3::Pose3"`.
+    Pose3,
     BVec2,
     BVec3,
     BVec4,
@@ -93,6 +96,7 @@ impl Ty {
             "Mat4" => Ty::Mat4,
             "Affine2" => Ty::Affine2,
             "Affine3" => Ty::Affine3,
+            "Pose3" => Ty::Pose3,
             "BVec2" => Ty::BVec2,
             "BVec3" => Ty::BVec3,
             "BVec4" => Ty::BVec4,
@@ -152,6 +156,7 @@ impl Ty {
             Ty::Mat4 => cols(4, Ty::Vec4),
             Ty::Affine2 => vec![("matrix2", Ty::Mat2), ("translation", Ty::Vec2)],
             Ty::Affine3 => vec![("matrix3", Ty::Mat3), ("translation", Ty::Vec3)],
+            Ty::Pose3 => vec![("rotation", Ty::Quat), ("translation", Ty::Vec3)],
             Ty::BVec2 => comps(2, Ty::Bool),
             Ty::BVec3 => comps(3, Ty::Bool),
             Ty::BVec4 => comps(4, Ty::Bool),
@@ -272,6 +277,7 @@ mod tests {
         );
         assert_eq!(Ty::parse("(Vec3, Fixed)").unwrap().leaves().len(), 4);
         assert_eq!(Ty::Affine3.leaves().len(), 12);
+        assert_eq!(Ty::Pose3.leaves().len(), 7);
         assert_eq!(Ty::Mat4.leaves().len(), 16);
         assert!(Ty::parse("((Fixed, Fixed), Fixed)").is_err());
         assert!(Ty::parse("Vec5").is_err());

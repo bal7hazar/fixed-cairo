@@ -1,0 +1,257 @@
+# Golden vectors of `glamx::pose3`, with glamx 0.3.1 `DPose3` (on glam-rs 0.33.8 `DQuat` /
+# `DVec3`) as the oracle. Oracles: tools/refgen/src/oracles/pose3.rs. Format:
+# tools/refgen/README.md.
+# Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen pose3
+#
+# Layout: `Pose3 { rotation: Quat, translation: Vec3 }`, flattened as the four rotation leaves
+# then the three translation leaves (`[types.Pose3]` below sets the import path).
+#
+# Tolerances. Every rotation of a vector is the fused triple-product kernel of `Quat::mul_vec3`
+# with the translation (or the conjugate sign) folded into the same exact Q96.96 sum and one
+# floor rescale per component, which is the same polynomial the f64 oracle evaluates: 1 ULP of
+# floor against the round-to-nearest quantization, plus the f64 error of the oracle, a relative
+# 1e-16 on terms of magnitude <= 1 000 (0.001 ULP): |diff| <= 2. Quaternion products are one
+# exact 4-term sum floored once: 1 ULP. The entries that reuse `glam::quat` functions
+# (`from_scaled_axis`, `slerp`, `lerp`, `from_mat4`) inherit the derived bounds of
+# `specs/quat.toml` and `Mat4::from_rotation_translation` those of `specs/mat4.toml`.
+#
+# Domains. Poses come from the `pose` generator (a quantized unit rotation, a translation within
+# |x| <= 500); vectors stay within |x| <= 500 as in `specs/quat.toml`, so that the quadratic
+# terms keep half a raw ULP of f64 resolution.
+#
+# Not covered here: `identity`, `from_translation`, `translation`, `from_rotation`, `from_parts`,
+# the conversions and `abs_diff_eq` (exact by construction, pinned by `tests/test_pose3.cairo`),
+# and the equality of the fused kernels with the composed glamx forms (bit-exact, also pinned
+# there).
+
+module = "pose3"
+package = "glamx"
+imports = ["glamx::pose3::Pose3Trait", "glamx::pose3::Rot3Pose3Trait"]
+
+[types.Pose3]
+path = "glamx::pose3::Pose3"
+
+# ------------------------------------------------------------------------------------------
+# Composition.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "mul"
+call = "{0} * {1}"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Pose3", custom = "pose" }]
+ret = "Pose3"
+cases = 12
+tolerance = 2
+justification = "rotation: one exact 4-term sum floored (1 ULP); translation: `ta + qa * tb` as one exact Q96.96 sum floored once, against the round-to-nearest f64 oracle (0.001 ULP at |x| <= 1 000): |diff| <= 2."
+edges = [
+    [[[0, 0, 0, 1], [0, 0, 0]], [[0, 0, 0, 1], [0, 0, 0]]],
+    [[[0.5, 0.5, 0.5, 0.5], [1, 2, 3]], [[0, 0, 0, 1], [-4, 5, 6]]],
+    [[[1, 0, 0, 0], [0, 0, 1]], [[0, 1, 0, 0], [1, 0, 0]]],
+]
+
+[[function]]
+name = "inv_mul"
+call = "{0}.inv_mul({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Pose3", custom = "pose" }]
+ret = "Pose3"
+cases = 12
+tolerance = 2
+justification = "rotation: `conj(qa) qb` as one exact 4-term sum floored (1 ULP); translation: `tb - ta` is exact and its rotation by the conjugate is one exact Q96.96 sum floored once: |diff| <= 2."
+edges = [
+    [[[0, 0, 0, 1], [1, 2, 3]], [[0, 0, 0, 1], [1, 2, 3]]],
+    [[[0.5, 0.5, 0.5, 0.5], [1, 2, 3]], [[0.5, 0.5, 0.5, 0.5], [1, 2, 3]]],
+    [[[0.5, -0.5, 0.5, 0.5], [-7, 0, 2]], [[0, 0, 1, 0], [3, 3, 3]]],
+]
+
+[[function]]
+name = "inverse"
+call = "{0}.inverse()"
+args = [{ type = "Pose3", custom = "pose" }]
+ret = "Pose3"
+cases = 10
+tolerance = 2
+justification = "rotation: the conjugate (exact); translation: `conj(q) * -t` as one exact Q96.96 sum floored once: |diff| <= 2."
+edges = [
+    [[[0, 0, 0, 1], [1, 2, 3]]],
+    [[[0.5, 0.5, 0.5, 0.5], [1, -2, 3]]],
+]
+
+[[function]]
+name = "mul_rot3"
+call = "{0}.mul_rot3({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Quat", constraint = "normalized" }]
+ret = "Pose3"
+cases = 8
+tolerance = 1
+justification = "rotation: one exact 4-term sum floored once (1 ULP); the translation is copied."
+edges = [[[[0.5, 0.5, 0.5, 0.5], [1, 2, 3]], [0, 0, 0, 1]]]
+
+[[function]]
+name = "mul_pose3"
+call = "{0}.mul_pose3({1})"
+args = [{ type = "Quat", constraint = "normalized" }, { type = "Pose3", custom = "pose" }]
+ret = "Pose3"
+cases = 8
+tolerance = 2
+justification = "rotation: one exact 4-term sum floored (1 ULP); translation: `Quat::mul_vec3` (see `mul`): |diff| <= 2."
+edges = [[[0, 0, 0, 1], [[0.5, 0.5, 0.5, 0.5], [1, 2, 3]]]]
+
+# ------------------------------------------------------------------------------------------
+# Points and vectors.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "transform_point"
+call = "{0}.transform_point({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Vec3"
+cases = 12
+tolerance = 2
+justification = "`q * p + t` as one exact Q96.96 sum floored once per component: |diff| <= 2 (see the header)."
+edges = [
+    [[[0, 0, 0, 1], [1, 2, 3]], [0, 0, 0]],
+    [[[0.5, 0.5, 0.5, 0.5], [1, 2, 3]], [1, 0, 0]],
+    [[[0, 0, 0.7071067811865476, 0.7071067811865476], [1, 0, 0]], [1, 0, 0]],
+]
+
+[[function]]
+name = "mul_vec3"
+call = "{0}.mul_vec3({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Vec3"
+cases = 6
+tolerance = 2
+justification = "the same kernel as `transform_point`."
+
+[[function]]
+name = "transform_vector"
+call = "{0}.transform_vector({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 2
+justification = "`Quat::mul_vec3`: one floor rescale per component (see the header)."
+edges = [[[[0.5, 0.5, 0.5, 0.5], [100, 200, 300]], [1, 0, 0]]]
+
+[[function]]
+name = "inverse_transform_point"
+call = "{0}.inverse_transform_point({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Vec3"
+cases = 12
+tolerance = 2
+justification = "`p - t` is exact (|x| <= 1 000) and its rotation by the conjugate is one exact Q96.96 sum floored once: |diff| <= 2."
+edges = [
+    [[[0, 0, 0, 1], [1, 2, 3]], [1, 2, 3]],
+    [[[0.5, 0.5, 0.5, 0.5], [1, 2, 3]], [2, 2, 3]],
+]
+
+[[function]]
+name = "inverse_transform_vector"
+call = "{0}.inverse_transform_vector({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 2
+justification = "the rotation by the conjugate: one exact Q96.96 sum floored once per component."
+edges = [[[[0.5, 0.5, 0.5, 0.5], [1, 2, 3]], [0, 1, 0]]]
+
+[[function]]
+name = "prepend_translation"
+call = "{0}.prepend_translation({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Pose3"
+cases = 8
+tolerance = 2
+justification = "the translation is the `transform_point` kernel (|diff| <= 2); the rotation is copied."
+
+[[function]]
+name = "append_translation"
+call = "{0}.append_translation({1})"
+args = [{ type = "Pose3", custom = "pose" }, { type = "Vec3", min = -500.0, max = 500.0 }]
+ret = "Pose3"
+cases = 6
+tolerance = 0
+justification = "an exact addition of the translations; the rotation is copied."
+
+# ------------------------------------------------------------------------------------------
+# Constructors and conversions.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "new"
+call = "Pose3Trait::new({0}, {1})"
+args = [{ type = "Vec3", min = -500.0, max = 500.0 }, { type = "Vec3", domain = "small" }]
+ret = "Pose3"
+cases = 8
+tolerance = 4
+justification = "the rotation is `Quat::from_scaled_axis` (derived bound 4 in `specs/quat.toml`); the translation is copied."
+edges = [[[1, 2, 3], [0, 0, 0]], [[1, 0, 0], [0, 0, 1.5707963267948966]]]
+
+[[function]]
+name = "rotation"
+call = "Pose3Trait::rotation({0})"
+args = [{ type = "Vec3", domain = "small" }]
+ret = "Pose3"
+cases = 6
+tolerance = 4
+justification = "as `new`, with a zero translation."
+edges = [[[0, 0, 0]], [[0, -3.141592653589793, 0]]]
+
+[[function]]
+name = "to_mat4"
+call = "{0}.to_mat4()"
+args = [{ type = "Pose3", custom = "pose" }]
+ret = "Mat4"
+cases = 8
+tolerance = 2
+justification = "`Mat4::from_rotation_translation` (derived bound 2 in `specs/mat4.toml`); the translation column is copied."
+edges = [[[[0, 0, 0, 1], [1, 2, 3]]], [[[0.5, 0.5, 0.5, 0.5], [0, 0, 0]]]]
+
+[[function]]
+name = "from_mat4"
+call = "Pose3Trait::from_mat4({0})"
+args = [{ type = "Mat4", custom = "rigid" }]
+ret = "Pose3"
+cases = 10
+tolerance = 7
+justification = "rotation: `Quat::from_mat4` of the linear part (derived bound 6 in `specs/quat.toml`); glamx first divides each column by its length, which is one to within 1 ULP on a quantized rotation matrix and moves each component by at most one more ULP: |diff| <= 7. The translation column is copied exactly."
+edges = [
+    [[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [1, 2, 3, 1]]],
+    [[[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]],
+]
+
+# ------------------------------------------------------------------------------------------
+# Interpolation.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "lerp"
+call = "{0}.lerp({1}, {2})"
+args = [
+    { type = "Pose3", custom = "pose" },
+    { type = "Pose3", custom = "pose" },
+    { type = "Fixed", domain = "t" },
+]
+ret = "Pose3"
+cases = 10
+tolerance = 48
+justification = "rotation: `Quat::slerp` with `|dot| <= 0.99` (derived bound 48 in `specs/quat.toml`); translation: `Fixed::lerp`, one floored product (1 ULP)."
+
+[[function]]
+name = "nlerp"
+call = "{0}.nlerp({1}, {2})"
+args = [
+    { type = "Pose3", custom = "pose" },
+    { type = "Pose3", custom = "pose" },
+    { type = "Fixed", domain = "t" },
+]
+ret = "Pose3"
+cases = 10
+tolerance = 4
+justification = "rotation: `Quat::lerp` (derived bound 4 in `specs/quat.toml`); translation: `Fixed::lerp`, one floored product (1 ULP)."
+edges = [
+    [[[0, 0, 0, 1], [0, 0, 0]], [[0.5, 0.5, 0.5, 0.5], [2, 4, 6]], 0.5],
+    [[[0, 0, 0, 1], [0, 0, 0]], [[0.5, 0.5, 0.5, 0.5], [2, 4, 6]], 0],
+    [[[0, 0, 0, 1], [0, 0, 0]], [[0.5, 0.5, 0.5, 0.5], [2, 4, 6]], 1],
+]

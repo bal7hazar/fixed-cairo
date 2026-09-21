@@ -10,6 +10,8 @@ use glam::{
     IVec2, IVec3, IVec4, UVec2, UVec3, UVec4,
 };
 
+use glamx::DPose3;
+
 use crate::types::Ty;
 
 /// Number of fractional bits of `fixed::Fixed`.
@@ -158,6 +160,15 @@ impl Value {
 
     pub fn daffine3(&self) -> DAffine3 {
         DAffine3::from_cols_array(&self.floats(Ty::Affine3))
+    }
+
+    /// A `glamx::Pose3` argument: the rotation leaves `[x, y, z, w]`, then the translation.
+    pub fn dpose3(&self) -> DPose3 {
+        let l = self.floats::<7>(Ty::Pose3);
+        DPose3::from_parts(
+            DVec3::new(l[4], l[5], l[6]),
+            DQuat::from_array([l[0], l[1], l[2], l[3]]),
+        )
     }
 
     fn bools(&self, ty: Ty) -> Vec<bool> {
@@ -342,6 +353,10 @@ out_from_floats! {
     DMat4 => Ty::Mat4, |v: DMat4| v.to_cols_array();
     DAffine2 => Ty::Affine2, |v: DAffine2| v.to_cols_array();
     DAffine3 => Ty::Affine3, |v: DAffine3| v.to_cols_array();
+    DPose3 => Ty::Pose3, |v: DPose3| {
+        let (q, t) = (v.rotation.to_array(), v.translation.to_array());
+        [q[0], q[1], q[2], q[3], t[0], t[1], t[2]]
+    };
 }
 
 macro_rules! out_from_ints {
