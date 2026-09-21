@@ -28,7 +28,7 @@ test = "snforge test"
 # One integration-test crate per bench file. snforge's cost per test grows with the size of the
 # compiled test program (58 tests: 28 s inside the 4 700-test crate, 1.3 s alone), so a single
 # crate over `tests/lib.cairo` made `scripts/bench.py` ~12x slower (990 s vs 82 s). Explicit
-# `[[test]]` targets replace the auto-detected `tests/lib.cairo` (now unused). `scripts/bench.py`
+# `[[test]]` targets replace the auto-detected the former `tests/lib.cairo` (deleted). `scripts/bench.py`
 # fails when this list and `tests/bench_*.cairo` differ. `test-type = "integration"` gives each
 # crate access to `benches::harness` / `benches::alt`.
 

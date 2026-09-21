@@ -43,7 +43,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1d | optimizer pass on `quat` (shared `slerp` helper, `rotate_towards`, wide `is_normalized`); after R1e | todo | |
 | R1e | optimizer pass on `fixed::wide` + `Vec2/3/4`: `is_unit2/3/4` kernels (`is_normalized` total and ~2x cheaper), shared norm in `Vec3::rotate_towards`; single-division and `slerp` candidates measured and kept in `benches::alt` | done | #32 |
 | R1f | `camera` / `Mat4::look_to_*` duplication; after R1i (bytecode evidence) | todo | |
-| R1g | faster bench job (one compile for the two snforge runs, CI and local gate) | inprogress | |
+| R1g | faster bench job: one snforge test crate per bench file (CI bench job 928 s -> 198 s, local check ~2 090 s -> 230 s, snapshots identical); `all-checks` is now bounded by `Test glam` (~16 min) | done | #33 |
 | R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`); 8 rows added to DESIGN section 3 | done | #30 |
 | R1j | `glamx::rot2`: `lerp` aligned with upstream (not normalised), `is_normalized` added (audit P0); after R1e (wide kernel) | todo | |
 | R1k | panic coverage: item/branch -> `should_panic` test manifest and checker, doc template on the nine `IndexView` impls (audit P0) | todo | |

@@ -41,3 +41,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 
 ### Changed
 - `fixed::wide::is_unit2/3/4`: exact wide predicates behind `Vec2/3/4::is_normalized`, which is now total (`false` on long vectors instead of `'Fixed: overflow'`) and 50-56 % cheaper; `Vec3::rotate_towards` shares its cross product and norm (109 970 -> 102 380 gas) (#32).
+- Benchmarks: one snforge test crate per `tests/bench_<module>.cairo` (`[[test]]` targets checked by `scripts/bench.py`); the bench run is ~12x faster with identical snapshots; `bench.py check <filter>` (#33).
