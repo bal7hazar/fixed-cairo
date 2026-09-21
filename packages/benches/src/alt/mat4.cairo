@@ -6,6 +6,7 @@
 use fixed::fixed::Fixed;
 use fixed::wide::{WideAdd, WideMul, WideNarrow, WideSub, det3, dot4, mul_sub, wide_mul};
 use glam::mat4::{Mat4, Mat4Trait};
+use glam::quat::Quat;
 use glam::vec4::Vec4;
 
 /// Alternative to `Mat4::mul_vec4`. The literal glam-rs sum of scaled columns: one rescale per
@@ -347,6 +348,42 @@ pub fn inverse_plain(m: Mat4) -> Option<Mat4> {
     )
 }
 
+/// Alternative to `Mat4::from_quat`. The literal glam-rs expression: the twelve products of
+/// the nine elements rescaled one by one (18 rescales for the 3x3 part) instead of one fused
+/// two-term kernel per element.
+#[inline(always)]
+pub fn from_quat_unfused(rotation: Quat) -> Mat4 {
+    let x2 = rotation.x + rotation.x;
+    let y2 = rotation.y + rotation.y;
+    let z2 = rotation.z + rotation.z;
+    Mat4 {
+        x_axis: Vec4 {
+            x: F_ONE - (rotation.y * y2 + rotation.z * z2),
+            y: rotation.x * y2 + rotation.w * z2,
+            z: rotation.x * z2 - rotation.w * y2,
+            w: Fixed { raw: 0 },
+        },
+        y_axis: Vec4 {
+            x: rotation.x * y2 - rotation.w * z2,
+            y: F_ONE - (rotation.x * x2 + rotation.z * z2),
+            z: rotation.y * z2 + rotation.w * x2,
+            w: Fixed { raw: 0 },
+        },
+        z_axis: Vec4 {
+            x: rotation.x * z2 + rotation.w * y2,
+            y: rotation.y * z2 - rotation.w * x2,
+            z: F_ONE - (rotation.x * x2 + rotation.y * y2),
+            w: Fixed { raw: 0 },
+        },
+        w_axis: Vec4 {
+            x: Fixed { raw: 0 },
+            y: Fixed { raw: 0 },
+            z: Fixed { raw: 0 },
+            w: Fixed { raw: 0x100000000 },
+        },
+    }
+}
+
 /// Alternative to `Mat4::determinant`. Expansion along the first row with four `det3` kernels
 /// (four rescales) instead of the six shared 2x2 minors: the 3x3 minors are recomputed instead
 /// of being shared.
@@ -405,3 +442,6 @@ pub fn determinant_det3(lhs: Mat4) -> Fixed {
 
 /// `0`.
 const F_ZERO: Fixed = Fixed { raw: 0 };
+
+/// `1`.
+const F_ONE: Fixed = Fixed { raw: 0x100000000 };

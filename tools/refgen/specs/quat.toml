@@ -27,7 +27,7 @@
 
 module = "quat"
 package = "glam"
-imports = ["glam::quat::QuatTrait"]
+imports = ["glam::quat::QuatTrait", "glam::vec3::Vec3Trait"]
 
 # ------------------------------------------------------------------------------------------
 # Products.
@@ -344,3 +344,116 @@ edges = [[[0, 0, 0, 1], 2], [[0.5, 0.5, 0.5, 0.5], 0.5]]
 name = "div_scalar_zero"
 args = [[0, 0, 0, 1], 0]
 expected = "Fixed: division by zero"
+
+# ------------------------------------------------------------------------------------------
+# The matrix constructors and the view constructors (task X1).
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "from_mat3"
+call = "QuatTrait::from_mat3({0})"
+args = [{ type = "Mat3", constraint = "rotation" }]
+ret = "Quat"
+cases = 14
+tolerance = 6
+justification = "both sides branch on the same quantized elements, so they select the same component: the value under the square root is an exact sum of them. The Cairo square root is the floor of the exact one (1 ULP on `2 |c| >= 1`) and the shared division rounds to nearest (0.5 ULP), so a component is off by `1 + |component| / |c| <= 3` ULP, plus the 0.5 of the quantization of the oracle. 6 covers the pool; the measured maximum over 50 000 random rotation matrices of the Python mirror is 4."
+edges = [
+    [[[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
+    [[[1, 0, 0], [0, -1, 0], [0, 0, -1]]],
+    [[[-1, 0, 0], [0, 1, 0], [0, 0, -1]]],
+    [[[-1, 0, 0], [0, -1, 0], [0, 0, 1]]],
+    [[[0, 1, 0], [-1, 0, 0], [0, 0, 1]]],
+]
+
+[[function]]
+name = "from_mat4"
+call = "QuatTrait::from_mat4({0})"
+args = [{ type = "Mat4", constraint = "rotation" }]
+ret = "Quat"
+cases = 8
+tolerance = 6
+justification = "as `from_mat3`: the same function on the upper 3x3 block."
+edges = [[[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]]]
+
+[[function]]
+name = "look_to"
+call = "(QuatTrait::look_to_rh({0}, {1}), QuatTrait::look_to_lh({0}, {1}))"
+args = [{ type = "Vec3", constraint = "normalized" }, { type = "Vec3", constraint = "normalized" }]
+ret = "(Quat, Quat)"
+cases = 10
+tolerance = 24
+justification = "the side axis is normalized (one square root and one shared division: 2 ULP per component, amplified by `1 / |dir x up|`, which the oracle guard keeps at or above 0.05, i.e. up to 20 ULP on the frame before `from_rotation_axes` runs) and the up axis is one `mul_sub` each. `from_rotation_axes` adds its own 3 ULP and the quantization 0.5."
+edges = [[[0, 0, -1], [0, 1, 0]], [[0, 0, 1], [0, 1, 0]], [[1, 0, 0], [0, 1, 0]]]
+
+[[function]]
+name = "look_at_rh"
+call = "QuatTrait::look_at_rh({0}, {1}, {2})"
+args = [
+    { type = "Vec3", min = -100.0, max = 100.0 },
+    { type = "Vec3", min = -100.0, max = 100.0 },
+    { type = "Vec3", constraint = "normalized" },
+]
+ret = "Quat"
+cases = 8
+tolerance = 24
+justification = "as `look_to`, plus the normalization of `center - eye` (1 ULP per component for a direction of length at least 1, which the oracle guard enforces)."
+edges = [[[0, 0, 1], [0, 0, 0], [0, 1, 0]], [[1, 2, 3], [4, -1, 2], [0, 1, 0]]]
+
+[[function]]
+name = "look_at_lh"
+call = "QuatTrait::look_at_lh({0}, {1}, {2})"
+args = [
+    { type = "Vec3", min = -100.0, max = 100.0 },
+    { type = "Vec3", min = -100.0, max = 100.0 },
+    { type = "Vec3", constraint = "normalized" },
+]
+ret = "Quat"
+cases = 8
+tolerance = 24
+justification = "as `look_at_rh` (the same function on the opposite direction)."
+edges = [[[0, 0, 1], [0, 0, 0], [0, 1, 0]], [[1, 2, 3], [4, -1, 2], [0, 1, 0]]]
+
+# ------------------------------------------------------------------------------------------
+# The `Vec3` methods implemented through `Quat` (task X1): `Vec3::rotate_axis`,
+# `Vec3::rotate_towards`, `Vec3::slerp` (its anti-parallel branch) and the
+# `any_orthogonal_vector` fallback they share. They live here rather than in
+# `golden_vec3.cairo`, which is at its 1 500-line cap.
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "rotate_pair"
+call = "({0}.rotate_axis({1}, {2}), {0}.rotate_towards({1}, {2}))"
+args = [
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Vec3", constraint = "normalized" },
+    { type = "Fixed", domain = "angle" },
+]
+ret = "(Vec3, Vec3)"
+cases = 6
+tolerance = 64
+justification = "`rotate_axis`: `Quat::from_axis_angle` costs 1.02 ULP on the half-angle sine and cosine, so each quaternion component is within 3 ULP, and `mul_vec3` is a sum of triple products rescaled once per component, i.e. about `4 |self| <= 32` ULP for |self| <= 8. `rotate_towards` adds one `angle_between` (`atan2`, 3.22 ULP plus the 2.9 of its floored kernels) on the angle, which the same chain multiplies by `|self| <= 8`: about 50 more. 64 covers both away from the clamp boundary, which the oracle skips, as it skips the nearly colinear pairs whose rotation axis is ill-conditioned."
+edges = [
+    [[1, 0, 0], [0, 0, 1], 0.9],
+    [[0, 1, 0], [0, 0, 1], 0.3],
+    [[3, -4, 2], [0.42857142857142855, 0.8571428571428571, 0.2857142857142857], 0.7],
+    [[3, -4, 2], [1, 0, 0], 0],
+]
+
+[[function]]
+name = "slerp_orthogonal"
+call = "({0}.slerp({1}, {2}), {0}.any_orthogonal_vector())"
+args = [
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Vec3", constraint = "nonzero", min_len = 1.0, min = -8.0, max = 8.0 },
+    { type = "Fixed", domain = "t" },
+]
+ret = "(Vec3, Vec3)"
+cases = 6
+tolerance = 64
+justification = "`any_orthogonal_vector` is exact (three copies and a negation). `slerp` is one `acos` of the normalized dot product (2.96 ULP, amplified by `1 / sin(theta)`, which the oracle guard keeps below 32), three sines (1.02 each) and a shared reciprocal of `sin(theta)`; each weight then scales a vector of length at most 8 and the two terms are summed and floored once per component. 64 covers the pool outside the linear band, which the oracle skips (glam-rs branches at `1 - 3e-7`, this port at `1 - 2^-20`)."
+edges = [
+    [[1, 0, 0], [0, 1, 0], 0],
+    [[1, 0, 0], [0, 1, 0], 1],
+    [[1, 0, 0], [0, 1, 0], 0.5],
+    [[3, -4, 2], [-1, 2, 5], 0.25],
+]

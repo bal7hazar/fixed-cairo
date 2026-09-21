@@ -44,6 +44,7 @@ pub fn register(r: &mut Registry) {
     r.add("from_scale_angle_translation", |a| {
         DMat3::from_scale_angle_translation(a[0].dvec2(), a[1].f(), a[2].dvec2())
     });
+    r.add("from_quat", |a| DMat3::from_quat(a[0].dquat()));
     r.add("from_mat2", |a| DMat3::from_mat2(a[0].dmat2()));
     r.add("from_mat4", |a| DMat3::from_mat4(a[0].dmat4()));
     r.add("from_mat4_minor", |a| {

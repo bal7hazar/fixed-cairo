@@ -18,7 +18,8 @@ use fixed::wide::{
     RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, dot3, dot3_add, dot4, mul_sub,
     wide_from, wide_mul,
 };
-use crate::mat3::Mat3;
+use crate::mat3::{Mat3, Mat3Trait};
+use crate::quat::{Quat, QuatTrait};
 use crate::vec3::{Vec3, Vec3Trait};
 use crate::vec4::{Vec4, Vec4Trait};
 
@@ -33,10 +34,10 @@ use crate::vec4::{Vec4, Vec4Trait};
 ///   `write_cols_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait
 ///   to implement), the by-reference operator overloads, the scalar-on-the-left operators
 ///   (`2.0 * m`) and the casts to types that do not exist in glam.cairo (`as_dmat4`, `Mat3A`).
-/// * The methods that need `Quat` (`from_quat`, `from_scale_rotation_translation`,
-///   `to_scale_rotation_translation`), `EulerRot` (`from_euler`, `to_euler`) and the projection
-///   matrices (`perspective_*`, `orthographic_*`, `frustum_*`, deprecated in glam-rs 0.33.1 in
-///   favour of `glam::camera`) are not ported yet: see `docs/PORTING_STATUS.md`.
+/// * `from_euler` / `to_euler` are the extension trait `glam::euler::Mat4EulerTrait`.
+/// * The projection matrices (`perspective_*`, `orthographic_*`, `frustum_*`, deprecated in
+///   glam-rs 0.33.1 in favour of `glam::camera`) are not ported yet: see
+///   `docs/PORTING_STATUS.md`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Mat4 {
     pub x_axis: Vec4,
@@ -414,6 +415,110 @@ pub trait Mat4Trait {
     ///   rs asserts that `scale` is not entirely zero.
     /// * Exact.
     fn from_scale(scale: Vec3) -> Mat4;
+    /// Creates an affine transformation matrix from the given `rotation` quaternion.
+    ///
+    /// The resulting matrix can be used to transform 3D points and vectors. See
+    /// `transform_point3` and `transform_vector3`.
+    ///
+    /// Mirrors `glam::Mat4::from_quat`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
+    ///   range.
+    /// #### Deviations
+    /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3).
+    ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
+    ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
+    ///   matrix by `l^2`.
+    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
+    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
+    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
+    ///   below the exact value each. The literal glam-rs expression rescales the twelve
+    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
+    ///   `Mat3`): it is kept in `benches::alt`.
+    fn from_quat(rotation: Quat) -> Mat4;
+    /// Creates an affine transformation matrix from the given `rotation` quaternion and 3D
+    /// `translation`.
+    ///
+    /// The resulting matrix can be used to transform 3D points and vectors. See
+    /// `transform_point3` and `transform_vector3`.
+    ///
+    /// Mirrors `glam::Mat4::from_rotation_translation`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
+    ///   range.
+    /// #### Deviations
+    /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3).
+    ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
+    ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
+    ///   matrix by `l^2`.
+    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
+    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
+    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
+    ///   below the exact value each. The literal glam-rs expression rescales the twelve
+    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
+    ///   `Mat3`): it is kept in `benches::alt`.
+    fn from_rotation_translation(rotation: Quat, translation: Vec3) -> Mat4;
+    /// Creates an affine transformation matrix from the given 3D `scale`, `rotation` and
+    /// `translation`.
+    ///
+    /// The resulting matrix can be used to transform 3D points and vectors. See
+    /// `transform_point3` and `transform_vector3`.
+    ///
+    /// Mirrors `glam::Mat4::from_scale_rotation_translation`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
+    ///   range.
+    /// #### Deviations
+    /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3).
+    ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
+    ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
+    ///   matrix by `l^2`.
+    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
+    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
+    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
+    ///   below the exact value each. The literal glam-rs expression rescales the twelve
+    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
+    ///   `Mat3`): it is kept in `benches::alt`.
+    /// * The scale of column `i` is applied inside the single rescale of each element (`W2
+    ///   * Fixed -> T2`), not after it: the elements are still one floor rescale away from
+    ///   the exact product, where glam-rs rounds the rotation matrix first and the scaled
+    ///   one second. The nine multiplications are free (21 360 gas, the cost of
+    ///   `from_quat`): a `WideMul` is one step and no range check.
+    fn from_scale_rotation_translation(scale: Vec3, rotation: Quat, translation: Vec3) -> Mat4;
+    /// Extracts `scale`, `rotation` and `translation` from `self`.
+    ///
+    /// The input matrix is expected to be a 3D affine transformation matrix otherwise the
+    /// output will be invalid.
+    ///
+    /// Mirrors `glam::Mat4::to_scale_rotation_translation`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if a column of the linear part is zero.
+    /// * `'Fixed: overflow'` if a column length or an element of the determinant does not
+    ///   fit the scalar range.
+    /// * `'i64_neg Underflow'` if an element is `MIN`.
+    /// #### Deviations
+    /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3). The
+    ///   4th row of `self` must be `(0, 0, 0, 1)` and the determinant must not be zero;
+    ///   the latter panics here instead (`'Fixed: division by zero'`).
+    /// * The sign of the determinant is applied to `scale.x` by negating the length
+    ///   (exact) instead of multiplying it by `signum(det)`; `signum(0)` is `+1` as
+    ///   everywhere else (docs/DESIGN.md section 3), but a zero determinant means a zero
+    ///   column, which panics.
+    /// * Each column is divided by its own shared `Recip` (rounded to nearest, one
+    ///   division for three components) instead of the `scale.recip()` then `column *
+    ///   inv_scale` of glam-rs, which rounds twice. Each length is the floor of the exact
+    ///   one, so a normalized column is within `1 / scale` ULP per component.
+    /// * The rotation is `Quat::from_rotation_axes` of the normalized columns: its own
+    ///   error (a square root and a shared division) adds to the above. Measured over 20
+    ///   000 random `(scale, rotation, translation)` triples of the Python mirror, the
+    ///   round trip `to_scale_rotation_translation(from_scale_rotation_translation(..))`
+    ///   recovers the translation exactly, the rotation within 13 raw ULP per component
+    ///   and the scale within `5 |scale| + 2` ULP, the linear term being the drift of the
+    ///   squared length of the quantized quaternion.
+    fn to_scale_rotation_translation(self: Mat4) -> (Vec3, Quat, Vec3);
     /// Creates an affine transformation matrix containing a 3D rotation around a
     /// normalized rotation `axis` of `angle` (in radians).
     ///
@@ -1214,6 +1319,154 @@ pub impl Mat4Impl of Mat4Trait {
                 w: Fixed { raw: 0x100000000 },
             },
         }
+    }
+
+    #[inline(always)]
+    fn from_quat(rotation: Quat) -> Mat4 {
+        let x2 = rotation.x + rotation.x;
+        let y2 = rotation.y + rotation.y;
+        let z2 = rotation.z + rotation.z;
+        Mat4 {
+            x_axis: Vec4 {
+                x: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.y, y2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .narrow(),
+                y: wide_mul(rotation.x, y2).add(wide_mul(rotation.w, z2)).narrow(),
+                z: wide_mul(rotation.x, z2).sub(wide_mul(rotation.w, y2)).narrow(),
+                w: Fixed { raw: 0 },
+            },
+            y_axis: Vec4 {
+                x: wide_mul(rotation.x, y2).sub(wide_mul(rotation.w, z2)).narrow(),
+                y: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .narrow(),
+                z: wide_mul(rotation.y, z2).add(wide_mul(rotation.w, x2)).narrow(),
+                w: Fixed { raw: 0 },
+            },
+            z_axis: Vec4 {
+                x: wide_mul(rotation.x, z2).add(wide_mul(rotation.w, y2)).narrow(),
+                y: wide_mul(rotation.y, z2).sub(wide_mul(rotation.w, x2)).narrow(),
+                z: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.y, y2))
+                    .narrow(),
+                w: Fixed { raw: 0 },
+            },
+            w_axis: Vec4 {
+                x: Fixed { raw: 0 },
+                y: Fixed { raw: 0 },
+                z: Fixed { raw: 0 },
+                w: Fixed { raw: 0x100000000 },
+            },
+        }
+    }
+
+    #[inline(always)]
+    fn from_rotation_translation(rotation: Quat, translation: Vec3) -> Mat4 {
+        let x2 = rotation.x + rotation.x;
+        let y2 = rotation.y + rotation.y;
+        let z2 = rotation.z + rotation.z;
+        Mat4 {
+            x_axis: Vec4 {
+                x: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.y, y2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .narrow(),
+                y: wide_mul(rotation.x, y2).add(wide_mul(rotation.w, z2)).narrow(),
+                z: wide_mul(rotation.x, z2).sub(wide_mul(rotation.w, y2)).narrow(),
+                w: Fixed { raw: 0 },
+            },
+            y_axis: Vec4 {
+                x: wide_mul(rotation.x, y2).sub(wide_mul(rotation.w, z2)).narrow(),
+                y: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .narrow(),
+                z: wide_mul(rotation.y, z2).add(wide_mul(rotation.w, x2)).narrow(),
+                w: Fixed { raw: 0 },
+            },
+            z_axis: Vec4 {
+                x: wide_mul(rotation.x, z2).add(wide_mul(rotation.w, y2)).narrow(),
+                y: wide_mul(rotation.y, z2).sub(wide_mul(rotation.w, x2)).narrow(),
+                z: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.y, y2))
+                    .narrow(),
+                w: Fixed { raw: 0 },
+            },
+            w_axis: Vec4 {
+                x: translation.x, y: translation.y, z: translation.z, w: Fixed { raw: 0x100000000 },
+            },
+        }
+    }
+
+    #[inline(always)]
+    fn from_scale_rotation_translation(scale: Vec3, rotation: Quat, translation: Vec3) -> Mat4 {
+        let x2 = rotation.x + rotation.x;
+        let y2 = rotation.y + rotation.y;
+        let z2 = rotation.z + rotation.z;
+        Mat4 {
+            x_axis: Vec4 {
+                x: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.y, y2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .mul(scale.x)
+                    .narrow(),
+                y: wide_mul(rotation.x, y2).add(wide_mul(rotation.w, z2)).mul(scale.x).narrow(),
+                z: wide_mul(rotation.x, z2).sub(wide_mul(rotation.w, y2)).mul(scale.x).narrow(),
+                w: Fixed { raw: 0 },
+            },
+            y_axis: Vec4 {
+                x: wide_mul(rotation.x, y2).sub(wide_mul(rotation.w, z2)).mul(scale.y).narrow(),
+                y: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .mul(scale.y)
+                    .narrow(),
+                z: wide_mul(rotation.y, z2).add(wide_mul(rotation.w, x2)).mul(scale.y).narrow(),
+                w: Fixed { raw: 0 },
+            },
+            z_axis: Vec4 {
+                x: wide_mul(rotation.x, z2).add(wide_mul(rotation.w, y2)).mul(scale.z).narrow(),
+                y: wide_mul(rotation.y, z2).sub(wide_mul(rotation.w, x2)).mul(scale.z).narrow(),
+                z: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.y, y2))
+                    .mul(scale.z)
+                    .narrow(),
+                w: Fixed { raw: 0 },
+            },
+            w_axis: Vec4 {
+                x: translation.x, y: translation.y, z: translation.z, w: Fixed { raw: 0x100000000 },
+            },
+        }
+    }
+
+    fn to_scale_rotation_translation(self: Mat4) -> (Vec3, Quat, Vec3) {
+        let r = Mat3Trait::from_mat4(self);
+        // The length of each column, the sign of the determinant carried by the first.
+        let len_x = Vec3Trait::length(r.x_axis);
+        let scale = Vec3 {
+            x: if Mat3Trait::determinant(r).is_negative() {
+                -len_x
+            } else {
+                len_x
+            },
+            y: Vec3Trait::length(r.y_axis),
+            z: Vec3Trait::length(r.z_axis),
+        };
+        // One shared reciprocal per column: three divisions instead of nine.
+        let rx = RecipTrait::new(scale.x);
+        let ry = RecipTrait::new(scale.y);
+        let rz = RecipTrait::new(scale.z);
+        let rotation = QuatTrait::from_rotation_axes(
+            Vec3 { x: rx.mul(r.x_axis.x), y: rx.mul(r.x_axis.y), z: rx.mul(r.x_axis.z) },
+            Vec3 { x: ry.mul(r.y_axis.x), y: ry.mul(r.y_axis.y), z: ry.mul(r.y_axis.z) },
+            Vec3 { x: rz.mul(r.z_axis.x), y: rz.mul(r.z_axis.y), z: rz.mul(r.z_axis.z) },
+        );
+        (scale, rotation, Vec4Trait::truncate(self.w_axis))
     }
 
     #[inline(always)]

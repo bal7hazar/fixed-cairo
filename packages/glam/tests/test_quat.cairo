@@ -10,6 +10,8 @@
 use core::hash::{HashStateExTrait, HashStateTrait};
 use core::poseidon::PoseidonTrait;
 use fixed::fixed::{Fixed, FixedTrait};
+use glam::mat3::{Mat3Trait, mat3};
+use glam::mat4::Mat4Trait;
 use glam::quat::{Quat, QuatTrait, quat};
 use glam::vec2::{Vec2, Vec2Trait, vec2};
 use glam::vec3::{Vec3, Vec3Trait, vec3};
@@ -502,6 +504,144 @@ fn test_hash_serde() {
     let back: Quat = Serde::deserialize(ref span).unwrap();
     assert_eq!(back, a);
 }
+/// `q` (4), the columns of `Mat3::from_quat(q)` (9), `Quat::from_rotation_axes` of
+/// those columns (4). The rows cover the four branches of the selection
+/// (`w` 4, `x` 2, `y` 3, `z` 3) and the exact quarter and half turns.
+#[cairofmt::skip]
+const FROM_AXES: [[i64; 17]; 12] = [
+    [0, 0, 0, 4294967296, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 4294967296], // the identity, `w` branch
+    [4294967296, 0, 0, 0, 4294967296, 0, 0, 0, -4294967296, 0, 0, 0, -4294967296, 4294967296, 0, 0, 0], // a half turn about x, `x` branch
+    [0, 4294967296, 0, 0, -4294967296, 0, 0, 0, 4294967296, 0, 0, 0, -4294967296, 0, 4294967296, 0, 0], // a half turn about y, `y` branch
+    [0, 0, 4294967296, 0, -4294967296, 0, 0, 0, -4294967296, 0, 0, 0, 4294967296, 0, 0, 4294967296, 0], // a half turn about z, `z` branch
+    [858993459, 1717986918, 1717986918, 3435973836, 1546188227, 3435973835, -2061584302, -2061584302, 2576980378, 2748779068, 3435973835, 0, 2576980378, 858993459, 1717986918, 1717986918, 3435973837], // (1, 2, 2, 4) / 5, `w` branch
+    [858993459, 1717986918, 3435973836, 1717986918, -2576980375, 3435973835, 0, -2061584302, -1546188224, 3435973835, 2748779068, 2061584301, 2576980378, 858993459, 1717986918, 3435973836, 1717986918], // (1, 2, 4, 2) / 5, `z` branch
+    [3435973836, 1717986918, 1717986918, 858993459, 1546188227, 3435973835, 2061584301, 2061584301, -2576980375, 2748779068, 3435973835, 0, -2576980375, 3435973836, 1717986918, 1717986918, 858993459], // (4, 2, 2, 1) / 5, `x` branch
+    [1717986918, 3435973836, 1717986918, 858993459, -2576980375, 3435973835, 0, 2061584301, 1546188227, 3435973835, 2748779068, 2061584301, -2576980375, 1717986918, 3435973836, 1717986918, 858993459], // (2, 4, 2, 1) / 5, `y` branch
+    [-2063235552, 687745183, 1375490367, 3438725918, 3193693631, 1541783131, -2422802063, -2863311529, 1431655764, -2863311532, -220254735, 3744330462, 2092419963, -2063235552, 687745183, 1375490367, 3438725919], // (-3, 1, 2, 5) normalized, `w` branch
+    [2147483648, -3579139414, 715827882, -715827883, -1908874356, -3817748709, -477218590, -3340530120, 1908874354, -1908874354, 1908874353, -477218588, -3817748710, -2147483648, 3579139414, -715827882, 715827883], // (3, -5, 1, -1) normalized, `y` branch
+    [985333074, 985333074, -3941332297, 985333074, -3390763656, -1356305462, -2260509103, 2260509102, -3390763656, -1356305462, -1356305462, -2260509103, 3390763655, -985333074, -985333074, 3941332297, -985333074], // (1, 1, -4, 1) normalized, `z` branch
+    [0, 0, 3037000499, 3037000500, 2, 4294967294, 0, -4294967295, 2, 0, 0, 0, 4294967296, 0, 0, 3037000498, 3037000501], // a quarter turn about z, `w` branch
+];
+
+#[test]
+fn test_from_rotation_axes() {
+    for row in FROM_AXES.span() {
+        let r = row.span();
+        let q = qt(r, 0);
+        let m = mat3(vc(r, 4), vc(r, 7), vc(r, 10));
+        let e = qt(r, 13);
+        assert_eq!(Mat3Trait::from_quat(q), m);
+        assert_eq!(QuatTrait::from_rotation_axes(m.x_axis, m.y_axis, m.z_axis), e);
+        assert_eq!(QuatTrait::from_mat3(m), e);
+        assert_eq!(QuatTrait::from_mat4(Mat4Trait::from_mat3(m)), e);
+        // the 4x4 constructor builds the same 3x3 linear part
+        assert_eq!(Mat4Trait::from_quat(q), Mat4Trait::from_mat3(m));
+        // `q` and `-q` are the same rotation: the branch picks the sign of its largest
+        // component. Every row of this table closes to 1 raw ULP.
+        assert!(e.abs_diff_eq(q, f(1)) || (-e).abs_diff_eq(q, f(1)));
+    }
+}
+
+#[test]
+fn test_from_rotation_axes_exact() {
+    let o = f(0x100000000);
+    let z = f(0);
+    // The identity and the three half turns, exactly.
+    assert_eq!(QuatTrait::from_mat3(Mat3Trait::IDENTITY), QuatTrait::IDENTITY);
+    assert_eq!(QuatTrait::from_mat4(Mat4Trait::IDENTITY), QuatTrait::IDENTITY);
+    assert_eq!(
+        QuatTrait::from_rotation_axes(vec3(o, z, z), vec3(z, -o, z), vec3(z, z, -o)),
+        quat(o, z, z, z),
+    );
+    assert_eq!(
+        QuatTrait::from_rotation_axes(vec3(-o, z, z), vec3(z, o, z), vec3(z, z, -o)),
+        quat(z, o, z, z),
+    );
+    assert_eq!(
+        QuatTrait::from_rotation_axes(vec3(-o, z, z), vec3(z, -o, z), vec3(z, z, o)),
+        quat(z, z, o, z),
+    );
+    // A 90 degree rotation about z is `from_rotation_z(pi / 2)` to within 2 ULP.
+    let m = Mat3Trait::from_cols(vec3(z, o, z), vec3(-o, z, z), vec3(z, z, o));
+    let e = QuatTrait::from_rotation_z(f(6746518852));
+    assert!(QuatTrait::from_mat3(m).abs_diff_eq(e, f(2)));
+}
+
+#[test]
+fn test_look() {
+    let up = Vec3Trait::Y;
+    // Looking down -Z with +Y up is the identity in a right-handed view frame, and looking
+    // down +Z is in a left-handed one.
+    assert_eq!(QuatTrait::look_to_rh(Vec3Trait::NEG_Z, up), QuatTrait::IDENTITY);
+    assert_eq!(QuatTrait::look_to_lh(Vec3Trait::Z, up), QuatTrait::IDENTITY);
+    let eye = vec3(f(0x100000000), f(0x200000000), f(0x300000000));
+    let center = vec3(f(0x400000000), f(-0x100000000), f(0x200000000));
+    let dir = (center - eye).normalize();
+    // `look_at_*` is `look_to_*` of the normalized direction, and `lh` is `rh` of `-dir`.
+    assert_eq!(QuatTrait::look_at_rh(eye, center, up), QuatTrait::look_to_rh(dir, up));
+    assert_eq!(QuatTrait::look_at_lh(eye, center, up), QuatTrait::look_to_lh(dir, up));
+    assert_eq!(QuatTrait::look_to_lh(dir, up), QuatTrait::look_to_rh(-dir, up));
+    // The rotation is the world -> view one: it maps the facing direction onto -Z.
+    let q = QuatTrait::look_to_rh(dir, up);
+    assert!(q.mul_vec3(dir).abs_diff_eq(Vec3Trait::NEG_Z, f(8)));
+    assert!(q.mul_vec3(dir.cross(up).normalize()).abs_diff_eq(Vec3Trait::X, f(8)));
+}
+
+// The `Vec3` methods implemented through `Quat` (`rotate_axis`, `rotate_towards`, `slerp`) and
+// the `any_orthogonal_vector` fallback they share. The exact values are the subject of
+// `golden_quat.cairo`; this test pins the relations and the three branches of `slerp`.
+
+#[test]
+fn test_vec3_rotations() {
+    let x = Vec3Trait::X;
+    let y = Vec3Trait::Y;
+    let z = Vec3Trait::Z;
+    let v = vec3(f(0x300000000), f(-0x400000000), f(0x200000000));
+    let w = vec3(f(-0x100000000), f(0x200000000), f(0x500000000));
+    // `any_orthogonal_vector`: `v x Y` or `v x X`, exact, and exactly orthogonal.
+    assert_eq!(v.any_orthogonal_vector(), vec3(f(0), v.z, -v.y));
+    assert_eq!(w.any_orthogonal_vector(), vec3(f(0), w.z, -w.y));
+    assert_eq!(
+        vec3(f(0x300000000), f(0x100000000), f(0)).any_orthogonal_vector(),
+        vec3(f(0), f(0), f(0x300000000)),
+    );
+    assert_eq!(v.dot(v.any_orthogonal_vector()), f(0));
+    assert_eq!(z.any_orthogonal_vector(), vec3(f(0), f(0x100000000), f(0)));
+    // `rotate_axis`: a zero angle is exact; quarter turns within 2 ULP (the half angle goes
+    // through `sin_cos`, then the 15-multiplication kernel of `mul_vec3`).
+    assert_eq!(v.rotate_axis(z, f(0)), v);
+    assert!(x.rotate_axis(z, f(6746518852)).abs_diff_eq(y, f(2)));
+    assert!(y.rotate_axis(z, f(6746518852)).abs_diff_eq(-x, f(2)));
+    assert!(z.rotate_axis(x, f(6746518852)).abs_diff_eq(-y, f(2)));
+    // It agrees with `rotate_x/y/z` (|v| = 5.4: the two formulations differ by 4 |v| ULP).
+    let a = f(0x59999999);
+    assert!(v.rotate_axis(z, a).abs_diff_eq(v.rotate_z(a), f(24)));
+    assert!(v.rotate_axis(x, a).abs_diff_eq(v.rotate_x(a), f(24)));
+    assert!(v.rotate_axis(y, a).abs_diff_eq(v.rotate_y(a), f(24)));
+    // `rotate_towards`: no rotation, clamped at the target (parallel to `w`, same length),
+    // and away from it by at most pi.
+    assert!(v.rotate_towards(v, f(0)).abs_diff_eq(v, f(1)));
+    assert!(v.rotate_towards(w, f(0)).abs_diff_eq(v, f(24)));
+    let far = v.rotate_towards(w, f(13493037705));
+    assert!(far.length().abs_diff_eq(v.length(), f(24)));
+    assert!(far.angle_between(w).abs_diff_eq(f(0), f(64)));
+    let back = v.rotate_towards(w, f(-13493037705));
+    assert!(back.angle_between(w).abs_diff_eq(f(13493037705), f(64)));
+    // `slerp`: the ends, the parallel branch (exactly `lerp`), the anti-parallel one (a half
+    // turn about an orthogonal axis) and the general one (linear length, angle split in two:
+    // each weight carries 2 ULP and scales a vector of length <= 5.5, 2 * 11 + sqrt(3) + 1 < 32).
+    let half = f(0x80000000);
+    assert!(v.slerp(w, f(0)).abs_diff_eq(v, f(8)));
+    assert!(v.slerp(w, f(0x100000000)).abs_diff_eq(w, f(8)));
+    let v2 = v.mul_scalar(f(0x200000000));
+    assert_eq!(v.slerp(v2, half), v.lerp(v2, half));
+    let opp = x.slerp(-x, half);
+    assert!(opp.length().abs_diff_eq(f(0x100000000), f(8)));
+    assert!(opp.dot(x).abs_diff_eq(f(0), f(8)));
+    let mid = v.slerp(w, half);
+    assert!(mid.length().abs_diff_eq(v.length().lerp(w.length(), half), f(32)));
+    assert!(mid.angle_between(v).abs_diff_eq(mid.angle_between(w), f(64)));
+}
 
 // Panic paths.
 
@@ -682,6 +822,14 @@ fn fuzz_axis_angle(a: i64, b: i64, c: i64, d: i64) {
         QuatTrait::from_scaled_axis(q.to_scaled_axis()).abs_diff_eq(back, f(0x10000))
             || QuatTrait::from_scaled_axis(q.to_scaled_axis()).abs_diff_eq(-back, f(0x10000)),
     );
+    // The matrix round trip: `q` and `-q` are the same rotation; measured at most 4 raw ULP
+    // per component over 50 000 random unit quaternions of the Python mirror, 16 on the
+    // matrix. The 4x4 constructors agree with the 3x3 one.
+    let m = Mat3Trait::from_quat(q);
+    let r = QuatTrait::from_mat3(m);
+    assert!(r.abs_diff_eq(q, f(8)) || (-r).abs_diff_eq(q, f(8)));
+    assert!(Mat3Trait::from_quat(r).abs_diff_eq(m, f(16)));
+    assert_eq!(QuatTrait::from_mat4(Mat4Trait::from_quat(q)), r);
 }
 
 #[test]

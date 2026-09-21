@@ -284,6 +284,73 @@ def body_angle_between(t, fused):
     return ("(Self::dot(self, rhs) / (Self::length(self) * Self::length(rhs))).acos_clamped()")
 
 
+def body_rotate_axis_quat(t):
+    """Vec3 `rotate_axis`: the glam-rs `Quat::from_axis_angle(axis, angle) * self`."""
+    return "QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), self)"
+
+
+def body_rotate_towards3(t):
+    """Vec3: clamp the travelled angle, then rotate around the (normalized) cross product."""
+    return ("let angle_between = Self::angle_between(self, rhs);\n"
+            "// When `max_angle < 0`, rotate no further than `PI` radians away\n"
+            "let angle = max_angle.clamp(angle_between - PI, angle_between);\n"
+            "// The rotation axis: the normalized cross product, or an arbitrary orthogonal\n"
+            "// direction when the two vectors are parallel.\n"
+            "let c = Self::cross(self, rhs);\n"
+            "let axis = match norm3_wide(c.x, c.y, c.z).try_recip() {\n"
+            "    Some(r) => " + normalized_fields(t, "r", "c") + ",\n"
+            "    None => Self::normalize(Self::any_orthogonal_vector(self)),\n"
+            "};\n"
+            "QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), self)")
+
+
+def body_any_orthogonal_vector(t):
+    """Vec3: `self x Y` or `self x X`, whichever is the longer of the two."""
+    return ("if self.x.abs() > self.y.abs() {\n"
+            "    // `self.cross(Vec3::Y)`\n"
+            "    Vec3 { x: -self.z, y: F_ZERO, z: self.x }\n"
+            "} else {\n"
+            "    // `self.cross(Vec3::X)`\n"
+            "    Vec3 { x: F_ZERO, y: self.z, z: -self.y }\n"
+            "}")
+
+
+def body_slerp(t):
+    """Vec3: the three branches of glam-rs, with the four divisions kept wide (`Recip`)."""
+    return ("let la = norm3_wide(self.x, self.y, self.z);\n"
+            "let lb = norm3_wide(rhs.x, rhs.y, rhs.z);\n"
+            "let self_length = la.to_fixed();\n"
+            "let rhs_length = lb.to_fixed();\n"
+            "// The cosine of the angle between the two directions.\n"
+            "let d = RecipTrait::new(self_length * rhs_length).mul(Self::dot(self, rhs));\n"
+            "if d.abs() < NEAR_ONE {\n"
+            "    let theta = d.acos_clamped();\n"
+            "    let r = RecipTrait::new(theta.sin());\n"
+            "    let t1 = r.mul((theta * (F_ONE - s)).sin());\n"
+            "    let t2 = r.mul((theta * s).sin());\n"
+            "    // The interpolated length, then one shared division per operand.\n"
+            "    let len = self_length.lerp(rhs_length, s);\n"
+            "    let k1 = la.recip().mul(len * t1);\n"
+            "    let k2 = lb.recip().mul(len * t2);\n"
+            "    Vec3 {\n"
+            "        x: wide_mul(self.x, k1).add(wide_mul(rhs.x, k2)).narrow(),\n"
+            "        y: wide_mul(self.y, k1).add(wide_mul(rhs.y, k2)).narrow(),\n"
+            "        z: wide_mul(self.z, k1).add(wide_mul(rhs.z, k2)).narrow(),\n"
+            "    }\n"
+            "} else if d.is_negative() {\n"
+            "    // Almost anti-parallel: turn by `PI * s` around an arbitrary orthogonal axis.\n"
+            "    let q = QuatTrait::from_axis_angle(\n"
+            "        Self::normalize(Self::any_orthogonal_vector(self)), PI * s,\n"
+            "    );\n"
+            "    let k = la.recip().mul(self_length.lerp(rhs_length, s));\n"
+            "    Self::mul_scalar(QuatTrait::mul_vec3(q, self), k)\n"
+            "} else {\n"
+            "    // Almost parallel: the linear interpolation is the spherical one to within\n"
+            "    // `theta^2 / 8`.\n"
+            "    Self::lerp(self, rhs, s)\n"
+            "}")
+
+
 def body_rotate_towards(t):
     return ("let a = Self::angle_to(self, rhs);\n"
             "let abs_a = a.abs();\n"
@@ -892,8 +959,8 @@ def methods(t):
              "|(triple, dot)|` ULP.",
              "The `axis.is_normalized()` precondition and the non-zero inputs are not checked "
              "(`glam_assert!`).",
-             "`Vec3::rotate_axis` (`Quat`) is not ported yet: the round trip of the doc above "
-             "needs it."])
+             "`self.rotate_axis(axis, self.angle_to(rhs, axis))` closes the round trip of the "
+             "doc above to within `10 |self|` ULP (see `rotate_axis`)."])
         for ax, others in [("x", ("y", "z")), ("y", ("z", "x")), ("z", ("x", "y"))]:
             add(f"rotate_{ax}", f"(self: {T}, angle: Fixed) -> {T}",
                 f"Rotates around the {ax} axis by `angle` (in radians).", fz(f"rotate_{ax}"),
@@ -902,11 +969,45 @@ def methods(t):
                  f"rescale) per rotated component: each is within `1.02 * (|{others[0]}| + "
                  f"|{others[1]}|) + 1` ULP of the exact rotation, the `{ax}` component is "
                  "unchanged."])
+        add("rotate_axis", f"(self: {T}, axis: {T}, angle: Fixed) -> {T}",
+            "Rotates around `axis` by `angle` (in radians).\n\nThe axis must be a unit vector.",
+            body_rotate_axis_quat(t), [OVF],
+            ["The `axis.is_normalized()` precondition is not checked (`glam_assert!`).",
+             "`Quat::from_axis_angle(axis, angle).mul_vec3(self)` as in glam-rs: one `sin_cos` "
+             "(about 1 ULP over a turn), then the 15-multiplication rotation kernel of "
+             "`Quat::mul_vec3`, which rescales once per component. The total error is below "
+             "`4 |self|` ULP for a unit `axis`.",
+             "Building the same rotation as a `Mat3::from_axis_angle` and multiplying costs "
+             "15 % more (58 730 against 51 120 gas, `alt_rotate_axis_mat3`)."], inline=False)
+        add("rotate_towards", f"(self: {T}, rhs: {T}, max_angle: Fixed) -> {T}",
+            "Rotates towards `rhs` up to `max_angle` (in radians).\n\nWhen `max_angle` is `0`, "
+            "the result will be equal to `self`. When `max_angle` is equal to "
+            "`self.angle_between(rhs)`, the result will be parallel to `rhs`. If `max_angle` is "
+            "negative, rotates towards the exact opposite of `rhs`. Will not go past the "
+            "target.", body_rotate_towards3(t),
+            ["`'Fixed: overflow'` if `|self x rhs|` or `self.dot(rhs)` does not fit the scalar "
+             "range, i.e. for `|self| * |rhs| >= 2^31`.", SUB_P],
+            ["One `atan2` (`angle_between`, error bound as there) and the `from_axis_angle` / "
+             "`mul_vec3` pair of `rotate_axis`: the total error is below `10 |self|` ULP.",
+             "The rotation axis is the normalized `self.cross(rhs)`, falling back to the "
+             "normalized `any_orthogonal_vector` when the two vectors are parallel, as in "
+             "glam-rs (`try_normalize` there). The length of the fallback is never zero for a "
+             "non-zero `self`. The normalization shares one square root and one division.",
+             "`max_angle` is clamped with `FixedTrait::clamp`, which panics on a reversed "
+             "range; here `angle_between - PI <= angle_between` always holds."], inline=False)
 
     if n == 3:
         ortho_dev = ("`a = -1 / (sign + z)` is one truncated division; every other term is a "
                      "triple product rescaled once. The inputs are unit vectors, so `|sign + z| "
                      ">= 1` and the division is always defined.")
+        add("any_orthogonal_vector", f"(self: {T}) -> {T}",
+            "Returns some vector that is orthogonal to the given one.\n\nThe input vector must "
+            "be non-zero.\n\nThe output vector is not necessarily unit length. For that use "
+            "`any_orthonormal_vector` instead.", body_any_orthogonal_vector(t), [NEG_P],
+            ["Exact: `self x Y` or `self x X`, whichever of the two is the longer, as in "
+             "glam-rs.",
+             "The `|x| > |y|` test is the one of glam-rs; it is a comparison of absolute "
+             "values, not of the components."])
         add("any_orthonormal_vector", f"(self: {T}) -> {T}",
             "Returns any unit vector that is orthogonal to the given one.\n\nThe input vector "
             "must be unit length.",
@@ -942,6 +1043,27 @@ def methods(t):
             ")", [OVF, NEG_P],
             ["The `self.is_normalized()` precondition is not checked (`glam_assert!`).",
              ortho_dev, "The second vector is exactly `any_orthonormal_vector`."])
+        add("slerp", f"(self: {T}, rhs: {T}, s: Fixed) -> {T}",
+            "Performs a spherical linear interpolation between `self` and `rhs` based on the "
+            "value `s`.\n\nWhen `s` is `0`, the result will be equal to `self`. When `s` is "
+            "`1`, the result will be equal to `rhs`. When `s` is outside of range `[0, 1]`, the "
+            "result is linearly extrapolated.", body_slerp(t),
+            ["`'Fixed: division by zero'` if `self` or `rhs` is zero.",
+             "`'Fixed: overflow'` if `|self| * |rhs|` does not fit the scalar range, i.e. for "
+             "`|self| * |rhs| >= 2^31`.", SUB_P],
+            ["The three branches of glam-rs, with the `1 - 3e-7` cosine band replaced by "
+             "[`NEAR_ONE`] (`1 - 2^-20`), re-derived for Q32.32 (docs/DESIGN.md section 3).",
+             "The four divisions are `fixed::wide::Recip` (one wide reciprocal, rounded to "
+             "nearest) and each component of the interpolated direction is one exact two-term "
+             "sum rescaled once. In the general branch the error is below "
+             "`(2 + 5 / sin(theta)) |result|` ULP; it is the `1 / sin(theta)` term that the "
+             "band bounds at `3.4e-7` relative.",
+             "`acos_clamped` (7.6e-10) instead of the degree-7 `acos_approx` of glam-rs; "
+             "the cosine is ill-conditioned near `+-1` but the error of `theta` cancels "
+             "between the three sines to first order, which is why the band can be as tight as "
+             "it is.",
+             "glam-rs returns `self.lerp(rhs, s)` when the dot product is NaN; there is no NaN "
+             "here (a zero input divides by zero and panics)."], inline=False)
 
     # ------------------------------------------------------------------ interpolation, mul_add
     add("lerp", f"(self: {T}, rhs: {T}, s: Fixed) -> {T}",
@@ -1065,6 +1187,17 @@ HELPERS = {
 /// The squared length of a vector normalized by this module is within a few ULP of 1; glam-rs
 /// uses `2e-4`, which is ~1700 f32 epsilons, while this is ~1000 Q32.32 epsilons.
 const NORMALIZED_EPS: Fixed = Fixed {{ raw: {NORMALIZED_EPS_RAW} }};
+""",
+    "NEAR_ONE": f"""
+/// `1 - 2^-20`, the cosine band in which [`Vec3Trait::slerp`] falls back to a linear
+/// interpolation, where glam-rs uses `1 - 3e-7`.
+///
+/// Below `theta = acos(NEAR_ONE) = 1.38e-3` rad the slerp branch divides the two sine weights
+/// by `sin(theta)`, which costs `2 ULP / sin(theta) = 3.4e-7` relative on the result, while the
+/// linear fallback differs from the exact slerp by `theta^2 / 8 = 2.4e-7`: the two branches
+/// meet with the same accuracy, which is what fixes the threshold. It is the same value as
+/// `quat::NEAR_ONE`, whose derivation is the same one on the half angle.
+pub const NEAR_ONE: Fixed = Fixed {{ raw: {hex(ONE_RAW - (1 << 12))} }};
 """,
     "scaled": """
 /// `v * (target / len)`: one division shared by the components, one fused product each.
@@ -1267,6 +1400,8 @@ def gen_module(t):
     uses.append(f"use crate::{t.bmod}::{{{t.B}, {t.B}Trait}};" if ".bitmask()" in code
                 else f"use crate::{t.bmod}::{t.B};")
     uses.append(f"use crate::{t.imod}::{t.I};")
+    if "QuatTrait::" in code:
+        uses.append("use crate::quat::QuatTrait;")
     others = sorted({x.name for x in (t.dim(n - 1) if n > 2 else None,
                                       t.dim(n + 1) if n < 4 else None,
                                       t.dim(2) if n == 4 else None) if x})
@@ -1276,8 +1411,7 @@ def gen_module(t):
 
     trig_note = {
         2: "",
-        3: ("/// * Not ported yet: `rotate_axis`, `rotate_towards` and `slerp` (they need `Quat`), see\n"
-            "///   `docs/PORTING_STATUS.md`.\n"),
+        3: "",
         4: "/// * The methods that need `fixed::trig` are not ported yet: see `docs/PORTING_STATUS.md`.\n",
     }[n]
     head = f"""{HEADER}//! Port of glam-rs `f32/{t.mod}.rs` @ 0.33.8 on the Q32.32 scalar: a {n}-dimensional
@@ -1360,6 +1494,11 @@ def raw_of(v):
     return v * ONE_RAW
 
 
+def neg_val(v):
+    """The opposite of an operand given in units (an int or a `(num, den)` pair)."""
+    return (-v[0], v[1]) if isinstance(v, tuple) else -v
+
+
 def vec_const(t, vals):
     return t.cw(lambda c: fixed_lit(raw_of(vals[t.c.index(c)])))
 
@@ -1402,6 +1541,7 @@ def bench_consts(t):
         out[name] = (t.name, vec_const(t, vals))
     out["UNIT"] = (t.name, vec_const(t, UNITS[t.n]))
     out["UNIT_NEG"] = (t.name, vec_const(t, UNITS_NEG[t.n]))
+    out["UNIT_OPP"] = (t.name, vec_const(t, [neg_val(v) for v in UNITS[t.n]]))
     for name, v in SCALARS.items():
         out[name] = ("Fixed", fixed_lit(raw_of(v)))
     for name, vals in MASKS.items():
@@ -1523,6 +1663,20 @@ def lib_benches(t):
         b("any_orthonormal_vector_neg", [("a", "UNIT_NEG")], "T", "a.any_orthonormal_vector()")
         b("any_orthonormal_pair_pos", [("a", "UNIT")], "TT", "a.any_orthonormal_pair()")
         b("any_orthonormal_pair_neg", [("a", "UNIT_NEG")], "TT", "a.any_orthonormal_pair()")
+        b("any_orthogonal_vector_lhs", [("a", "A")], "T", "a.any_orthogonal_vector()")
+        b("any_orthogonal_vector_rhs", [("a", "B")], "T", "a.any_orthogonal_vector()")
+        b("rotate_axis", [("a", "A"), ("x", "UNIT"), ("k", "K_ANGLE")], "T",
+          "a.rotate_axis(x, k)")
+        b("rotate_towards_far", [("a", "A"), ("b", "B"), ("k", "K_ANGLE")], "T",
+          "a.rotate_towards(b, k)")
+        b("rotate_towards_near", [("a", "A"), ("b", "B"), ("k", "K_HUNDRED")], "T",
+          "a.rotate_towards(b, k)")
+        # The three branches of `slerp`: general, almost anti-parallel, almost parallel.
+        b("slerp_general", [("a", "A"), ("b", "B"), ("k", "K_HALF")], "T", "a.slerp(b, k)")
+        b("slerp_opposite", [("a", "UNIT"), ("b", "UNIT_OPP"), ("k", "K_HALF")], "T",
+          "a.slerp(b, k)")
+        b("slerp_parallel", [("a", "UNIT"), ("b", "UNIT"), ("k", "K_HALF")], "T",
+          "a.slerp(b, k)")
     for f, sym in [("add", "+"), ("sub", "-"), ("mul", "*"), ("div", "/"), ("rem", "%")]:
         b(f, [("a", "A"), ("b", "B")], "T", f"a {sym} b")
         b(f"{f}_scalar", [("a", "A"), ("k", "K_THREE")], "T", f"a.{f}_scalar(k)")
@@ -1672,6 +1826,11 @@ def alts(t):
             "    Vec3 { x: b, y: sign + lhs.y * lhs.y * a, z: -lhs.y },\n"
             ")",
             "The literal glam-rs expression: every product rescaled separately.")
+        add("rotate_axis_mat3", "rotate_axis", f"(lhs: {T}, axis: {T}, angle: Fixed) -> {T}",
+            "Mat3Trait::mul_vec3(Mat3Trait::from_axis_angle(axis, angle), lhs)",
+            "The same rotation through the 3x3 matrix of the axis and angle instead of through "
+            "the quaternion: 9 elements to build and 3 `dot3` against 4 components and the "
+            "15-multiplication kernel of `Quat::mul_vec3`.", inline="never")
     return out
 
 
@@ -1704,6 +1863,8 @@ def gen_alt(t):
         uses.append(f"use glam::{t.bmod}::{{{t.B}, {t.B}Trait}};")
     elif t.B in code:
         uses.append(f"use glam::{t.bmod}::{t.B};")
+    if "Mat3Trait::" in code:
+        uses.append("use glam::mat3::Mat3Trait;")
     uses.append(f"use glam::{t.mod}::{{{t.name}, {t.name}Trait}};")
     return (f"{HEADER}//! Alternative implementations benchmarked against `glam::{t.mod}` "
             f"(the `alt_*` rows of\n//! `gas/{t.mod}.snap`). The library ships the cheapest "

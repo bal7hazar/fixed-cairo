@@ -12,6 +12,7 @@ use benches::harness::{bb, sink};
 use fixed::fixed::Fixed;
 use glam::mat3::Mat3;
 use glam::mat4::{Mat4, Mat4Trait};
+use glam::quat::Quat;
 use glam::vec3::Vec3;
 use glam::vec4::Vec4;
 
@@ -144,6 +145,116 @@ const EYE: Vec3 = Vec3 {
 };
 const CENTER: Vec3 = Vec3 {
     x: Fixed { raw: 0x400000000 }, y: Fixed { raw: -0x100000000 }, z: Fixed { raw: 0x200000000 },
+};
+const ROT: Quat = Quat {
+    x: Fixed { raw: 0x33333333 },
+    y: Fixed { raw: 0x66666666 },
+    z: Fixed { raw: 0x66666666 },
+    w: Fixed { raw: 0xcccccccc },
+};
+const TRS_W: Mat4 = Mat4 {
+    x_axis: Vec4 {
+        x: Fixed { raw: 0x5c28f5c2 },
+        y: Fixed { raw: 0xcccccccc },
+        z: Fixed { raw: -0x7ae147af },
+        w: Fixed { raw: 0 },
+    },
+    y_axis: Vec4 {
+        x: Fixed { raw: -0x7ae147af },
+        y: Fixed { raw: 0x99999999 },
+        z: Fixed { raw: 0xa3d70a3d },
+        w: Fixed { raw: 0 },
+    },
+    z_axis: Vec4 {
+        x: Fixed { raw: 0xcccccccc },
+        y: Fixed { raw: 0 },
+        z: Fixed { raw: 0x99999999 },
+        w: Fixed { raw: 0 },
+    },
+    w_axis: Vec4 {
+        x: Fixed { raw: 0x300000000 },
+        y: Fixed { raw: -0x200000000 },
+        z: Fixed { raw: 0x100000000 },
+        w: Fixed { raw: 0x100000000 },
+    },
+};
+const TRS_Z: Mat4 = Mat4 {
+    x_axis: Vec4 {
+        x: Fixed { raw: -0x9999999a },
+        y: Fixed { raw: 0xcccccccc },
+        z: Fixed { raw: 0 },
+        w: Fixed { raw: 0 },
+    },
+    y_axis: Vec4 {
+        x: Fixed { raw: -0x7ae147af },
+        y: Fixed { raw: -0x5c28f5c3 },
+        z: Fixed { raw: 0xcccccccc },
+        w: Fixed { raw: 0 },
+    },
+    z_axis: Vec4 {
+        x: Fixed { raw: 0xa3d70a3d },
+        y: Fixed { raw: 0x7ae147ae },
+        z: Fixed { raw: 0x99999999 },
+        w: Fixed { raw: 0 },
+    },
+    w_axis: Vec4 {
+        x: Fixed { raw: 0x300000000 },
+        y: Fixed { raw: -0x200000000 },
+        z: Fixed { raw: 0x100000000 },
+        w: Fixed { raw: 0x100000000 },
+    },
+};
+const TRS_X: Mat4 = Mat4 {
+    x_axis: Vec4 {
+        x: Fixed { raw: 0x5c28f5c2 },
+        y: Fixed { raw: 0xcccccccc },
+        z: Fixed { raw: 0x7ae147ae },
+        w: Fixed { raw: 0 },
+    },
+    y_axis: Vec4 {
+        x: Fixed { raw: 0x7ae147ae },
+        y: Fixed { raw: -0x9999999a },
+        z: Fixed { raw: 0xa3d70a3d },
+        w: Fixed { raw: 0 },
+    },
+    z_axis: Vec4 {
+        x: Fixed { raw: 0xcccccccc },
+        y: Fixed { raw: 0 },
+        z: Fixed { raw: -0x9999999a },
+        w: Fixed { raw: 0 },
+    },
+    w_axis: Vec4 {
+        x: Fixed { raw: 0x300000000 },
+        y: Fixed { raw: -0x200000000 },
+        z: Fixed { raw: 0x100000000 },
+        w: Fixed { raw: 0x100000000 },
+    },
+};
+const TRS_Y: Mat4 = Mat4 {
+    x_axis: Vec4 {
+        x: Fixed { raw: -0x9999999a },
+        y: Fixed { raw: 0xcccccccc },
+        z: Fixed { raw: 0 },
+        w: Fixed { raw: 0 },
+    },
+    y_axis: Vec4 {
+        x: Fixed { raw: 0x7ae147ae },
+        y: Fixed { raw: 0x5c28f5c2 },
+        z: Fixed { raw: 0xcccccccc },
+        w: Fixed { raw: 0 },
+    },
+    z_axis: Vec4 {
+        x: Fixed { raw: 0xa3d70a3d },
+        y: Fixed { raw: 0x7ae147ae },
+        z: Fixed { raw: -0x9999999a },
+        w: Fixed { raw: 0 },
+    },
+    w_axis: Vec4 {
+        x: Fixed { raw: 0x300000000 },
+        y: Fixed { raw: -0x200000000 },
+        z: Fixed { raw: 0x100000000 },
+        w: Fixed { raw: 0x100000000 },
+    },
 };
 
 #[test]
@@ -864,6 +975,110 @@ fn from_scale__op() {
 }
 
 #[test]
+fn from_quat__base() {
+    let _q = bb(ROT);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_quat__op() {
+    let q = bb(ROT);
+    let _r = bb(A);
+    sink(Mat4Trait::from_quat(q));
+}
+
+#[test]
+fn from_rotation_translation__base() {
+    let _q = bb(ROT);
+    let _p = bb(TRANS3);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_rotation_translation__op() {
+    let q = bb(ROT);
+    let p = bb(TRANS3);
+    let _r = bb(A);
+    sink(Mat4Trait::from_rotation_translation(q, p));
+}
+
+#[test]
+fn from_scale_rotation_translation__base() {
+    let _s = bb(SCALE3);
+    let _q = bb(ROT);
+    let _p = bb(TRANS3);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_scale_rotation_translation__op() {
+    let s = bb(SCALE3);
+    let q = bb(ROT);
+    let p = bb(TRANS3);
+    let _r = bb(A);
+    sink(Mat4Trait::from_scale_rotation_translation(s, q, p));
+}
+
+#[test]
+fn to_scale_rotation_translation_x__base() {
+    let _a = bb(TRS_X);
+    let r = bb((SCALE3, ROT, TRANS3));
+    sink(r);
+}
+
+#[test]
+fn to_scale_rotation_translation_x__op() {
+    let a = bb(TRS_X);
+    let _r = bb((SCALE3, ROT, TRANS3));
+    sink(a.to_scale_rotation_translation());
+}
+
+#[test]
+fn to_scale_rotation_translation_y__base() {
+    let _a = bb(TRS_Y);
+    let r = bb((SCALE3, ROT, TRANS3));
+    sink(r);
+}
+
+#[test]
+fn to_scale_rotation_translation_y__op() {
+    let a = bb(TRS_Y);
+    let _r = bb((SCALE3, ROT, TRANS3));
+    sink(a.to_scale_rotation_translation());
+}
+
+#[test]
+fn to_scale_rotation_translation_z__base() {
+    let _a = bb(TRS_Z);
+    let r = bb((SCALE3, ROT, TRANS3));
+    sink(r);
+}
+
+#[test]
+fn to_scale_rotation_translation_z__op() {
+    let a = bb(TRS_Z);
+    let _r = bb((SCALE3, ROT, TRANS3));
+    sink(a.to_scale_rotation_translation());
+}
+
+#[test]
+fn to_scale_rotation_translation_w__base() {
+    let _a = bb(TRS_W);
+    let r = bb((SCALE3, ROT, TRANS3));
+    sink(r);
+}
+
+#[test]
+fn to_scale_rotation_translation_w__op() {
+    let a = bb(TRS_W);
+    let _r = bb((SCALE3, ROT, TRANS3));
+    sink(a.to_scale_rotation_translation());
+}
+
+#[test]
 fn from_axis_angle__base() {
     let _x = bb(AXIS);
     let _t = bb(ANGLE);
@@ -1129,6 +1344,20 @@ fn alt_inverse_plain_try_inverse_none__op() {
     let a = bb(SING);
     let _r = bb(Some(A));
     sink(alt::inverse_plain(a));
+}
+
+#[test]
+fn alt_from_quat_unfused_from_quat__base() {
+    let _q = bb(ROT);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_quat_unfused_from_quat__op() {
+    let q = bb(ROT);
+    let _r = bb(A);
+    sink(alt::from_quat_unfused(q));
 }
 
 #[test]

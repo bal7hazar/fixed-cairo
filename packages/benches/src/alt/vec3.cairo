@@ -7,6 +7,7 @@ use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
 use fixed::wide::{NormTrait, RecipTrait, dot3, norm3, norm3_squared, norm3_wide, normalize3};
 use glam::bvec3::{BVec3, BVec3Trait};
+use glam::mat3::Mat3Trait;
 use glam::vec3::{Vec3, Vec3Trait};
 
 /// Alternative to `Vec3::element_product`. The literal chain of `Fixed * Fixed` (one rescale per
@@ -265,6 +266,14 @@ pub fn any_orthonormal_pair_unfused(lhs: Vec3) -> (Vec3, Vec3) {
         Vec3 { x: F_ONE + sign * lhs.x * lhs.x * a, y: sign * b, z: -(sign * lhs.x) },
         Vec3 { x: b, y: sign + lhs.y * lhs.y * a, z: -lhs.y },
     )
+}
+
+/// Alternative to `Vec3::rotate_axis`. The same rotation through the 3x3 matrix of the axis and
+/// angle instead of through the quaternion: 9 elements to build and 3 `dot3` against 4 components
+/// and the 15-multiplication kernel of `Quat::mul_vec3`.
+#[inline(never)]
+pub fn rotate_axis_mat3(lhs: Vec3, axis: Vec3, angle: Fixed) -> Vec3 {
+    Mat3Trait::mul_vec3(Mat3Trait::from_axis_angle(axis, angle), lhs)
 }
 
 /// `1`.

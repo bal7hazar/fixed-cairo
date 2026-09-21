@@ -143,6 +143,58 @@ pub fn is_near_identity_angle(lhs: Quat) -> bool {
     a + a < NEAR_IDENTITY_ANGLE
 }
 
+/// Alternative to `Quat::from_rotation_axes`. The literal glam-rs `0.5 / sqrt(four_csq)` as a
+/// truncated `Fixed` division followed by four multiplications, instead of the shared wide
+/// `Recip` of `2 sqrt(four_csq)`: two roundings per component instead of one.
+#[inline(never)]
+pub fn from_rotation_axes_fixed_recip(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Quat {
+    if !z_axis.z.is_positive() {
+        let dif10 = y_axis.y - x_axis.x;
+        let omm22 = F_ONE - z_axis.z;
+        if !dif10.is_positive() {
+            let four_xsq = omm22 - dif10;
+            let inv = F_HALF / four_xsq.sqrt();
+            Quat {
+                x: four_xsq * inv,
+                y: (x_axis.y + y_axis.x) * inv,
+                z: (x_axis.z + z_axis.x) * inv,
+                w: (y_axis.z - z_axis.y) * inv,
+            }
+        } else {
+            let four_ysq = omm22 + dif10;
+            let inv = F_HALF / four_ysq.sqrt();
+            Quat {
+                x: (x_axis.y + y_axis.x) * inv,
+                y: four_ysq * inv,
+                z: (y_axis.z + z_axis.y) * inv,
+                w: (z_axis.x - x_axis.z) * inv,
+            }
+        }
+    } else {
+        let sum10 = y_axis.y + x_axis.x;
+        let opm22 = F_ONE + z_axis.z;
+        if !sum10.is_positive() {
+            let four_zsq = opm22 - sum10;
+            let inv = F_HALF / four_zsq.sqrt();
+            Quat {
+                x: (x_axis.z + z_axis.x) * inv,
+                y: (y_axis.z + z_axis.y) * inv,
+                z: four_zsq * inv,
+                w: (x_axis.y - y_axis.x) * inv,
+            }
+        } else {
+            let four_wsq = opm22 + sum10;
+            let inv = F_HALF / four_wsq.sqrt();
+            Quat {
+                x: (y_axis.z - z_axis.y) * inv,
+                y: (z_axis.x - x_axis.z) * inv,
+                z: (x_axis.y - y_axis.x) * inv,
+                w: four_wsq * inv,
+            }
+        }
+    }
+}
+
 /// `1`.
 const F_ONE: Fixed = Fixed { raw: 0x100000000 };
 

@@ -112,6 +112,16 @@ DOT_DEV = ("One `dot{n}` fused kernel per element of the result: the exact Q64.6
 TRIG_DEV = ("`fixed::trig::sin_cos` is accurate to about 1 ULP over a turn (see its "
             "documentation); the products that follow add one floor rescale each.")
 GLAM_ASSERT = "The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3)."
+QUAT_DEV = [
+    GLAM_ASSERT + " `rotation` must be normalized: as in glam-rs the elements are the ones of "
+    "the rotation matrix of a unit quaternion, and a quaternion of length `l` scales the matrix "
+    "by `l^2`.",
+    "Every element is one exact two-term sum of raw products rescaled once (floored): "
+    "`1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling folded into "
+    "the second factor. Nine rescales for the nine elements, at most 1 ULP below the exact "
+    "value each. The literal glam-rs expression rescales the twelve products one by one and "
+    "costs 2.1x as much (43 460 against 20 660 gas for `Mat3`): it is kept in `benches::alt`.",
+]
 
 
 def index_msg(t):
@@ -364,6 +374,56 @@ def rotation_axis_named(t, axis):
         return fixed_lit(0)
 
     return "let (sin, cos) = angle.sin_cos();\n" + t.by_col(el)
+
+
+def quat_axes(t, q="rotation", scale=None, translation=None, fused=True):
+    """`from_quat` and the TRS constructors: the 9 elements of the rotation matrix of a unit
+    quaternion, each one an exact two-term sum of raw products rescaled once.
+
+    `m[i][j] = 1 - 2 (b^2 + c^2)` on the diagonal and `+-2 (ab +- cd)` off it, with the doubling
+    folded into the second factor (`x2 = x + x`, exact for a unit quaternion), so that every
+    element is one `dot2` / `mul_sub` kernel. `scale` multiplies column `i` inside the same
+    rescale (`W2 * Fixed -> T2`), never after it."""
+    d = {c: f"{q}.{c}" for c in "xyzw"}
+    dbl = {c: f"{c}2" for c in "xyz"}
+    # (column, row) -> (a, b, c, d, sign): the element is `a * b2 (+-) c * d2`.
+    off = {(0, 1): ("x", "y", "w", "z", 1), (0, 2): ("x", "z", "w", "y", -1),
+           (1, 0): ("x", "y", "w", "z", -1), (1, 2): ("y", "z", "w", "x", 1),
+           (2, 0): ("x", "z", "w", "y", 1), (2, 1): ("y", "z", "w", "x", -1)}
+
+    def term(i, j):
+        """The element as a wide accumulator expression (before the scale and the rescale)."""
+        if i == j:
+            a, b = [c for c in "xyz" if c != "xyz"[i]]
+            return (f"wide_from(F_ONE).sub(wide_mul({d[a]}, {dbl[a]}))"
+                    f".sub(wide_mul({d[b]}, {dbl[b]}))")
+        a, b, c, e, sign = off[(i, j)]
+        op = "add" if sign > 0 else "sub"
+        return f"wide_mul({d[a]}, {dbl[b]}).{op}(wide_mul({d[c]}, {dbl[e]}))"
+
+    def el(i, j):
+        if i == 3:
+            return fixed_lit(ONE_RAW) if j == 3 else f"{translation}.{t.c[j]}"
+        if j == 3:
+            return fixed_lit(0)
+        if not fused:
+            return unfused_el(i, j) if scale is None else f"({unfused_el(i, j)}) * {scale}.{t.c[i]}"
+        acc = term(i, j)
+        return acc + (f".mul({scale}.{t.c[i]}).narrow()" if scale else ".narrow()")
+
+    def unfused_el(i, j):
+        """The literal glam-rs expression: one rescale per product."""
+        if i == j:
+            a, b = [c for c in "xyz" if c != "xyz"[i]]
+            return f"F_ONE - ({d[a]} * {dbl[a]} + {d[b]} * {dbl[b]})"
+        a, b, c, e, sign = off[(i, j)]
+        return f"{d[a]} * {dbl[b]} {'+' if sign > 0 else '-'} {d[c]} * {dbl[e]}"
+
+    head = "".join(f"let {c}2 = {d[c]} + {d[c]};\n" for c in "xyz")
+    if translation is None and t.n == 4:
+        return head + t.by_col(lambda i, j: (fixed_lit(ONE_RAW if i == j else 0) if i == 3
+                                             else el(i, j)))
+    return head + t.by_col(el)
 
 
 def affine2(t, scale=None, angle=False, translation=None):
@@ -641,6 +701,9 @@ def per_dimension(t):
             [f"`{index_msg(t)}` if `i` or `j` is greater than 3."],
             ["Exact. glam-rs panics with `'index out of bounds'`; the message is the one of this "
              "module."])
+        add("from_quat", "(rotation: Quat) -> Mat3",
+            "Creates a 3D rotation matrix from the given quaternion.", quat_axes(t), [OVF, ADD_P],
+            QUAT_DEV)
         add("from_axis_angle", "(axis: Vec3, angle: Fixed) -> Mat3",
             "Creates a 3D rotation matrix from a normalized rotation `axis` and `angle` (in "
             "radians).", rotation_axis(t), [OVF],
@@ -717,6 +780,71 @@ def per_dimension(t):
             t.by_col(lambda i, j: fixed_lit(0) if i != j
                      else (fixed_lit(ONE_RAW) if i == 3 else f"scale.{v3.c[i]}")), None,
             [GLAM_ASSERT + " glam-rs asserts that `scale` is not entirely zero.", "Exact."])
+        add("from_quat", "(rotation: Quat) -> Mat4",
+            "Creates an affine transformation matrix from the given `rotation` "
+            "quaternion.\n\nThe resulting matrix can be used to transform 3D points and "
+            "vectors. See `transform_point3` and `transform_vector3`.", quat_axes(t),
+            [OVF, ADD_P], QUAT_DEV)
+        add("from_rotation_translation", "(rotation: Quat, translation: Vec3) -> Mat4",
+            "Creates an affine transformation matrix from the given `rotation` quaternion and "
+            "3D `translation`.\n\nThe resulting matrix can be used to transform 3D points and "
+            "vectors. See `transform_point3` and `transform_vector3`.",
+            quat_axes(t, translation="translation"), [OVF, ADD_P], QUAT_DEV)
+        add("from_scale_rotation_translation",
+            "(scale: Vec3, rotation: Quat, translation: Vec3) -> Mat4",
+            "Creates an affine transformation matrix from the given 3D `scale`, `rotation` and "
+            "`translation`.\n\nThe resulting matrix can be used to transform 3D points and "
+            "vectors. See `transform_point3` and `transform_vector3`.",
+            quat_axes(t, scale="scale", translation="translation"), [OVF, ADD_P],
+            QUAT_DEV + ["The scale of column `i` is applied inside the single rescale of each "
+                        "element (`W2 * Fixed -> T2`), not after it: the elements are still one "
+                        "floor rescale away from the exact product, where glam-rs rounds the "
+                        "rotation matrix first and the scaled one second. The nine "
+                        "multiplications are free (21 360 gas, the cost of `from_quat`): a "
+                        "`WideMul` is one step and no range check."])
+        add("to_scale_rotation_translation", "(self: Mat4) -> (Vec3, Quat, Vec3)",
+            "Extracts `scale`, `rotation` and `translation` from `self`.\n\nThe input matrix is "
+            "expected to be a 3D affine transformation matrix otherwise the output will be "
+            "invalid.",
+            "let r = Mat3Trait::from_mat4(self);\n"
+            "// The length of each column, the sign of the determinant carried by the first.\n"
+            "let len_x = Vec3Trait::length(r.x_axis);\n"
+            "let scale = Vec3 {\n"
+            "    x: if Mat3Trait::determinant(r).is_negative() {\n        -len_x\n"
+            "    } else {\n        len_x\n    },\n"
+            "    y: Vec3Trait::length(r.y_axis),\n"
+            "    z: Vec3Trait::length(r.z_axis),\n"
+            "};\n"
+            "// One shared reciprocal per column: three divisions instead of nine.\n"
+            "let rx = RecipTrait::new(scale.x);\n"
+            "let ry = RecipTrait::new(scale.y);\n"
+            "let rz = RecipTrait::new(scale.z);\n"
+            "let rotation = QuatTrait::from_rotation_axes(\n"
+            "    Vec3 { x: rx.mul(r.x_axis.x), y: rx.mul(r.x_axis.y), z: rx.mul(r.x_axis.z) },\n"
+            "    Vec3 { x: ry.mul(r.y_axis.x), y: ry.mul(r.y_axis.y), z: ry.mul(r.y_axis.z) },\n"
+            "    Vec3 { x: rz.mul(r.z_axis.x), y: rz.mul(r.z_axis.y), z: rz.mul(r.z_axis.z) },\n"
+            ");\n"
+            "(scale, rotation, Vec4Trait::truncate(self.w_axis))",
+            ["`'Fixed: division by zero'` if a column of the linear part is zero.",
+             "`'Fixed: overflow'` if a column length or an element of the determinant does not "
+             "fit the scalar range.", NEG_P],
+            [GLAM_ASSERT + " The 4th row of `self` must be `(0, 0, 0, 1)` and the determinant "
+             "must not be zero; the latter panics here instead (`'Fixed: division by zero'`).",
+             "The sign of the determinant is applied to `scale.x` by negating the length "
+             "(exact) instead of multiplying it by `signum(det)`; `signum(0)` is `+1` as "
+             "everywhere else (docs/DESIGN.md section 3), but a zero determinant means a zero "
+             "column, which panics.",
+             "Each column is divided by its own shared `Recip` (rounded to nearest, one "
+             "division for three components) instead of the `scale.recip()` then "
+             "`column * inv_scale` of glam-rs, which rounds twice. Each length is the floor of "
+             "the exact one, so a normalized column is within `1 / scale` ULP per component.",
+             "The rotation is `Quat::from_rotation_axes` of the normalized columns: its own "
+             "error (a square root and a shared division) adds to the above. Measured over "
+             "20 000 random `(scale, rotation, translation)` triples of the Python mirror, the "
+             "round trip `to_scale_rotation_translation(from_scale_rotation_translation(..))` "
+             "recovers the translation exactly, the rotation within 13 raw ULP per component "
+             "and the scale within `5 |scale| + 2` ULP, the linear term being the drift of the "
+             "squared length of the quantized quaternion."], inline=False)
         add("from_axis_angle", "(axis: Vec3, angle: Fixed) -> Mat4",
             "Creates an affine transformation matrix containing a 3D rotation around a "
             "normalized rotation `axis` of `angle` (in radians).", rotation_axis(t), [OVF],
@@ -861,6 +989,16 @@ def operators(t):
 # Whether `inverse_checked` is inlined in its three callers: measured in `gas/<m>.snap`.
 INV_INLINE = {2: "#[inline(always)]", 3: "#[inline(always)]", 4: "#[inline(never)]"}
 
+# What is still missing from each module, in the header of the type. `Mat2` is complete.
+TODO_NOTE = {
+    2: "",
+    3: ("/// * `from_euler` / `to_euler` are the extension trait `glam::euler::Mat3EulerTrait`.\n"),
+    4: ("/// * `from_euler` / `to_euler` are the extension trait `glam::euler::Mat4EulerTrait`.\n") + ("/// * The projection matrices (`perspective_*`, `orthographic_*`, "
+                          "`frustum_*`, deprecated in\n///   glam-rs 0.33.1 in favour of "
+                          "`glam::camera`) are not ported yet: see\n"
+                          "///   `docs/PORTING_STATUS.md`.\n"),
+}
+
 F_ZERO = "\n/// `0`.\nconst F_ZERO: Fixed = Fixed { raw: 0 };\n"
 F_ONE = f"\n/// `1`.\nconst F_ONE: Fixed = Fixed {{ raw: {hex(ONE_RAW)} }};\n"
 
@@ -892,6 +1030,10 @@ def module_uses(t, code):
     wide = wide_imports(code)
     if wide:
         uses.append("use fixed::wide::{" + ", ".join(wide) + "};")
+    quat = [x for x in ("Quat", "QuatTrait") if re.search(rf"\b{x}\b(?!Trait)", code)]
+    if quat:
+        uses.append("use crate::quat::"
+                    + (quat[0] if len(quat) == 1 else "{" + ", ".join(quat) + "}") + ";")
     for k in (2, 3, 4):
         for kind in ("Mat", "Vec"):
             if kind == "Mat" and k == t.n:
@@ -970,11 +1112,7 @@ fn inverse_checked(m: {T}) -> Option<{T}> {{
 ///   `write_cols_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait
 ///   to implement), the by-reference operator overloads, the scalar-on-the-left operators
 ///   (`2.0 * m`) and the casts to types that do not exist in glam.cairo (`as_dmat{n}`, `Mat3A`).
-/// * The methods that need `Quat` (`from_quat`, `from_scale_rotation_translation`,
-///   `to_scale_rotation_translation`), `EulerRot` (`from_euler`, `to_euler`) and the projection
-///   matrices (`perspective_*`, `orthographic_*`, `frustum_*`, deprecated in glam-rs 0.33.1 in
-///   favour of `glam::camera`) are not ported yet: see `docs/PORTING_STATUS.md`.
-#[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
+{TODO_NOTE[n]}#[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct {T} {{
 {chr(10).join(f"    pub {c}: {V}," for c in t.cols)}
 }}
@@ -1038,6 +1176,42 @@ UP = [0, 1, 0]
 EYE = [1, 2, 3]
 CENTER = [4, -1, 2]
 
+# Unit quaternions with exactly rational components (`1 + 4 + 4 + 16 = 25`), one per branch of
+# `Quat::from_rotation_axes`: the branch is decided by `z^2 + w^2 > 1/2` then by `w^2 > z^2`
+# (respectively `x^2 > y^2`), so permuting the same four numerators reaches the four of them.
+ROT_Q = (1, 2, 2, 4)
+BRANCH_Q = {"w": (1, 2, 2, 4), "z": (1, 2, 4, 2), "x": (4, 2, 2, 1), "y": (2, 4, 2, 1)}
+
+
+def quat_const(q, den=5):
+    """The Cairo literal of the unit quaternion `q / den` (floored to Q32.32)."""
+    return ("Quat { "
+            + ", ".join(f"{c}: {fixed_lit(v * ONE_RAW // den)}" for c, v in zip("xyzw", q))
+            + " }")
+
+
+def trs_const(q, translation, den=5):
+    """`Mat4::from_rotation_translation(q / den, translation)` as a Cairo literal: the rotation
+    matrix of the unit quaternion, floored element by element, plus the translation column."""
+    x, y, z, w = (v for v in q)
+    d2 = den * den
+    # `num(i, j) * 2 / d2` off the diagonal, `1 - 2 num / d2` on it (exact integer numerators).
+    diag = {0: y * y + z * z, 1: x * x + z * z, 2: x * x + y * y}
+    off = {(0, 1): (x * y, w * z, 1), (0, 2): (x * z, w * y, -1), (1, 0): (x * y, w * z, -1),
+           (1, 2): (y * z, w * x, 1), (2, 0): (x * z, w * y, 1), (2, 1): (y * z, w * x, -1)}
+
+    def raw(i, j):
+        if i == 3:
+            return ONE_RAW if j == 3 else translation[j] * ONE_RAW
+        if j == 3:
+            return 0
+        if i == j:
+            return (d2 - 2 * diag[i]) * ONE_RAW // d2
+        a, b, sign = off[(i, j)]
+        return 2 * (a + sign * b) * ONE_RAW // d2
+
+    return Ty(4).by_col(lambda i, j: fixed_lit(raw(i, j)))
+
 
 def bench_consts(t):
     """name -> (type, const value) of every operand a bench of `t` may use."""
@@ -1072,6 +1246,9 @@ def bench_consts(t):
     out["CENTER"] = ("Vec3", vec_const(3, CENTER))
     out["M4"] = ("Mat4", mat_const(Ty(4), lambda i, j: ((5 + 2 * i, 2) if i == j
                                                         else OFF_A[(i + 2 * j) % 4])))
+    out["ROT"] = ("Quat", quat_const(ROT_Q))
+    for branch, q in BRANCH_Q.items():
+        out[f"TRS_{branch.upper()}"] = ("Mat4", trs_const(q, [3, -2, 1]))
     return out
 
 
@@ -1149,6 +1326,7 @@ def lib_benches(t):
           "Mat3Trait::from_mat4_minor(m, i, j)")
         b("from_mat4_minor_last", [("m", "M4"), ("i", "3_usize"), ("j", "3_usize")], "A",
           "Mat3Trait::from_mat4_minor(m, i, j)")
+        b("from_quat", [("q", "ROT")], "A", "Mat3Trait::from_quat(q)")
         b("from_axis_angle", [("x", "AXIS"), ("t", "ANGLE")], "A",
           "Mat3Trait::from_axis_angle(x, t)")
         for axis in "xyz":
@@ -1167,6 +1345,16 @@ def lib_benches(t):
           "Mat4Trait::from_mat3_translation(m, p)")
         b("from_translation", [("p", "TRANS3")], "A", "Mat4Trait::from_translation(p)")
         b("from_scale", [("s", "SCALE3")], "A", "Mat4Trait::from_scale(s)")
+        b("from_quat", [("q", "ROT")], "A", "Mat4Trait::from_quat(q)")
+        b("from_rotation_translation", [("q", "ROT"), ("p", "TRANS3")], "A",
+          "Mat4Trait::from_rotation_translation(q, p)")
+        b("from_scale_rotation_translation",
+          [("s", "SCALE3"), ("q", "ROT"), ("p", "TRANS3")], "A",
+          "Mat4Trait::from_scale_rotation_translation(s, q, p)")
+        # The four branches of `Quat::from_rotation_axes` reached through the decomposition.
+        for name, src in (("x", "TRS_X"), ("y", "TRS_Y"), ("z", "TRS_Z"), ("w", "TRS_W")):
+            b(f"to_scale_rotation_translation_{name}", [("a", src)],
+              "(SCALE3, ROT, TRANS3)", "a.to_scale_rotation_translation()")
         b("from_axis_angle", [("x", "AXIS"), ("t", "ANGLE")], "A",
           "Mat4Trait::from_axis_angle(x, t)")
         for axis in "xyz":
@@ -1219,6 +1407,12 @@ def alts(t):
             "the shared `Recip`: this is the formulation of glam-rs (`m * (1 / det)`).",
             inline="never"),
     ]
+    if n > 2:
+        out.append(Alt("from_quat_unfused", ["from_quat"], f"(rotation: Quat) -> {T}",
+                       quat_axes(t, fused=False),
+                       "The literal glam-rs expression: the twelve products of the nine "
+                       "elements rescaled one by one (18 rescales for the 3x3 part) instead of "
+                       "one fused two-term kernel per element."))
     if n == 3:
         out.append(Alt("determinant_cross", ["determinant", "determinant_singular"],
                        f"(lhs: {T}) -> Fixed", to_free(t, body_determinant(t, False)),
@@ -1271,6 +1465,8 @@ def gen_alt(t):
                 glam.append(f"use glam::{kind.lower()}{k}::"
                             + (items[0] if len(items) == 1 else "{" + ", ".join(items) + "}")
                             + ";")
+    if re.search(r"\bQuat\b(?!Trait)", code):
+        glam.append("use glam::quat::Quat;")
     uses += sorted(glam)
     return (f"{HEADER}//! Alternative implementations benchmarked against `glam::{t.mod}` "
             f"(the `alt_*` rows of\n//! `gas/{t.mod}.snap`). The library ships the cheapest "
@@ -1298,6 +1494,8 @@ def gen_bench(t):
             items = [name] + ([f"{name}Trait"] if re.search(rf"\b{name}Trait\b", body) else [])
             glam.append(f"use glam::{prefix}{k}::"
                         + (items[0] if len(items) == 1 else "{" + ", ".join(items) + "}") + ";")
+    if re.search(r"\bQuat\b(?!Trait)", body + decls):
+        glam.append("use glam::quat::Quat;")
     uses += sorted(glam)
     return (f"{HEADER}//! Gas benchmarks of `glam::{t.mod}` and of the alternatives kept in "
             f"`benches::alt::{t.mod}`\n//! (the `alt_*` benches).\n//!\n"

@@ -13,6 +13,7 @@ use fixed::fixed::Fixed;
 use glam::mat2::Mat2;
 use glam::mat3::{Mat3, Mat3Trait};
 use glam::mat4::Mat4;
+use glam::quat::Quat;
 use glam::vec2::Vec2;
 use glam::vec3::Vec3;
 use glam::vec4::Vec4;
@@ -98,6 +99,12 @@ const M4: Mat4 = Mat4 {
         z: Fixed { raw: -0x60000000 },
         w: Fixed { raw: 0x580000000 },
     },
+};
+const ROT: Quat = Quat {
+    x: Fixed { raw: 0x33333333 },
+    y: Fixed { raw: 0x66666666 },
+    z: Fixed { raw: 0x66666666 },
+    w: Fixed { raw: 0xcccccccc },
 };
 
 #[test]
@@ -824,6 +831,20 @@ fn from_mat4_minor_last__op() {
 }
 
 #[test]
+fn from_quat__base() {
+    let _q = bb(ROT);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_quat__op() {
+    let q = bb(ROT);
+    let _r = bb(A);
+    sink(Mat3Trait::from_quat(q));
+}
+
+#[test]
 fn from_axis_angle__base() {
     let _x = bb(AXIS);
     let _t = bb(ANGLE);
@@ -1061,6 +1082,20 @@ fn alt_inverse_plain_try_inverse_none__op() {
     let a = bb(SING);
     let _r = bb(Some(A));
     sink(alt::inverse_plain(a));
+}
+
+#[test]
+fn alt_from_quat_unfused_from_quat__base() {
+    let _q = bb(ROT);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_quat_unfused_from_quat__op() {
+    let q = bb(ROT);
+    let _r = bb(A);
+    sink(alt::from_quat_unfused(q));
 }
 
 #[test]

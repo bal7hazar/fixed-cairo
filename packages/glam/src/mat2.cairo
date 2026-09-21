@@ -30,10 +30,6 @@ use crate::vec3::Vec3Trait;
 ///   `write_cols_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait
 ///   to implement), the by-reference operator overloads, the scalar-on-the-left operators
 ///   (`2.0 * m`) and the casts to types that do not exist in glam.cairo (`as_dmat2`, `Mat3A`).
-/// * The methods that need `Quat` (`from_quat`, `from_scale_rotation_translation`,
-///   `to_scale_rotation_translation`), `EulerRot` (`from_euler`, `to_euler`) and the projection
-///   matrices (`perspective_*`, `orthographic_*`, `frustum_*`, deprecated in glam-rs 0.33.1 in
-///   favour of `glam::camera`) are not ported yet: see `docs/PORTING_STATUS.md`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Mat2 {
     pub x_axis: Vec2,

@@ -20,6 +20,7 @@ use fixed::wide::{
 };
 use crate::mat2::Mat2;
 use crate::mat4::Mat4;
+use crate::quat::Quat;
 use crate::vec2::Vec2;
 use crate::vec3::{Vec3, Vec3Trait};
 use crate::vec4::Vec4Trait;
@@ -35,10 +36,7 @@ use crate::vec4::Vec4Trait;
 ///   `write_cols_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait
 ///   to implement), the by-reference operator overloads, the scalar-on-the-left operators
 ///   (`2.0 * m`) and the casts to types that do not exist in glam.cairo (`as_dmat3`, `Mat3A`).
-/// * The methods that need `Quat` (`from_quat`, `from_scale_rotation_translation`,
-///   `to_scale_rotation_translation`), `EulerRot` (`from_euler`, `to_euler`) and the projection
-///   matrices (`perspective_*`, `orthographic_*`, `frustum_*`, deprecated in glam-rs 0.33.1 in
-///   favour of `glam::camera`) are not ported yet: see `docs/PORTING_STATUS.md`.
+/// * `from_euler` / `to_euler` are the extension trait `glam::euler::Mat3EulerTrait`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Mat3 {
     pub x_axis: Vec3,
@@ -386,6 +384,25 @@ pub trait Mat3Trait {
     /// * Exact. glam-rs panics with `'index out of bounds'`; the message is the one of
     ///   this module.
     fn from_mat4_minor(m: Mat4, i: usize, j: usize) -> Mat3;
+    /// Creates a 3D rotation matrix from the given quaternion.
+    ///
+    /// Mirrors `glam::Mat3::from_quat`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
+    ///   range.
+    /// #### Deviations
+    /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3).
+    ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
+    ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
+    ///   matrix by `l^2`.
+    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
+    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
+    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
+    ///   below the exact value each. The literal glam-rs expression rescales the twelve
+    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
+    ///   `Mat3`): it is kept in `benches::alt`.
+    fn from_quat(rotation: Quat) -> Mat3;
     /// Creates a 3D rotation matrix from a normalized rotation `axis` and `angle` (in
     /// radians).
     ///
@@ -923,6 +940,39 @@ pub impl Mat3Impl of Mat3Trait {
                 _ => core::panic_with_felt252('Mat3: index out of bounds'),
             },
             _ => core::panic_with_felt252('Mat3: index out of bounds'),
+        }
+    }
+
+    #[inline(always)]
+    fn from_quat(rotation: Quat) -> Mat3 {
+        let x2 = rotation.x + rotation.x;
+        let y2 = rotation.y + rotation.y;
+        let z2 = rotation.z + rotation.z;
+        Mat3 {
+            x_axis: Vec3 {
+                x: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.y, y2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .narrow(),
+                y: wide_mul(rotation.x, y2).add(wide_mul(rotation.w, z2)).narrow(),
+                z: wide_mul(rotation.x, z2).sub(wide_mul(rotation.w, y2)).narrow(),
+            },
+            y_axis: Vec3 {
+                x: wide_mul(rotation.x, y2).sub(wide_mul(rotation.w, z2)).narrow(),
+                y: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.z, z2))
+                    .narrow(),
+                z: wide_mul(rotation.y, z2).add(wide_mul(rotation.w, x2)).narrow(),
+            },
+            z_axis: Vec3 {
+                x: wide_mul(rotation.x, z2).add(wide_mul(rotation.w, y2)).narrow(),
+                y: wide_mul(rotation.y, z2).sub(wide_mul(rotation.w, x2)).narrow(),
+                z: wide_from(F_ONE)
+                    .sub(wide_mul(rotation.x, x2))
+                    .sub(wide_mul(rotation.y, y2))
+                    .narrow(),
+            },
         }
     }
 

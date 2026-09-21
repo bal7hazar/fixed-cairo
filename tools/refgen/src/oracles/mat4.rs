@@ -22,6 +22,24 @@ pub fn register(r: &mut Registry) {
     r.add("div_scalar", |a| a[0].dmat4() / a[1].f());
     r.add("mul_diagonal_scale", |a| a[0].dmat4().mul_diagonal_scale(a[1].dvec4()));
     r.add("determinant", |a| a[0].dmat4().determinant());
+    r.add("from_quat", |a| DMat4::from_quat(a[0].dquat()));
+    r.add("from_rotation_translation", |a| {
+        DMat4::from_rotation_translation(a[0].dquat(), a[1].dvec3())
+    });
+    r.add("from_scale_rotation_translation", |a| {
+        DMat4::from_scale_rotation_translation(a[0].dvec3(), a[1].dquat(), a[2].dvec3())
+    });
+    // The decomposition is only well posed when the columns are long enough to normalize and
+    // the scale is not degenerate; `constraint = "trs"` guarantees both, the guard below drops
+    // the draws where the oracle itself would lose the rotation.
+    r.add("to_scale_rotation_translation", |a| -> Out {
+        let m = a[0].dmat4();
+        let (s, q, t) = m.to_scale_rotation_translation();
+        if s.abs().min_element() < 0.05 {
+            return skip("to_scale_rotation_translation: a degenerate scale");
+        }
+        (s, q, t).into()
+    });
     r.add("inverse", |a| a[0].dmat4().inverse());
     r.add("transpose_abs", |a| {
         let m = a[0].dmat4();

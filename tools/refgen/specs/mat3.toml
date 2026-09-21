@@ -274,3 +274,20 @@ justification = "exact: a selection of nine elements."
 name = "column"
 args = [[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], 4, 0]
 expected = "Mat3: index out of bounds"
+
+[[function]]
+name = "from_quat"
+call = "Mat3Trait::from_quat({0})"
+args = [{ type = "Quat", constraint = "normalized" }]
+ret = "Mat3"
+cases = 12
+tolerance = 2
+justification = "every element is one exact two-term sum of raw products (`1 - 2 (b^2 + c^2)` or `2 (ab +- cd)`) rescaled once: 1 ULP below the exact value, plus the 0.5 of the quantization of the oracle. The quantized unit quaternion is the same on both sides, so its own drift cancels. Rounded up to 2."
+edges = [
+    [[0, 0, 0, 1]],
+    [[1, 0, 0, 0]],
+    [[0, 1, 0, 0]],
+    [[0, 0, 1, 0]],
+    [[0.2, 0.4, 0.4, 0.8]],
+    [[0.8, 0.4, 0.4, 0.2]],
+]

@@ -13,7 +13,7 @@
 
 use core::ops::index::IndexView;
 use core::ops::{AddAssign, DivAssign, MulAssign, RemAssign, SubAssign};
-use fixed::fixed::{Fixed, FixedTrait};
+use fixed::fixed::{Fixed, FixedTrait, PI};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
     Norm, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, det3, distance3,
@@ -22,6 +22,7 @@ use fixed::wide::{
 };
 use crate::bvec3::{BVec3, BVec3Trait};
 use crate::ivec3::IVec3;
+use crate::quat::QuatTrait;
 use crate::uvec3::UVec3;
 use crate::vec2::Vec2;
 use crate::vec4::Vec4;
@@ -39,8 +40,6 @@ use crate::vec4::Vec4;
 ///   operators (`2.0 * v`), the element-wise transcendental wrappers (`exp`, `ln`, `powf`,
 ///   `sqrt`, `sin`, `cos`, `sin_cos`: `fixed` tier B / C) and the casts to types that do not
 ///   exist in glam.cairo (`as_dvec3`, `as_i8vec3`, ...).
-/// * Not ported yet: `rotate_axis`, `rotate_towards` and `slerp` (they need `Quat`), see
-///   `docs/PORTING_STATUS.md`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct Vec3 {
     pub x: Fixed,
@@ -777,8 +776,8 @@ pub trait Vec3Trait {
     ///   |(triple, dot)|` ULP.
     /// * The `axis.is_normalized()` precondition and the non-zero inputs are not checked
     ///   (`glam_assert!`).
-    /// * `Vec3::rotate_axis` (`Quat`) is not ported yet: the round trip of the doc above
-    ///   needs it.
+    /// * `self.rotate_axis(axis, self.angle_to(rhs, axis))` closes the round trip of the
+    ///   doc above to within `10 |self|` ULP (see `rotate_axis`).
     fn angle_to(self: Vec3, rhs: Vec3, axis: Vec3) -> Fixed;
     /// Rotates around the x axis by `angle` (in radians).
     ///
@@ -810,6 +809,61 @@ pub trait Vec3Trait {
     ///   rescale) per rotated component: each is within `1.02 * (|x| + |y|) + 1` ULP of
     ///   the exact rotation, the `z` component is unchanged.
     fn rotate_z(self: Vec3, angle: Fixed) -> Vec3;
+    /// Rotates around `axis` by `angle` (in radians).
+    ///
+    /// The axis must be a unit vector.
+    ///
+    /// Mirrors `glam::Vec3::rotate_axis`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * The `axis.is_normalized()` precondition is not checked (`glam_assert!`).
+    /// * `Quat::from_axis_angle(axis, angle).mul_vec3(self)` as in glam-rs: one `sin_cos`
+    ///   (about 1 ULP over a turn), then the 15-multiplication rotation kernel of
+    ///   `Quat::mul_vec3`, which rescales once per component. The total error is below `4
+    ///   |self|` ULP for a unit `axis`.
+    /// * Building the same rotation as a `Mat3::from_axis_angle` and multiplying costs 15
+    ///   % more (58 730 against 51 120 gas, `alt_rotate_axis_mat3`).
+    fn rotate_axis(self: Vec3, axis: Vec3, angle: Fixed) -> Vec3;
+    /// Rotates towards `rhs` up to `max_angle` (in radians).
+    ///
+    /// When `max_angle` is `0`, the result will be equal to `self`. When `max_angle` is
+    /// equal to `self.angle_between(rhs)`, the result will be parallel to `rhs`. If
+    /// `max_angle` is negative, rotates towards the exact opposite of `rhs`. Will not go
+    /// past the target.
+    ///
+    /// Mirrors `glam::Vec3::rotate_towards`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self x rhs|` or `self.dot(rhs)` does not fit the scalar
+    ///   range, i.e. for `|self| * |rhs| >= 2^31`.
+    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if a component difference leaves the
+    ///   scalar range.
+    /// #### Deviations
+    /// * One `atan2` (`angle_between`, error bound as there) and the `from_axis_angle` /
+    ///   `mul_vec3` pair of `rotate_axis`: the total error is below `10 |self|` ULP.
+    /// * The rotation axis is the normalized `self.cross(rhs)`, falling back to the
+    ///   normalized `any_orthogonal_vector` when the two vectors are parallel, as in glam-
+    ///   rs (`try_normalize` there). The length of the fallback is never zero for a non-
+    ///   zero `self`. The normalization shares one square root and one division.
+    /// * `max_angle` is clamped with `FixedTrait::clamp`, which panics on a reversed
+    ///   range; here `angle_between - PI <= angle_between` always holds.
+    fn rotate_towards(self: Vec3, rhs: Vec3, max_angle: Fixed) -> Vec3;
+    /// Returns some vector that is orthogonal to the given one.
+    ///
+    /// The input vector must be non-zero.
+    ///
+    /// The output vector is not necessarily unit length. For that use
+    /// `any_orthonormal_vector` instead.
+    ///
+    /// Mirrors `glam::Vec3::any_orthogonal_vector`.
+    /// #### Panics
+    /// * `'i64_neg Underflow'` if a component is `MIN`.
+    /// #### Deviations
+    /// * Exact: `self x Y` or `self x X`, whichever of the two is the longer, as in glam-
+    ///   rs.
+    /// * The `|x| > |y|` test is the one of glam-rs; it is a comparison of absolute
+    ///   values, not of the components.
+    fn any_orthogonal_vector(self: Vec3) -> Vec3;
     /// Returns any unit vector that is orthogonal to the given one.
     ///
     /// The input vector must be unit length.
@@ -841,6 +895,34 @@ pub trait Vec3Trait {
     ///   division is always defined.
     /// * The second vector is exactly `any_orthonormal_vector`.
     fn any_orthonormal_pair(self: Vec3) -> (Vec3, Vec3);
+    /// Performs a spherical linear interpolation between `self` and `rhs` based on the
+    /// value `s`.
+    ///
+    /// When `s` is `0`, the result will be equal to `self`. When `s` is `1`, the result
+    /// will be equal to `rhs`. When `s` is outside of range `[0, 1]`, the result is
+    /// linearly extrapolated.
+    ///
+    /// Mirrors `glam::Vec3::slerp`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if `self` or `rhs` is zero.
+    /// * `'Fixed: overflow'` if `|self| * |rhs|` does not fit the scalar range, i.e. for
+    ///   `|self| * |rhs| >= 2^31`.
+    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if a component difference leaves the
+    ///   scalar range.
+    /// #### Deviations
+    /// * The three branches of glam-rs, with the `1 - 3e-7` cosine band replaced by
+    ///   [`NEAR_ONE`] (`1 - 2^-20`), re-derived for Q32.32 (docs/DESIGN.md section 3).
+    /// * The four divisions are `fixed::wide::Recip` (one wide reciprocal, rounded to
+    ///   nearest) and each component of the interpolated direction is one exact two-term
+    ///   sum rescaled once. In the general branch the error is below `(2 + 5 / sin(theta))
+    ///   |result|` ULP; it is the `1 / sin(theta)` term that the band bounds at `3.4e-7`
+    ///   relative.
+    /// * `acos_clamped` (7.6e-10) instead of the degree-7 `acos_approx` of glam-rs; the
+    ///   cosine is ill-conditioned near `+-1` but the error of `theta` cancels between the
+    ///   three sines to first order, which is why the band can be as tight as it is.
+    /// * glam-rs returns `self.lerp(rhs, s)` when the dot product is NaN; there is no NaN
+    ///   here (a zero input divides by zero and panics).
+    fn slerp(self: Vec3, rhs: Vec3, s: Fixed) -> Vec3;
     /// Performs a linear interpolation between `self` and `rhs` based on the value `s`.
     ///
     /// When `s` is `0`, the result will be equal to `self`. When `s` is `1`, the result
@@ -1565,6 +1647,35 @@ pub impl Vec3Impl of Vec3Trait {
         Vec3 { x: mul_sub(self.x, c, self.y, s), y: dot2(self.x, s, self.y, c), z: self.z }
     }
 
+    fn rotate_axis(self: Vec3, axis: Vec3, angle: Fixed) -> Vec3 {
+        QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), self)
+    }
+
+    fn rotate_towards(self: Vec3, rhs: Vec3, max_angle: Fixed) -> Vec3 {
+        let angle_between = Self::angle_between(self, rhs);
+        // When `max_angle < 0`, rotate no further than `PI` radians away
+        let angle = max_angle.clamp(angle_between - PI, angle_between);
+        // The rotation axis: the normalized cross product, or an arbitrary orthogonal
+        // direction when the two vectors are parallel.
+        let c = Self::cross(self, rhs);
+        let axis = match norm3_wide(c.x, c.y, c.z).try_recip() {
+            Some(r) => Vec3 { x: r.mul(c.x), y: r.mul(c.y), z: r.mul(c.z) },
+            None => Self::normalize(Self::any_orthogonal_vector(self)),
+        };
+        QuatTrait::mul_vec3(QuatTrait::from_axis_angle(axis, angle), self)
+    }
+
+    #[inline(always)]
+    fn any_orthogonal_vector(self: Vec3) -> Vec3 {
+        if self.x.abs() > self.y.abs() {
+            // `self.cross(Vec3::Y)`
+            Vec3 { x: -self.z, y: F_ZERO, z: self.x }
+        } else {
+            // `self.cross(Vec3::X)`
+            Vec3 { x: F_ZERO, y: self.z, z: -self.y }
+        }
+    }
+
     #[inline(always)]
     fn any_orthonormal_vector(self: Vec3) -> Vec3 {
         let sign = self.z.signum();
@@ -1608,6 +1719,41 @@ pub impl Vec3Impl of Vec3Trait {
                 z: -self.y,
             },
         )
+    }
+
+    fn slerp(self: Vec3, rhs: Vec3, s: Fixed) -> Vec3 {
+        let la = norm3_wide(self.x, self.y, self.z);
+        let lb = norm3_wide(rhs.x, rhs.y, rhs.z);
+        let self_length = la.to_fixed();
+        let rhs_length = lb.to_fixed();
+        // The cosine of the angle between the two directions.
+        let d = RecipTrait::new(self_length * rhs_length).mul(Self::dot(self, rhs));
+        if d.abs() < NEAR_ONE {
+            let theta = d.acos_clamped();
+            let r = RecipTrait::new(theta.sin());
+            let t1 = r.mul((theta * (F_ONE - s)).sin());
+            let t2 = r.mul((theta * s).sin());
+            // The interpolated length, then one shared division per operand.
+            let len = self_length.lerp(rhs_length, s);
+            let k1 = la.recip().mul(len * t1);
+            let k2 = lb.recip().mul(len * t2);
+            Vec3 {
+                x: wide_mul(self.x, k1).add(wide_mul(rhs.x, k2)).narrow(),
+                y: wide_mul(self.y, k1).add(wide_mul(rhs.y, k2)).narrow(),
+                z: wide_mul(self.z, k1).add(wide_mul(rhs.z, k2)).narrow(),
+            }
+        } else if d.is_negative() {
+            // Almost anti-parallel: turn by `PI * s` around an arbitrary orthogonal axis.
+            let q = QuatTrait::from_axis_angle(
+                Self::normalize(Self::any_orthogonal_vector(self)), PI * s,
+            );
+            let k = la.recip().mul(self_length.lerp(rhs_length, s));
+            Self::mul_scalar(QuatTrait::mul_vec3(q, self), k)
+        } else {
+            // Almost parallel: the linear interpolation is the spherical one to within
+            // `theta^2 / 8`.
+            Self::lerp(self, rhs, s)
+        }
     }
 
     #[inline(always)]
@@ -1969,6 +2115,16 @@ const F_HALF: Fixed = Fixed { raw: 0x80000000 };
 /// The squared length of a vector normalized by this module is within a few ULP of 1; glam-rs
 /// uses `2e-4`, which is ~1700 f32 epsilons, while this is ~1000 Q32.32 epsilons.
 const NORMALIZED_EPS: Fixed = Fixed { raw: 1024 };
+
+/// `1 - 2^-20`, the cosine band in which [`Vec3Trait::slerp`] falls back to a linear
+/// interpolation, where glam-rs uses `1 - 3e-7`.
+///
+/// Below `theta = acos(NEAR_ONE) = 1.38e-3` rad the slerp branch divides the two sine weights
+/// by `sin(theta)`, which costs `2 ULP / sin(theta) = 3.4e-7` relative on the result, while the
+/// linear fallback differs from the exact slerp by `theta^2 / 8 = 2.4e-7`: the two branches
+/// meet with the same accuracy, which is what fixes the threshold. It is the same value as
+/// `quat::NEAR_ONE`, whose derivation is the same one on the half angle.
+pub const NEAR_ONE: Fixed = Fixed { raw: 0xfffff000 };
 
 /// `v * (target / len)`: one division shared by the components, one fused product each.
 #[inline(always)]

@@ -6,6 +6,8 @@
 //! Q32.32, `docs/DESIGN.md` section 3) and the ill-conditioned ones (`acos` near a dot product
 //! of one, the normalization of a vector part that Cairo floors before dividing by it).
 
+#![allow(deprecated)]
+
 use crate::prelude::*;
 use glam::{DMat3, DQuat, DVec3};
 
@@ -22,6 +24,11 @@ const ARC_BAND: f64 = 1.0e-3;
 /// `1 / sqrt(1 - dot^2)` ULP on the angle. The entries that go through `acos` keep
 /// `|dot| <= 0.99`, i.e. an amplification of at most 7.1.
 const MAX_DOT: f64 = 0.99;
+
+/// The shortest `dir x up` the `look_*` entries accept: below it the normalized side axis
+/// carries more than `1 ULP / LOOK_MIN_SIDE = 4.7e-9` per component, which the quaternion then
+/// amplifies by its own shared division.
+const LOOK_MIN_SIDE: f64 = 0.05;
 
 pub fn register(r: &mut Registry) {
     r.add("mul_quat", |a| a[0].dquat() * a[1].dquat());
@@ -93,6 +100,28 @@ pub fn register(r: &mut Registry) {
         }
         p.rotate_towards(q, m).into()
     });
+    r.add("from_mat3", |a| DQuat::from_mat3(&a[0].dmat3()));
+    r.add("from_mat4", |a| DQuat::from_mat4(&a[0].dmat4()));
+    // `look_to_*` / `look_at_*` are deprecated in glam-rs 0.33.1 (moved to `glam::camera`,
+    // task C1 of `docs/PLAN.md`); they are still the oracle of the `Quat` methods of the same
+    // name. A `dir` nearly parallel to `up` makes the normalized side axis ill-conditioned.
+    r.add("look_to", |a| -> Out {
+        let (dir, up) = (a[0].dvec3(), a[1].dvec3());
+        if dir.cross(up).length() < LOOK_MIN_SIDE {
+            return skip("look_to: `dir` and `up` are nearly parallel");
+        }
+        (DQuat::look_to_rh(dir, up), DQuat::look_to_lh(dir, up)).into()
+    });
+    r.add("look_at_rh", |a| {
+        look_at_guard(a).unwrap_or_else(|| {
+            DQuat::look_at_rh(a[0].dvec3(), a[1].dvec3(), a[2].dvec3()).into()
+        })
+    });
+    r.add("look_at_lh", |a| {
+        look_at_guard(a).unwrap_or_else(|| {
+            DQuat::look_at_lh(a[0].dvec3(), a[1].dvec3(), a[2].dvec3()).into()
+        })
+    });
     r.add("from_rotation_arc", |a| -> Out {
         let (from, to) = (a[0].dvec3(), a[1].dvec3());
         arc_guard(from.dot(to)).unwrap_or_else(|| DQuat::from_rotation_arc(from, to).into())
@@ -105,6 +134,31 @@ pub fn register(r: &mut Registry) {
     r.add("from_rotation_arc_2d", |a| -> Out {
         let (from, to) = (a[0].dvec2(), a[1].dvec2());
         arc_guard(from.dot(to)).unwrap_or_else(|| DQuat::from_rotation_arc_2d(from, to).into())
+    });
+    // The `Vec3` methods implemented through `Quat` (golden_vec3 is at its line cap).
+    // `rotate_towards` clamps the travelled angle: a draw on the clamp boundary, or one whose
+    // cross product is too short to normalize accurately, would have the two ports take
+    // different paths.
+    r.add("rotate_pair", |a| -> Out {
+        let (v, w, m) = (a[0].dvec3(), a[1].dvec3(), a[2].f());
+        let angle = v.angle_between(w);
+        if v.cross(w).length() < 0.05 * v.length() * w.length() {
+            return skip("rotate_towards: the two vectors are nearly colinear");
+        }
+        if (m - angle).abs() < 1.0e-3 || (m - (angle - std::f64::consts::PI)).abs() < 1.0e-3 {
+            return skip("rotate_towards: on the clamp boundary");
+        }
+        (v.rotate_axis(w, m), v.rotate_towards(w, m)).into()
+    });
+    // `slerp` branches on the cosine at `1 - 3e-7` in glam-rs and at `1 - 2^-20` here: the
+    // band and its neighbourhood are dropped, and the general branch divides by `sin(theta)`.
+    r.add("slerp_orthogonal", |a| -> Out {
+        let (v, w, s) = (a[0].dvec3(), a[1].dvec3(), a[2].f());
+        let d = v.dot(w) / (v.length() * w.length());
+        if d.abs() > 1.0 - 1.0e-3 {
+            return skip("slerp: inside or next to the linear band");
+        }
+        (v.slerp(w, s), v.any_orthogonal_vector()).into()
     });
     // A unit quaternion whose vector part is long enough for `to_axis_angle` to normalize it:
     // an axis-angle rotation with an angle away from zero and from a half turn.
@@ -127,6 +181,17 @@ fn arc_guard(dot: f64) -> Option<Out> {
     }
     if dot < -1.0 + ARC_BAND {
         return Some(skip("from_rotation_arc: inside the 180 degree band"));
+    }
+    None
+}
+
+/// `None` when `look_at_*` is well posed, a skip when the direction is degenerate or nearly
+/// parallel to `up`.
+fn look_at_guard(a: &[Value]) -> Option<Out> {
+    let (eye, center, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+    let d = center - eye;
+    if d.length() < 1.0 || d.normalize().cross(up).length() < LOOK_MIN_SIDE {
+        return Some(skip("look_at: the direction is degenerate or nearly parallel to `up`"));
     }
     None
 }

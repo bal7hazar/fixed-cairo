@@ -8,6 +8,7 @@ bench_mat4::add_mat4: 13440 112 32 0 0
 bench_mat4::alt_determinant_det3_determinant: 17330 149 20 0 0
 bench_mat4::alt_determinant_det3_determinant_singular: 17330 149 20 0 0
 bench_mat4::alt_div_scalar_plain_div_scalar: 46700 394 96 0 0
+bench_mat4::alt_from_quat_unfused_from_quat: 44160 369 102 0 0
 bench_mat4::alt_inverse_plain_inverse: 122100 1023 236 0 0
 bench_mat4::alt_inverse_plain_try_inverse_none: 122100 393 76 0 0
 bench_mat4::alt_inverse_plain_try_inverse_some: 122100 1023 236 0 0
@@ -27,12 +28,15 @@ bench_mat4::from_cols_array_2d: 2520 24 0 0 0
 bench_mat4::from_diagonal: 1600 16 0 0 0
 bench_mat4::from_mat3: 1600 16 0 0 0
 bench_mat4::from_mat3_translation: 2520 24 0 0 0
+bench_mat4::from_quat: 21360 183 42 0 0
+bench_mat4::from_rotation_translation: 21360 183 42 0 0
 bench_mat4::from_rotation_x: 33820 267 62 0 0
 bench_mat4::from_rotation_y: 33820 267 62 0 0
 bench_mat4::from_rotation_z: 33820 267 62 0 0
 bench_mat4::from_rows: 1600 16 0 0 0
 bench_mat4::from_rows_array: 2520 24 0 0 0
 bench_mat4::from_scale: 1600 16 0 0 0
+bench_mat4::from_scale_rotation_translation: 21360 183 42 0 0
 bench_mat4::from_translation: 1600 16 0 0 0
 bench_mat4::inverse: 102610 868 208 0 0
 bench_mat4::inverse_or_zero_none: 102710 394 76 0 0
@@ -60,6 +64,10 @@ bench_mat4::sub_mat4: 13440 112 32 0 0
 bench_mat4::to_cols_array: 2520 24 0 0 0
 bench_mat4::to_cols_array_2d: 2520 24 0 0 0
 bench_mat4::to_rows_array: 2520 24 0 0 0
+bench_mat4::to_scale_rotation_translation_w: 54160 451 113 0 0
+bench_mat4::to_scale_rotation_translation_x: 54160 450 113 0 0
+bench_mat4::to_scale_rotation_translation_y: 54160 451 113 0 0
+bench_mat4::to_scale_rotation_translation_z: 54160 451 113 0 0
 bench_mat4::transform_point3: 7760 68 12 0 0
 bench_mat4::transform_vector3: 7160 62 12 0 0
 bench_mat4::transpose: 2520 24 0 0 0

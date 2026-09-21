@@ -16,6 +16,7 @@ the same inputs; this file pins the bit-exact fixed-point semantics instead.
 Compile budget (see `tools/codegen/README.md`): one `const [[i64; W]; K]` table and ONE looping
 `#[test]` per function group, at most 6 fuzz properties per module. Add a row, never an assertion.
 """
+import math
 import re
 
 import fvec_tests as ft
@@ -136,6 +137,73 @@ def cw(f, *ms):
     return [[f(*[m[i][j] for m in ms]) for j in range(n)] for i in range(n)]
 
 
+def quat_axes(q, n, scale=None, translation=None):
+    """`Mat3::from_quat` / `Mat4::from_scale_rotation_translation` on raw values: every element
+    is one exact two-term sum of raw products, rescaled once (floored)."""
+    x, y, z, w = q
+    d = {"x": x, "y": y, "z": z, "w": w}
+    dbl = {"x": 2 * x, "y": 2 * y, "z": 2 * z}
+    off = {(0, 1): ("x", "y", "w", "z", 1), (0, 2): ("x", "z", "w", "y", -1),
+           (1, 0): ("x", "y", "w", "z", -1), (1, 2): ("y", "z", "w", "x", 1),
+           (2, 0): ("x", "z", "w", "y", 1), (2, 1): ("y", "z", "w", "x", -1)}
+
+    def el(i, j):
+        if i == 3:
+            return ONE if j == 3 else (translation[j] if translation else 0)
+        if j == 3:
+            return 0
+        if i == j:
+            a, b = [c for c in "xyz" if c != "xyz"[i]]
+            acc = ONE * ONE - d[a] * dbl[a] - d[b] * dbl[b]
+        else:
+            a, b, c, e, sg = off[(i, j)]
+            acc = d[a] * dbl[b] + sg * d[c] * dbl[e]
+        return (acc * scale[i]) >> 64 if scale else acc >> 32
+
+    return [[el(i, j) for j in range(n)] for i in range(n)]
+
+
+def from_rotation_axes(m):
+    """`Quat::from_rotation_axes` on the three raw columns of a 3x3 matrix."""
+    (m00, m01, m02), (m10, m11, m12), (m20, m21, m22) = (c[:3] for c in m[:3])
+    rm = ft.recip_mul
+
+    def shared(v):
+        # `Fixed::sqrt`: the integer square root of the raw value scaled back to Q32.32.
+        s = math.isqrt(v << 32)
+        return ft.recip_wide(s + s)
+
+    if m22 <= 0:
+        dif10, omm22 = m11 - m00, ONE - m22
+        if dif10 <= 0:
+            v = omm22 - dif10
+            r = shared(v)
+            return [rm(r, v), rm(r, m01 + m10), rm(r, m02 + m20), rm(r, m12 - m21)]
+        v = omm22 + dif10
+        r = shared(v)
+        return [rm(r, m01 + m10), rm(r, v), rm(r, m12 + m21), rm(r, m20 - m02)]
+    sum10, opm22 = m11 + m00, ONE + m22
+    if sum10 <= 0:
+        v = opm22 - sum10
+        r = shared(v)
+        return [rm(r, m02 + m20), rm(r, m12 + m21), rm(r, v), rm(r, m01 - m10)]
+    v = opm22 + sum10
+    r = shared(v)
+    return [rm(r, m12 - m21), rm(r, m20 - m02), rm(r, m01 - m10), rm(r, v)]
+
+
+def to_scale_rotation_translation(m):
+    """`Mat4::to_scale_rotation_translation` on the raw columns of a 4x4 matrix."""
+    r = [[m[i][j] for j in range(3)] for i in range(3)]
+    lx = ft.norm(r[0])
+    scale = [-lx if det(r) < 0 else lx, ft.norm(r[1]), ft.norm(r[2])]
+    cols = []
+    for i in range(3):
+        rec = ft.recip_wide(scale[i])
+        cols.append([ft.recip_mul(rec, r[i][j]) for j in range(3)])
+    return scale, from_rotation_axes(cols), [m[3][j] for j in range(3)]
+
+
 def transform_point(m, v):
     """`dotN_add`: the translation column is added exactly inside the single rescale."""
     n = len(m) - 1
@@ -210,7 +278,7 @@ class Gen:
         n = t.n
         self.kinds = {
             "m": (n * n, "mx"), "v": (n, "vc"), "s": (1, "fx"), "us": (1, "us"),
-            "bl": (1, "bl"), "om": (n * n + 1, "om"),
+            "bl": (1, "bl"), "om": (n * n + 1, "om"), "q": (4, "qq"),
         }
         for k in (2, 3, 4):
             self.kinds[f"m{k}"] = (k * k, "mx" if k == n else f"mm{k}")
@@ -230,6 +298,8 @@ class Gen:
                         f"fn {name}({args}) {{\n{body}\n}}\n")
 
     def cells(self, kind, v):
+        if kind == "q":
+            return [int(x) for x in v]
         if kind[0] == "m" and kind != "om":
             return [int(x) for c in v for x in c]
         if kind[0] == "v":
@@ -270,6 +340,22 @@ class Gen:
 # floored determinant (|inverse| / |det| ULP); each element of the product then multiplies those
 # by |m| and floors once. 8 raw ULP covers every row of the table below (the rows where it does
 # not are still checked element by element against the oracle).
+# Unit quaternions, in raw Q32.32: the identity, the three half turns, a quarter turn about z,
+# the four permutations of (1, 2, 2, 4) / 5 (one per branch of `Quat::from_rotation_axes`) and
+# two generic ones. `1 + 4 + 4 + 16 = 25`, so the permutations are exactly rational.
+def _q(v, den):
+    return [k * ONE // den for k in v]
+
+
+QUATS = [
+    _q([0, 0, 0, 1], 1), _q([1, 0, 0, 0], 1), _q([0, 1, 0, 0], 1), _q([0, 0, 1, 0], 1),
+    [0, 0, 3037000499, 3037000500],
+    _q([1, 2, 2, 4], 5), _q([1, 2, 4, 2], 5), _q([4, 2, 2, 1], 5), _q([2, 4, 2, 1], 5),
+    [-2063235552, 687745183, 1375490367, 3438725918],
+    [2147483648, -3579139414, 715827882, -715827883],
+]
+
+
 IDENTITY_EPS = 8
 
 
@@ -465,6 +551,43 @@ def gen_tests(t):
                         for j in range(3)] for i in range(3)]} for b in POOL[3:6]]
         table("from_mat2", [("m", "m2"), ("e", "m")], rows,
               lambda c: [eq(f"Mat3Trait::from_mat2({c['m']})", c["e"])])
+        rows = [{"q": q, "e": quat_axes(q, 3), "b": from_rotation_axes(quat_axes(q, 3))}
+                for q in QUATS]
+        table("from_quat", [("q", "q"), ("e", "m"), ("b", "q")], rows,
+              lambda c: [eq(f"Mat3Trait::from_quat({c['q']})", c["e"]),
+                         "// the round trip through `Quat::from_mat3` closes to 1 raw ULP on",
+                         "// this pool (4 over 50 000 random unit quaternions)",
+                         eq(f"QuatTrait::from_mat3({c['e']})", c["b"]),
+                         f"assert!({c['b']}.abs_diff_eq({c['q']}, f(1)) "
+                         f"|| (-{c['b']}).abs_diff_eq({c['q']}, f(1)));",
+                         "// a rotation matrix: unit columns, determinant one",
+                         f"assert!({c['e']}.determinant().abs_diff_eq(f({ONE}), f(8)));",
+                         f"assert!({c['e']}.x_axis.length().abs_diff_eq(f({ONE}), f(4)));"])
+        test("test_from_quat_axes", [
+            "let o = f(0x100000000);",
+            "let z = f(0);",
+            "// a half turn about each axis, exactly",
+            eq("Mat3Trait::from_quat(QuatTrait::IDENTITY)", "Mat3Trait::IDENTITY"),
+            eq("Mat3Trait::from_quat(quat(o, z, z, z))",
+               "mat3(vec3(o, z, z), vec3(z, -o, z), vec3(z, z, -o))"),
+            eq("Mat3Trait::from_quat(quat(z, o, z, z))",
+               "mat3(vec3(-o, z, z), vec3(z, o, z), vec3(z, z, -o))"),
+            eq("Mat3Trait::from_quat(quat(z, z, o, z))",
+               "mat3(vec3(-o, z, z), vec3(z, -o, z), vec3(z, z, o))"),
+            "// `from_quat` and `from_axis_angle` build the same rotation (2 ULP apart: the",
+            "// quaternion halves the angle through `sin_cos`, the matrix does not)",
+            "let a = f(0x59999999);",
+            "let x = Mat3Trait::from_quat(QuatTrait::from_rotation_x(a));",
+            "assert!(x.abs_diff_eq(Mat3Trait::from_rotation_x(a), f(2)));",
+            "let y = Mat3Trait::from_quat(QuatTrait::from_rotation_y(a));",
+            "assert!(y.abs_diff_eq(Mat3Trait::from_rotation_y(a), f(2)));",
+            "let zz = Mat3Trait::from_quat(QuatTrait::from_rotation_z(a));",
+            "assert!(zz.abs_diff_eq(Mat3Trait::from_rotation_z(a), f(2)));",
+            "// rotating a vector through the matrix or through the quaternion agrees",
+            "let q = QuatTrait::from_axis_angle(vec3(f(0x6db6db6e), f(0xdb6db6db), "
+            "f(0x49249249)), a);",
+            "let v = vec3(f(0x180000000), f(-0x1c0000000), f(0x160000000));",
+            "assert!(Mat3Trait::from_quat(q).mul_vec3(v).abs_diff_eq(q.mul_vec3(v), f(8)));"])
         affine = [m for m in mats if m[0][2] == 0 and m[1][2] == 0 and m[2][2] == ONE]
         rows = [{"m": m, "v": rawv(v, 2), "p": transform_point(m, rawv(v, 2)),
                  "d": transform_vector(m, rawv(v, 2))}
@@ -526,6 +649,66 @@ def gen_tests(t):
                          eq(f"Mat4Trait::from_mat3_translation({c['m']}, {c['t']})",
                             f"Mat4Trait::from_translation({c['t']}) "
                             f"* Mat4Trait::from_mat3({c['m']})")])
+        # The TRS constructors and the decomposition. `scale` and `translation` are exactly
+        # representable, so the round trip is only limited by the floored elements and by the
+        # drift of the quantized quaternion's squared length (see `to_scale_rotation_translation`).
+        trs, scales = [], [[ONE, ONE, ONE], [ONE * 2, ONE * 3, ONE // 2],
+                           [-ONE, ONE * 2, ONE], [ONE // 4, ONE // 4, ONE // 4]]
+        tvs = [[0, 0, 0], rawv(VECS[0], 3), rawv(VECS[1], 3), rawv(VECS[3], 3)]
+        for k, qq in enumerate(QUATS):
+            sc, tv = scales[k % len(scales)], tvs[k % len(tvs)]
+            m = quat_axes(qq, 4, scale=sc, translation=tv)
+            s2, q2, t2 = to_scale_rotation_translation(m)
+            tol = max(abs(a - b) for a, b in zip(s2, sc))
+            trs.append({"q": qq, "sc": sc, "tv": tv, "m": m,
+                        "s2": s2, "q2": q2, "t2": t2, "tol": tol + 1})
+        table("trs", [("q", "q"), ("sc", "v3"), ("tv", "v3"), ("m", "m"), ("s2", "v3"),
+                      ("q2", "q"), ("t2", "v3"), ("tol", "s")], trs,
+              lambda c: [eq(f"Mat4Trait::from_scale_rotation_translation({c['sc']}, {c['q']}, "
+                            f"{c['tv']})", c["m"]),
+                         "// the three constructors build the same linear part",
+                         eq(f"Mat4Trait::from_quat({c['q']})",
+                            f"Mat4Trait::from_mat3(Mat3Trait::from_quat({c['q']}))"),
+                         eq(f"Mat4Trait::from_rotation_translation({c['q']}, {c['tv']})",
+                            f"Mat4Trait::from_mat3_translation(Mat3Trait::from_quat({c['q']}), "
+                            f"{c['tv']})"),
+                         "// the decomposition, element by element against the oracle",
+                         f"let (s, q, t) = {c['m']}.to_scale_rotation_translation();",
+                         eq("s", c["s2"]), eq("q", c["q2"]), eq("t", c["t2"]),
+                         "// and as a round trip: the translation is exact, the scale is within",
+                         "// `5 |scale| + 2` ULP and the rotation within 13",
+                         f"assert_eq!(t, {c['tv']});",
+                         f"assert!(s.abs_diff_eq({c['sc']}, {c['tol']}));",
+                         f"assert!(q.abs_diff_eq({c['q']}, f(13)) "
+                         f"|| (-q).abs_diff_eq({c['q']}, f(13)));",
+                         "// and rebuilding gives the same matrix back",
+                         f"assert!(Mat4Trait::from_scale_rotation_translation(s, q, t)"
+                         f".abs_diff_eq({c['m']}, f(64)));"])
+        test("test_from_quat_axes", [
+            "let o = f(0x100000000);",
+            "let z = f(0);",
+            eq("Mat4Trait::from_quat(QuatTrait::IDENTITY)", "Mat4Trait::IDENTITY"),
+            eq("Mat4Trait::from_rotation_translation(QuatTrait::IDENTITY, Vec3Trait::ZERO)",
+               "Mat4Trait::IDENTITY"),
+            eq("Mat4Trait::from_scale_rotation_translation(Vec3Trait::ONE, "
+               "QuatTrait::IDENTITY, Vec3Trait::ZERO)", "Mat4Trait::IDENTITY"),
+            "// a half turn about x, exactly",
+            eq("Mat4Trait::from_quat(quat(o, z, z, z))",
+               "mat4(vec4(o, z, z, z), vec4(z, -o, z, z), vec4(z, z, -o, z), vec4(z, z, z, o))"),
+            "// scale and translation are the `from_scale` / `from_translation` matrices",
+            "let sc = vec3(f(0x200000000), f(0x300000000), f(0x80000000));",
+            "let tv = vec3(f(0x300000000), f(-0x200000000), f(0x100000000));",
+            eq("Mat4Trait::from_scale_rotation_translation(sc, QuatTrait::IDENTITY, tv)",
+               "Mat4Trait::from_translation(tv) * Mat4Trait::from_scale(sc)"),
+            eq("Mat4Trait::from_rotation_translation(QuatTrait::IDENTITY, tv)",
+               "Mat4Trait::from_translation(tv)"),
+            "// rotating a point through the TRS matrix: scale, then rotate, then translate",
+            "let a = f(0x59999999);",
+            "let q = QuatTrait::from_rotation_z(a);",
+            "let m = Mat4Trait::from_scale_rotation_translation(sc, q, tv);",
+            "let v = vec3(f(0x180000000), f(-0x1c0000000), f(0x160000000));",
+            "assert!(m.transform_point3(v).abs_diff_eq(q.mul_vec3(sc * v) + tv, f(8)));",
+            "assert!(m.transform_vector3(v).abs_diff_eq(q.mul_vec3(sc * v), f(8)));"])
         rows = []
         for m, v in zip(mats, VECS * 3):
             w = ft.dot([m[i][3] for i in range(3)] + [ONE], rawv(v, 3) + [m[3][3]])
@@ -764,6 +947,11 @@ fn {name}(r: Span<i64>, o: u32) -> {d.name} {{
     {d.name}Trait::from_cols_array([{", ".join(f"fx(r, {at(i)})" for i in range(k * k))}])
 }}
 """
+    helpers["qq"] = """
+fn qq(r: Span<i64>, o: u32) -> Quat {
+    QuatTrait::from_array([fx(r, o), fx(r, o + 1), fx(r, o + 2), fx(r, o + 3)])
+}
+"""
     helpers["om"] = f"""
 fn om(r: Span<i64>, o: u32) -> Option<{T}> {{
     if *r[o] == 0 {{
@@ -833,6 +1021,12 @@ fn vb({args}) -> {V} {{
                 glam.append(f"use glam::{prefix}{k}::"
                             + (items[0] if len(items) == 1 else "{" + ", ".join(items) + "}")
                             + ";")
+    qitems = [x for x in ("Quat", "QuatTrait", "quat")
+              if re.search(rf"\b{x}\b(?!Trait)" if x == "Quat" else rf"\b{x}\b",
+                           body_and_helpers)]
+    if qitems:
+        glam.append("use glam::quat::"
+                    + (qitems[0] if len(qitems) == 1 else "{" + ", ".join(qitems) + "}") + ";")
     uses += sorted(glam)
     prelude = f"""{g.HEADER}//! Tests of `glam::{t.mod}`: the glam-rs matrix test cases of `tests/mat{n}.rs`, tables over pools
 //! of matrices (expected values computed by the generator with an exact Q32.32 Python oracle that

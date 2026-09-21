@@ -13,6 +13,8 @@
 use benches::alt::quat as alt;
 use benches::harness::{bb, sink};
 use fixed::fixed::Fixed;
+use glam::mat3::Mat3;
+use glam::mat4::Mat4;
 use glam::quat::{Quat, QuatTrait};
 use glam::vec2::Vec2;
 use glam::vec3::Vec3;
@@ -101,6 +103,96 @@ const VEC4_ONE: Vec4 = Vec4 {
     z: Fixed { raw: 0x100000000 },
     w: Fixed { raw: 0x100000000 },
 };
+/// The rotation matrix of the unit quaternion (4, 2, 2, 1) / 5: the
+/// `x^2 >= ..` branch of `from_rotation_axes`.
+const ROT_X: Mat3 = Mat3 {
+    x_axis: Vec3 {
+        x: Fixed { raw: 0x5c28f5c2 }, y: Fixed { raw: 0xcccccccc }, z: Fixed { raw: 0x7ae147ae },
+    },
+    y_axis: Vec3 {
+        x: Fixed { raw: 0x7ae147ae }, y: Fixed { raw: -0x9999999a }, z: Fixed { raw: 0xa3d70a3d },
+    },
+    z_axis: Vec3 {
+        x: Fixed { raw: 0xcccccccc }, y: Fixed { raw: 0x0 }, z: Fixed { raw: -0x9999999a },
+    },
+};
+/// The rotation matrix of the unit quaternion (2, 4, 2, 1) / 5: the
+/// `y^2 >= ..` branch of `from_rotation_axes`.
+const ROT_Y: Mat3 = Mat3 {
+    x_axis: Vec3 {
+        x: Fixed { raw: -0x9999999a }, y: Fixed { raw: 0xcccccccc }, z: Fixed { raw: 0x0 },
+    },
+    y_axis: Vec3 {
+        x: Fixed { raw: 0x7ae147ae }, y: Fixed { raw: 0x5c28f5c2 }, z: Fixed { raw: 0xcccccccc },
+    },
+    z_axis: Vec3 {
+        x: Fixed { raw: 0xa3d70a3d }, y: Fixed { raw: 0x7ae147ae }, z: Fixed { raw: -0x9999999a },
+    },
+};
+/// The rotation matrix of the unit quaternion (1, 2, 4, 2) / 5: the
+/// `z^2 >= ..` branch of `from_rotation_axes`.
+const ROT_Z: Mat3 = Mat3 {
+    x_axis: Vec3 {
+        x: Fixed { raw: -0x9999999a }, y: Fixed { raw: 0xcccccccc }, z: Fixed { raw: 0x0 },
+    },
+    y_axis: Vec3 {
+        x: Fixed { raw: -0x7ae147af }, y: Fixed { raw: -0x5c28f5c3 }, z: Fixed { raw: 0xcccccccc },
+    },
+    z_axis: Vec3 {
+        x: Fixed { raw: 0xa3d70a3d }, y: Fixed { raw: 0x7ae147ae }, z: Fixed { raw: 0x99999999 },
+    },
+};
+/// The rotation matrix of the unit quaternion (1, 2, 2, 4) / 5: the
+/// `w^2 >= ..` branch of `from_rotation_axes`.
+const ROT_W: Mat3 = Mat3 {
+    x_axis: Vec3 {
+        x: Fixed { raw: 0x5c28f5c2 }, y: Fixed { raw: 0xcccccccc }, z: Fixed { raw: -0x7ae147af },
+    },
+    y_axis: Vec3 {
+        x: Fixed { raw: -0x7ae147af }, y: Fixed { raw: 0x99999999 }, z: Fixed { raw: 0xa3d70a3d },
+    },
+    z_axis: Vec3 {
+        x: Fixed { raw: 0xcccccccc }, y: Fixed { raw: 0x0 }, z: Fixed { raw: 0x99999999 },
+    },
+};
+/// `ROT_W` as the linear part of a homogeneous 4x4 matrix.
+const ROT4: Mat4 = Mat4 {
+    x_axis: Vec4 {
+        x: Fixed { raw: 0x5c28f5c2 },
+        y: Fixed { raw: 0xcccccccc },
+        z: Fixed { raw: -0x7ae147af },
+        w: Fixed { raw: 0x0 },
+    },
+    y_axis: Vec4 {
+        x: Fixed { raw: -0x7ae147af },
+        y: Fixed { raw: 0x99999999 },
+        z: Fixed { raw: 0xa3d70a3d },
+        w: Fixed { raw: 0x0 },
+    },
+    z_axis: Vec4 {
+        x: Fixed { raw: 0xcccccccc },
+        y: Fixed { raw: 0x0 },
+        z: Fixed { raw: 0x99999999 },
+        w: Fixed { raw: 0x0 },
+    },
+    w_axis: Vec4 {
+        x: Fixed { raw: 0x0 },
+        y: Fixed { raw: 0x0 },
+        z: Fixed { raw: 0x0 },
+        w: Fixed { raw: 0x100000000 },
+    },
+};
+/// The y axis: the `up` of the `look_*` constructors.
+const UP: Vec3 = Vec3 {
+    x: Fixed { raw: 0x0 }, y: Fixed { raw: 0x100000000 }, z: Fixed { raw: 0x0 },
+};
+/// A camera position and a focal point for the `look_at_*` constructors.
+const EYE: Vec3 = Vec3 {
+    x: Fixed { raw: 0x100000000 }, y: Fixed { raw: 0x200000000 }, z: Fixed { raw: 0x300000000 },
+};
+const CENTER: Vec3 = Vec3 {
+    x: Fixed { raw: 0x400000000 }, y: Fixed { raw: -0x100000000 }, z: Fixed { raw: 0x200000000 },
+};
 
 
 #[test]
@@ -187,6 +279,158 @@ fn from_rotation_z__op() {
     let k = bb(ANGLE);
     let _r = bb(A);
     sink(QuatTrait::from_rotation_z(k));
+}
+
+#[test]
+fn from_rotation_axes__x__base() {
+    let _m = bb(ROT_X);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_rotation_axes__x__op() {
+    let m = bb(ROT_X);
+    let _r = bb(A);
+    sink(QuatTrait::from_rotation_axes(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn from_rotation_axes__y__base() {
+    let _m = bb(ROT_Y);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_rotation_axes__y__op() {
+    let m = bb(ROT_Y);
+    let _r = bb(A);
+    sink(QuatTrait::from_rotation_axes(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn from_rotation_axes__z__base() {
+    let _m = bb(ROT_Z);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_rotation_axes__z__op() {
+    let m = bb(ROT_Z);
+    let _r = bb(A);
+    sink(QuatTrait::from_rotation_axes(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn from_rotation_axes__w__base() {
+    let _m = bb(ROT_W);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_rotation_axes__w__op() {
+    let m = bb(ROT_W);
+    let _r = bb(A);
+    sink(QuatTrait::from_rotation_axes(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn from_mat3__base() {
+    let _m = bb(ROT_W);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_mat3__op() {
+    let m = bb(ROT_W);
+    let _r = bb(A);
+    sink(QuatTrait::from_mat3(m));
+}
+
+#[test]
+fn from_mat4__base() {
+    let _m = bb(ROT4);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_mat4__op() {
+    let m = bb(ROT4);
+    let _r = bb(A);
+    sink(QuatTrait::from_mat4(m));
+}
+
+#[test]
+fn look_to_rh__base() {
+    let _d = bb(AXIS);
+    let _u = bb(UP);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn look_to_rh__op() {
+    let d = bb(AXIS);
+    let u = bb(UP);
+    let _r = bb(A);
+    sink(QuatTrait::look_to_rh(d, u));
+}
+
+#[test]
+fn look_at_rh__base() {
+    let _e = bb(EYE);
+    let _c = bb(CENTER);
+    let _u = bb(UP);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn look_at_rh__op() {
+    let e = bb(EYE);
+    let c = bb(CENTER);
+    let u = bb(UP);
+    let _r = bb(A);
+    sink(QuatTrait::look_at_rh(e, c, u));
+}
+
+#[test]
+fn look_to_lh__base() {
+    let _d = bb(AXIS);
+    let _u = bb(UP);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn look_to_lh__op() {
+    let d = bb(AXIS);
+    let u = bb(UP);
+    let _r = bb(A);
+    sink(QuatTrait::look_to_lh(d, u));
+}
+
+#[test]
+fn look_at_lh__base() {
+    let _e = bb(EYE);
+    let _c = bb(CENTER);
+    let _u = bb(UP);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn look_at_lh__op() {
+    let e = bb(EYE);
+    let c = bb(CENTER);
+    let u = bb(UP);
+    let _r = bb(A);
+    sink(QuatTrait::look_at_lh(e, c, u));
 }
 
 #[test]
@@ -802,6 +1046,62 @@ fn into_vec4__op() {
         let v: Vec4 = a.into();
         v
     });
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__x__base() {
+    let _m = bb(ROT_X);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__x__op() {
+    let m = bb(ROT_X);
+    let _r = bb(A);
+    sink(alt::from_rotation_axes_fixed_recip(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__y__base() {
+    let _m = bb(ROT_Y);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__y__op() {
+    let m = bb(ROT_Y);
+    let _r = bb(A);
+    sink(alt::from_rotation_axes_fixed_recip(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__z__base() {
+    let _m = bb(ROT_Z);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__z__op() {
+    let m = bb(ROT_Z);
+    let _r = bb(A);
+    sink(alt::from_rotation_axes_fixed_recip(m.x_axis, m.y_axis, m.z_axis));
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__w__base() {
+    let _m = bb(ROT_W);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_from_rotation_axes_fixed_recip__w__op() {
+    let m = bb(ROT_W);
+    let _r = bb(A);
+    sink(alt::from_rotation_axes_fixed_recip(m.x_axis, m.y_axis, m.z_axis));
 }
 
 #[test]

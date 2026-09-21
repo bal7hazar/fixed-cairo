@@ -56,6 +56,9 @@ const UNIT: Vec3 = Vec3 {
 const UNIT_NEG: Vec3 = Vec3 {
     x: Fixed { raw: 0x6db6db6d }, y: Fixed { raw: 0xdb6db6db }, z: Fixed { raw: -0x4924924a },
 };
+const UNIT_OPP: Vec3 = Vec3 {
+    x: Fixed { raw: -0x6db6db6e }, y: Fixed { raw: -0xdb6db6dc }, z: Fixed { raw: -0x4924924a },
+};
 const K_ONE: Fixed = Fixed { raw: 0x100000000 };
 const K_THREE: Fixed = Fixed { raw: 0x300000000 };
 const K_FOUR: Fixed = Fixed { raw: 0x400000000 };
@@ -1616,6 +1619,142 @@ fn any_orthonormal_pair_neg__op() {
 }
 
 #[test]
+fn any_orthogonal_vector_lhs__base() {
+    let _a = bb(A);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn any_orthogonal_vector_lhs__op() {
+    let a = bb(A);
+    let _r = bb(A);
+    sink(a.any_orthogonal_vector());
+}
+
+#[test]
+fn any_orthogonal_vector_rhs__base() {
+    let _a = bb(B);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn any_orthogonal_vector_rhs__op() {
+    let a = bb(B);
+    let _r = bb(A);
+    sink(a.any_orthogonal_vector());
+}
+
+#[test]
+fn rotate_axis__base() {
+    let _a = bb(A);
+    let _x = bb(UNIT);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_axis__op() {
+    let a = bb(A);
+    let x = bb(UNIT);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_axis(x, k));
+}
+
+#[test]
+fn rotate_towards_far__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_towards_far__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(a.rotate_towards(b, k));
+}
+
+#[test]
+fn rotate_towards_near__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HUNDRED);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn rotate_towards_near__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HUNDRED);
+    let _r = bb(A);
+    sink(a.rotate_towards(b, k));
+}
+
+#[test]
+fn slerp_general__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn slerp_general__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(a.slerp(b, k));
+}
+
+#[test]
+fn slerp_opposite__base() {
+    let _a = bb(UNIT);
+    let _b = bb(UNIT_OPP);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn slerp_opposite__op() {
+    let a = bb(UNIT);
+    let b = bb(UNIT_OPP);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(a.slerp(b, k));
+}
+
+#[test]
+fn slerp_parallel__base() {
+    let _a = bb(UNIT);
+    let _b = bb(UNIT);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn slerp_parallel__op() {
+    let a = bb(UNIT);
+    let b = bb(UNIT);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(a.slerp(b, k));
+}
+
+#[test]
 fn add__base() {
     let _a = bb(A);
     let _b = bb(B);
@@ -2587,4 +2726,22 @@ fn alt_any_orthonormal_pair_unfused_neg__op() {
     let a = bb(UNIT_NEG);
     let _r = bb((A, A));
     sink(alt::any_orthonormal_pair_unfused(a));
+}
+
+#[test]
+fn alt_rotate_axis_mat3__base() {
+    let _a = bb(A);
+    let _x = bb(UNIT);
+    let _k = bb(K_ANGLE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_axis_mat3__op() {
+    let a = bb(A);
+    let x = bb(UNIT);
+    let k = bb(K_ANGLE);
+    let _r = bb(A);
+    sink(alt::rotate_axis_mat3(a, x, k));
 }

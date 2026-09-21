@@ -16,6 +16,7 @@ use fixed::trig::TrigTrait;
 use glam::mat2::{Mat2, Mat2Trait};
 use glam::mat3::{Mat3, Mat3Trait, mat3};
 use glam::mat4::{Mat4, Mat4Trait};
+use glam::quat::{Quat, QuatTrait, quat};
 use glam::vec2::{Vec2, Vec2Trait, vec2};
 use glam::vec3::{Vec3, Vec3Trait, vec3};
 
@@ -70,6 +71,10 @@ fn mm4(r: Span<i64>, o: u32) -> Mat4 {
             fx(r, o + 12), fx(r, o + 13), fx(r, o + 14), fx(r, o + 15),
         ],
     )
+}
+
+fn qq(r: Span<i64>, o: u32) -> Quat {
+    QuatTrait::from_array([fx(r, o), fx(r, o + 1), fx(r, o + 2), fx(r, o + 3)])
 }
 
 fn om(r: Span<i64>, o: u32) -> Option<Mat3> {
@@ -452,6 +457,65 @@ fn test_from_mat2() {
         let r = row.span();
         assert_eq!(Mat3Trait::from_mat2(mm2(r, 0)), mx(r, 4));
     }
+}
+#[cairofmt::skip]
+const FROM_QUAT: [[i64; 17]; 11] = [
+    [0, 0, 0, 4294967296, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 4294967296],
+    [4294967296, 0, 0, 0, 4294967296, 0, 0, 0, -4294967296, 0, 0, 0, -4294967296, 4294967296, 0, 0, 0],
+    [0, 4294967296, 0, 0, -4294967296, 0, 0, 0, 4294967296, 0, 0, 0, -4294967296, 0, 4294967296, 0, 0],
+    [0, 0, 4294967296, 0, -4294967296, 0, 0, 0, -4294967296, 0, 0, 0, 4294967296, 0, 0, 4294967296, 0],
+    [0, 0, 3037000499, 3037000500, 2, 4294967294, 0, -4294967295, 2, 0, 0, 0, 4294967296, 0, 0, 3037000498, 3037000501],
+    [858993459, 1717986918, 1717986918, 3435973836, 1546188227, 3435973835, -2061584302, -2061584302, 2576980378, 2748779068, 3435973835, 0, 2576980378, 858993459, 1717986918, 1717986918, 3435973837],
+    [858993459, 1717986918, 3435973836, 1717986918, -2576980375, 3435973835, 0, -2061584302, -1546188224, 3435973835, 2748779068, 2061584301, 2576980378, 858993459, 1717986918, 3435973836, 1717986918],
+    [3435973836, 1717986918, 1717986918, 858993459, 1546188227, 3435973835, 2061584301, 2061584301, -2576980375, 2748779068, 3435973835, 0, -2576980375, 3435973836, 1717986918, 1717986918, 858993459],
+    [1717986918, 3435973836, 1717986918, 858993459, -2576980375, 3435973835, 0, 2061584301, 1546188227, 3435973835, 2748779068, 2061584301, -2576980375, 1717986918, 3435973836, 1717986918, 858993459],
+    [-2063235552, 687745183, 1375490367, 3438725918, 3193693631, 1541783131, -2422802063, -2863311529, 1431655764, -2863311532, -220254735, 3744330462, 2092419963, -2063235552, 687745183, 1375490367, 3438725919],
+    [2147483648, -3579139414, 715827882, -715827883, -1908874356, -3817748709, -477218590, -3340530120, 1908874354, -1908874354, 1908874353, -477218588, -3817748710, -2147483648, 3579139414, -715827882, 715827883],
+];
+
+#[test]
+fn test_from_quat() {
+    for row in FROM_QUAT.span() {
+        let r = row.span();
+        assert_eq!(Mat3Trait::from_quat(qq(r, 0)), mx(r, 4));
+        // the round trip through `Quat::from_mat3` closes to 1 raw ULP on
+        // this pool (4 over 50 000 random unit quaternions)
+        assert_eq!(QuatTrait::from_mat3(mx(r, 4)), qq(r, 13));
+        assert!(qq(r, 13).abs_diff_eq(qq(r, 0), f(1)) || (-qq(r, 13)).abs_diff_eq(qq(r, 0), f(1)));
+        // a rotation matrix: unit columns, determinant one
+        assert!(mx(r, 4).determinant().abs_diff_eq(f(4294967296), f(8)));
+        assert!(mx(r, 4).x_axis.length().abs_diff_eq(f(4294967296), f(4)));
+    }
+}
+
+#[test]
+fn test_from_quat_axes() {
+    let o = f(0x100000000);
+    let z = f(0);
+    // a half turn about each axis, exactly
+    assert_eq!(Mat3Trait::from_quat(QuatTrait::IDENTITY), Mat3Trait::IDENTITY);
+    assert_eq!(
+        Mat3Trait::from_quat(quat(o, z, z, z)), mat3(vec3(o, z, z), vec3(z, -o, z), vec3(z, z, -o)),
+    );
+    assert_eq!(
+        Mat3Trait::from_quat(quat(z, o, z, z)), mat3(vec3(-o, z, z), vec3(z, o, z), vec3(z, z, -o)),
+    );
+    assert_eq!(
+        Mat3Trait::from_quat(quat(z, z, o, z)), mat3(vec3(-o, z, z), vec3(z, -o, z), vec3(z, z, o)),
+    );
+    // `from_quat` and `from_axis_angle` build the same rotation (2 ULP apart: the
+    // quaternion halves the angle through `sin_cos`, the matrix does not)
+    let a = f(0x59999999);
+    let x = Mat3Trait::from_quat(QuatTrait::from_rotation_x(a));
+    assert!(x.abs_diff_eq(Mat3Trait::from_rotation_x(a), f(2)));
+    let y = Mat3Trait::from_quat(QuatTrait::from_rotation_y(a));
+    assert!(y.abs_diff_eq(Mat3Trait::from_rotation_y(a), f(2)));
+    let zz = Mat3Trait::from_quat(QuatTrait::from_rotation_z(a));
+    assert!(zz.abs_diff_eq(Mat3Trait::from_rotation_z(a), f(2)));
+    // rotating a vector through the matrix or through the quaternion agrees
+    let q = QuatTrait::from_axis_angle(vec3(f(0x6db6db6e), f(0xdb6db6db), f(0x49249249)), a);
+    let v = vec3(f(0x180000000), f(-0x1c0000000), f(0x160000000));
+    assert!(Mat3Trait::from_quat(q).mul_vec3(v).abs_diff_eq(q.mul_vec3(v), f(8)));
 }
 #[cairofmt::skip]
 const TRANSFORM2: [[i64; 15]; 11] = [

@@ -15,6 +15,7 @@ use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
 use glam::mat3::{Mat3, Mat3Trait};
 use glam::mat4::{Mat4, Mat4Trait, mat4};
+use glam::quat::{Quat, QuatTrait, quat};
 use glam::vec3::{Vec3, Vec3Trait, vec3};
 use glam::vec4::{Vec4, Vec4Trait, vec4};
 
@@ -61,6 +62,10 @@ fn mx(r: Span<i64>, o: u32) -> Mat4 {
             fx(r, o + 12), fx(r, o + 13), fx(r, o + 14), fx(r, o + 15),
         ],
     )
+}
+
+fn qq(r: Span<i64>, o: u32) -> Quat {
+    QuatTrait::from_array([fx(r, o), fx(r, o + 1), fx(r, o + 2), fx(r, o + 3)])
 }
 
 fn om(r: Span<i64>, o: u32) -> Option<Mat4> {
@@ -406,6 +411,90 @@ fn test_from_mat3() {
             Mat4Trait::from_translation(vv3(r, 9)) * Mat4Trait::from_mat3(mm3(r, 0)),
         );
     }
+}
+#[cairofmt::skip]
+const TRS: [[i64; 37]; 11] = [
+    [0, 0, 0, 4294967296, 4294967296, 4294967296, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 0, 4294967296, 0, 0, 0, 0, 4294967296, 0, 0, 0, 0, 4294967296, 4294967296, 4294967296, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 1],
+    [4294967296, 0, 0, 0, 8589934592, 12884901888, 2147483648, 6442450944, -7516192768, 5905580032, 8589934592, 0, 0, 0, 0, -12884901888, 0, 0, 0, 0, -2147483648, 0, 6442450944, -7516192768, 5905580032, 4294967296, 8589934592, 12884901888, 2147483648, 4294967296, 0, 0, 0, 6442450944, -7516192768, 5905580032, 1],
+    [0, 4294967296, 0, 0, -4294967296, 8589934592, 4294967296, 4294967296, 8589934592, 12884901888, 4294967296, 0, 0, 0, 0, 8589934592, 0, 0, 0, 0, -4294967296, 0, 4294967296, 8589934592, 12884901888, 4294967296, -4294967296, 8589934592, 4294967296, 0, 4294967296, 0, 0, 4294967296, 8589934592, 12884901888, 1],
+    [0, 0, 4294967296, 0, 1073741824, 1073741824, 1073741824, 1, -1, 3, -1073741824, 0, 0, 0, 0, -1073741824, 0, 0, 0, 0, 1073741824, 0, 1, -1, 3, 4294967296, 1073741824, 1073741824, 1073741824, 0, 0, 4294967296, 0, 1, -1, 3, 1],
+    [0, 0, 3037000499, 3037000500, 4294967296, 4294967296, 4294967296, 0, 0, 0, 2, 4294967294, 0, 0, -4294967295, 2, 0, 0, 0, 0, 4294967296, 0, 0, 0, 0, 4294967296, 4294967294, 4294967295, 4294967296, 0, 0, 3037000499, 3037000501, 0, 0, 0, 3],
+    [858993459, 1717986918, 1717986918, 3435973836, 8589934592, 12884901888, 2147483648, 6442450944, -7516192768, 5905580032, 3092376455, 6871947670, -4123168603, 0, -6184752904, 7730941135, 8246337204, 0, 1717986917, 0, 1288490189, 0, 6442450944, -7516192768, 5905580032, 4294967296, 8589934589, 12884901885, 2147483647, 858993459, 1717986918, 1717986918, 3435973838, 6442450944, -7516192768, 5905580032, 4],
+    [858993459, 1717986918, 3435973836, 1717986918, -4294967296, 8589934592, 4294967296, 4294967296, 8589934592, 12884901888, 2576980374, -3435973836, 0, 0, -4123168603, -3092376448, 6871947670, 0, 2748779068, 2061584301, 2576980378, 0, 4294967296, 8589934592, 12884901888, 4294967296, -4294967293, 8589934586, 4294967294, 858993459, 1717986919, 3435973837, 1717986919, 4294967296, 8589934592, 12884901888, 7],
+    [3435973836, 1717986918, 1717986918, 858993459, 1073741824, 1073741824, 1073741824, 1, -1, 3, 386547056, 858993458, 515396075, 0, 515396075, -644245094, 687194767, 0, 858993458, 0, -644245094, 0, 1, -1, 3, 4294967296, 1073741822, 1073741823, 1073741822, 3435973838, 1717986919, 1717986919, 858993460, 1, -1, 3, 3],
+    [1717986918, 3435973836, 1717986918, 858993459, 4294967296, 4294967296, 4294967296, 0, 0, 0, -2576980375, 3435973835, 0, 0, 2061584301, 1546188227, 3435973835, 0, 2748779068, 2061584301, -2576980375, 0, 0, 0, 0, 4294967296, 4294967293, 4294967294, 4294967293, 1717986919, 3435973837, 1717986919, 858993459, 0, 0, 0, 4],
+    [-2063235552, 687745183, 1375490367, 3438725918, 8589934592, 12884901888, 2147483648, 6442450944, -7516192768, 5905580032, 6387387263, 3083566262, -4845604126, 0, -8589934587, 4294967293, -8589934596, 0, -110127368, 1872165231, 1046209981, 0, 6442450944, -7516192768, 5905580032, 4294967296, 8589934591, 12884901886, 2147483646, -2063235552, 687745182, 1375490367, 3438725919, 6442450944, -7516192768, 5905580032, 3],
+    [2147483648, -3579139414, 715827882, -715827883, -4294967296, 8589934592, 4294967296, 4294967296, 8589934592, 12884901888, 1908874355, 3817748708, 477218589, 0, -6681060240, 3817748708, -3817748707, 0, 1908874353, -477218588, -3817748710, 0, 4294967296, 8589934592, 12884901888, 4294967296, -4294967297, 8589934593, 4294967297, -2147483648, 3579139414, -715827882, 715827883, 4294967296, 8589934592, 12884901888, 2],
+];
+
+#[test]
+fn test_trs() {
+    for row in TRS.span() {
+        let r = row.span();
+        assert_eq!(
+            Mat4Trait::from_scale_rotation_translation(vv3(r, 4), qq(r, 0), vv3(r, 7)), mx(r, 10),
+        );
+        // the three constructors build the same linear part
+        assert_eq!(
+            Mat4Trait::from_quat(qq(r, 0)), Mat4Trait::from_mat3(Mat3Trait::from_quat(qq(r, 0))),
+        );
+        assert_eq!(
+            Mat4Trait::from_rotation_translation(qq(r, 0), vv3(r, 7)),
+            Mat4Trait::from_mat3_translation(Mat3Trait::from_quat(qq(r, 0)), vv3(r, 7)),
+        );
+        // the decomposition, element by element against the oracle
+        let (s, q, t) = mx(r, 10).to_scale_rotation_translation();
+        assert_eq!(s, vv3(r, 26));
+        assert_eq!(q, qq(r, 29));
+        assert_eq!(t, vv3(r, 33));
+        // and as a round trip: the translation is exact, the scale is within
+        // `5 |scale| + 2` ULP and the rotation within 13
+        assert_eq!(t, vv3(r, 7));
+        assert!(s.abs_diff_eq(vv3(r, 4), fx(r, 36)));
+        assert!(q.abs_diff_eq(qq(r, 0), f(13)) || (-q).abs_diff_eq(qq(r, 0), f(13)));
+        // and rebuilding gives the same matrix back
+        assert!(Mat4Trait::from_scale_rotation_translation(s, q, t).abs_diff_eq(mx(r, 10), f(64)));
+    }
+}
+
+#[test]
+fn test_from_quat_axes() {
+    let o = f(0x100000000);
+    let z = f(0);
+    assert_eq!(Mat4Trait::from_quat(QuatTrait::IDENTITY), Mat4Trait::IDENTITY);
+    assert_eq!(
+        Mat4Trait::from_rotation_translation(QuatTrait::IDENTITY, Vec3Trait::ZERO),
+        Mat4Trait::IDENTITY,
+    );
+    assert_eq!(
+        Mat4Trait::from_scale_rotation_translation(
+            Vec3Trait::ONE, QuatTrait::IDENTITY, Vec3Trait::ZERO,
+        ),
+        Mat4Trait::IDENTITY,
+    );
+    // a half turn about x, exactly
+    assert_eq!(
+        Mat4Trait::from_quat(quat(o, z, z, z)),
+        mat4(vec4(o, z, z, z), vec4(z, -o, z, z), vec4(z, z, -o, z), vec4(z, z, z, o)),
+    );
+    // scale and translation are the `from_scale` / `from_translation` matrices
+    let sc = vec3(f(0x200000000), f(0x300000000), f(0x80000000));
+    let tv = vec3(f(0x300000000), f(-0x200000000), f(0x100000000));
+    assert_eq!(
+        Mat4Trait::from_scale_rotation_translation(sc, QuatTrait::IDENTITY, tv),
+        Mat4Trait::from_translation(tv) * Mat4Trait::from_scale(sc),
+    );
+    assert_eq!(
+        Mat4Trait::from_rotation_translation(QuatTrait::IDENTITY, tv),
+        Mat4Trait::from_translation(tv),
+    );
+    // rotating a point through the TRS matrix: scale, then rotate, then translate
+    let a = f(0x59999999);
+    let q = QuatTrait::from_rotation_z(a);
+    let m = Mat4Trait::from_scale_rotation_translation(sc, q, tv);
+    let v = vec3(f(0x180000000), f(-0x1c0000000), f(0x160000000));
+    assert!(m.transform_point3(v).abs_diff_eq(q.mul_vec3(sc * v) + tv, f(8)));
+    assert!(m.transform_vector3(v).abs_diff_eq(q.mul_vec3(sc * v), f(8)));
 }
 #[cairofmt::skip]
 const TRANSFORM3: [[i64; 28]; 9] = [

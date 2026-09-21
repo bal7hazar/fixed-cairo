@@ -18,12 +18,14 @@
 use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
-    NormTrait, RecipTrait, WideAdd, WideMul, WideNarrow, WideSub, dot4, mul_sub, norm2_wide,
+    NormTrait, Recip, RecipTrait, WideAdd, WideMul, WideNarrow, WideSub, dot4, mul_sub, norm2_wide,
     norm3_wide, norm4, norm4_squared, norm4_wide, wide_mul,
 };
+use crate::mat3::Mat3;
+use crate::mat4::Mat4;
 use crate::vec2::{Vec2, Vec2Trait};
 use crate::vec3::{Vec3, Vec3Trait};
-use crate::vec4::Vec4;
+use crate::vec4::{Vec4, Vec4Trait};
 
 /// A quaternion of Q32.32 fixed-point scalars representing an orientation.
 ///
@@ -42,9 +44,9 @@ use crate::vec4::Vec4;
 ///   (docs/DESIGN.md section 3).
 /// * Not ported: `from_slice` / `write_to_slice` (no `Span` in fixed-size math), `Sum` /
 ///   `Product` (no iterator trait to implement), the by-reference operator overloads and
-///   `as_dquat`. `from_euler` / `to_euler` (task E1), `from_rotation_axes` / `from_mat3` /
-///   `from_mat4` / `from_affine3` and `look_to_*` / `look_at_*` (task X1) are not ported yet:
-///   see `docs/PORTING_STATUS.md`.
+///   `as_dquat`. `from_euler` / `to_euler` are the extension trait
+///   `glam::euler::QuatEulerTrait`; `from_affine3` (task A3) is not ported yet: see
+///   `docs/PORTING_STATUS.md`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Quat {
     pub x: Fixed,
@@ -184,6 +186,113 @@ pub trait QuatTrait {
     /// #### Deviations
     /// * As [`QuatTrait::from_rotation_x`].
     fn from_rotation_z(angle: Fixed) -> Quat;
+    /// Creates a quaternion from the columns of a 3x3 rotation matrix.
+    ///
+    /// #### Preconditions
+    /// * Each axis must be a unit vector and the three must be orthogonal; it is not checked.
+    ///   A matrix that contains scales, shears or other non-rotation transformations gives an
+    ///   ill-defined quaternion, as in glam-rs.
+    ///
+    /// Mirrors `glam::Quat::from_rotation_axes`.
+    /// #### Panics
+    /// * `'i64_add Overflow'` / `'i64_sub Overflow'` (and their `Underflow` forms) if an element
+    ///   is far outside `[-1, 1]`, and `'Fixed: overflow'` if a component of the result is.
+    ///   The division and the square root cannot fail: whichever branch is taken, the value
+    ///   under the root is `1 - m22 -+ (m11 -+ m00) >= 1` by the very tests that select it.
+    /// #### Deviations
+    /// * The four-branch algorithm of glam-rs (`XMQuaternionRotationMatrix`), branching on
+    ///   `m22 <= 0` then on `m11 -+ m00 <= 0`, so that the component the division is carried by
+    ///   is the largest of the four (at least `1 / 2` in absolute value).
+    /// * `0.5 / sqrt(4 c^2)` is one `fixed::wide::Recip` of `2 sqrt(4 c^2)`, shared by the four
+    ///   components and rounded to nearest, instead of a truncated `Fixed` reciprocal
+    ///   multiplied four times: one rounding instead of two, and 130 gas cheaper as well
+    ///   (19 770 against 19 900, `alt_from_rotation_axes_fixed_recip`). The square root is the
+    ///   floor of the exact one, so each component is within `1 + |component| / |c|` ULP of the
+    ///   exact value, i.e. at most 3 ULP. Measured over 50 000 random unit quaternions of the
+    ///   Python mirror: at most 4 raw ULP per component over the `Quat -> Mat3 -> Quat` round
+    ///   trip and 16 over `Mat3 -> Quat -> Mat3`, where the matrix itself is already 1 ULP off
+    ///   per element.
+    fn from_rotation_axes(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Quat;
+    /// Creates a quaternion from a 3x3 rotation matrix.
+    ///
+    /// #### Preconditions
+    /// * As [`QuatTrait::from_rotation_axes`].
+    ///
+    /// Mirrors `glam::Quat::from_mat3`.
+    /// #### Panics
+    /// * As [`QuatTrait::from_rotation_axes`].
+    /// #### Deviations
+    /// * Takes the matrix by value; glam-rs takes `&Mat3`.
+    fn from_mat3(mat: Mat3) -> Quat;
+    /// Creates a quaternion from the upper 3x3 rotation matrix inside a homogeneous 4x4 matrix.
+    ///
+    /// #### Preconditions
+    /// * As [`QuatTrait::from_rotation_axes`], on the upper 3x3 part.
+    ///
+    /// Mirrors `glam::Quat::from_mat4`.
+    /// #### Panics
+    /// * As [`QuatTrait::from_rotation_axes`].
+    /// #### Deviations
+    /// * Takes the matrix by value; glam-rs takes `&Mat4`.
+    fn from_mat4(mat: Mat4) -> Quat;
+    /// Creates a quaternion rotation from a facing direction and an up direction, for a
+    /// left-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=forward`.
+    ///
+    /// #### Preconditions
+    /// * `dir` and `up` must be unit vectors; it is not checked.
+    ///
+    /// Mirrors `glam::Quat::look_to_lh`.
+    /// #### Panics
+    /// * As [`QuatTrait::look_to_rh`].
+    /// #### Deviations
+    /// * As [`QuatTrait::look_to_rh`].
+    fn look_to_lh(dir: Vec3, up: Vec3) -> Quat;
+    /// Creates a quaternion rotation from a facing direction and an up direction, for a
+    /// right-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=back`.
+    ///
+    /// #### Preconditions
+    /// * `dir` and `up` must be unit vectors; it is not checked.
+    ///
+    /// Mirrors `glam::Quat::look_to_rh`.
+    /// #### Panics
+    /// * `'Vec3: normalize zero'` if `dir` and `up` are parallel.
+    /// * As [`QuatTrait::from_rotation_axes`] otherwise.
+    /// #### Deviations
+    /// * Deprecated in glam-rs 0.33.1 in favour of `glam::camera::rh::view::look_to_quat`,
+    ///   which is not ported yet (task C1 of `docs/PLAN.md`); the name and the layout are the
+    ///   ones of `Quat::look_to_rh`, as for `Mat4::look_to_rh`.
+    /// * The side axis is normalized (one square root, one shared division) and the up axis is
+    ///   one `mul_sub` per component: the three axes are within 2 ULP per component of the
+    ///   exact frame before `from_rotation_axes` runs.
+    fn look_to_rh(dir: Vec3, up: Vec3) -> Quat;
+    /// Creates a quaternion rotation from a camera position, a focal point and an up direction,
+    /// for a left-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=forward`.
+    ///
+    /// #### Preconditions
+    /// * `up` must be a unit vector; it is not checked.
+    ///
+    /// Mirrors `glam::Quat::look_at_lh`.
+    /// #### Panics
+    /// * `'Vec3: normalize zero'` if `center` is `eye`, or if the direction and `up` are
+    ///   parallel.
+    /// * As [`QuatTrait::look_to_rh`] otherwise.
+    /// #### Deviations
+    /// * As [`QuatTrait::look_to_rh`].
+    fn look_at_lh(eye: Vec3, center: Vec3, up: Vec3) -> Quat;
+    /// Creates a quaternion rotation from a camera position, a focal point and an up direction,
+    /// for a right-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=back`.
+    ///
+    /// #### Preconditions
+    /// * `up` must be a unit vector; it is not checked.
+    ///
+    /// Mirrors `glam::Quat::look_at_rh`.
+    /// #### Panics
+    /// * `'Vec3: normalize zero'` if `center` is `eye`, or if the direction and `up` are
+    ///   parallel.
+    /// * As [`QuatTrait::look_to_rh`] otherwise.
+    /// #### Deviations
+    /// * As [`QuatTrait::look_to_rh`].
+    fn look_at_rh(eye: Vec3, center: Vec3, up: Vec3) -> Quat;
     /// Returns the minimal rotation transforming `from` into `to`, in the plane spanned by the
     /// two vectors. Rotates at most 180 degrees.
     ///
@@ -551,6 +660,101 @@ pub impl QuatImpl of QuatTrait {
     fn from_rotation_z(angle: Fixed) -> Quat {
         let (s, c) = (angle * F_HALF).sin_cos();
         Quat { x: F_ZERO, y: F_ZERO, z: s, w: c }
+    }
+
+    fn from_rotation_axes(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Quat {
+        // Based on the `XMQuaternionRotationMatrix` of DirectXMath, as glam-rs is: the branch
+        // taken is the one of the largest of the four components, so that `4 c^2 >= 1` and the
+        // shared division is always well conditioned. `r` is `1 / (4 |c|)`, i.e. the
+        // `0.5 / sqrt(4 c^2)` of glam-rs, kept wide.
+        if !z_axis.z.is_positive() {
+            // x^2 + y^2 >= z^2 + w^2
+            let dif10 = y_axis.y - x_axis.x;
+            let omm22 = F_ONE - z_axis.z;
+            if !dif10.is_positive() {
+                // x^2 >= y^2
+                let four_xsq = omm22 - dif10;
+                let r = recip_of_twice_sqrt(four_xsq);
+                Quat {
+                    x: r.mul(four_xsq),
+                    y: r.mul(x_axis.y + y_axis.x),
+                    z: r.mul(x_axis.z + z_axis.x),
+                    w: r.mul(y_axis.z - z_axis.y),
+                }
+            } else {
+                // y^2 >= x^2
+                let four_ysq = omm22 + dif10;
+                let r = recip_of_twice_sqrt(four_ysq);
+                Quat {
+                    x: r.mul(x_axis.y + y_axis.x),
+                    y: r.mul(four_ysq),
+                    z: r.mul(y_axis.z + z_axis.y),
+                    w: r.mul(z_axis.x - x_axis.z),
+                }
+            }
+        } else {
+            // z^2 + w^2 >= x^2 + y^2
+            let sum10 = y_axis.y + x_axis.x;
+            let opm22 = F_ONE + z_axis.z;
+            if !sum10.is_positive() {
+                // z^2 >= w^2
+                let four_zsq = opm22 - sum10;
+                let r = recip_of_twice_sqrt(four_zsq);
+                Quat {
+                    x: r.mul(x_axis.z + z_axis.x),
+                    y: r.mul(y_axis.z + z_axis.y),
+                    z: r.mul(four_zsq),
+                    w: r.mul(x_axis.y - y_axis.x),
+                }
+            } else {
+                // w^2 >= z^2
+                let four_wsq = opm22 + sum10;
+                let r = recip_of_twice_sqrt(four_wsq);
+                Quat {
+                    x: r.mul(y_axis.z - z_axis.y),
+                    y: r.mul(z_axis.x - x_axis.z),
+                    z: r.mul(x_axis.y - y_axis.x),
+                    w: r.mul(four_wsq),
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn from_mat3(mat: Mat3) -> Quat {
+        Self::from_rotation_axes(mat.x_axis, mat.y_axis, mat.z_axis)
+    }
+
+    #[inline(always)]
+    fn from_mat4(mat: Mat4) -> Quat {
+        Self::from_rotation_axes(
+            mat.x_axis.truncate(), mat.y_axis.truncate(), mat.z_axis.truncate(),
+        )
+    }
+
+    #[inline(always)]
+    fn look_to_lh(dir: Vec3, up: Vec3) -> Quat {
+        Self::look_to_rh(-dir, up)
+    }
+
+    fn look_to_rh(dir: Vec3, up: Vec3) -> Quat {
+        let s = dir.cross(up).normalize();
+        let u = s.cross(dir);
+        Self::from_rotation_axes(
+            Vec3 { x: s.x, y: u.x, z: -dir.x },
+            Vec3 { x: s.y, y: u.y, z: -dir.y },
+            Vec3 { x: s.z, y: u.z, z: -dir.z },
+        )
+    }
+
+    #[inline(always)]
+    fn look_at_lh(eye: Vec3, center: Vec3, up: Vec3) -> Quat {
+        Self::look_to_lh((center - eye).normalize(), up)
+    }
+
+    #[inline(always)]
+    fn look_at_rh(eye: Vec3, center: Vec3, up: Vec3) -> Quat {
+        Self::look_to_rh((center - eye).normalize(), up)
     }
 
     fn from_rotation_arc(from: Vec3, to: Vec3) -> Quat {
@@ -952,6 +1156,18 @@ pub const NEAR_IDENTITY_W: Fixed = Fixed { raw: 4294963001 };
 /// `1e-4` rad quantized (429 497 ULP), the angle below which `rotate_towards` returns the target
 /// directly, as in glam-rs.
 pub const ROTATE_TOWARDS_EPS: Fixed = Fixed { raw: 429497 };
+
+/// `1 / (2 sqrt(v))`, the shared division of the four branches of
+/// [`QuatTrait::from_rotation_axes`]: the `0.5 / sqrt(v)` of glam-rs, kept wide so that the four
+/// components it scales are rounded once instead of twice.
+///
+/// `v` is `4 c^2` for the largest component `c` of the quaternion, so `v >= 1` for a rotation
+/// matrix and the square root loses at most 1 ULP relative to `2 |c| >= 1`.
+#[inline(always)]
+fn recip_of_twice_sqrt(v: Fixed) -> Recip {
+    let s = v.sqrt();
+    RecipTrait::new(s + s)
+}
 
 /// `(a (1 - s) + b t).normalize()`: the `lerp_impl` of glam-rs with the sign of the shortest
 /// path folded into the weight `t = +-s`, one fused rescale per component.

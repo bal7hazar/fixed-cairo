@@ -300,3 +300,51 @@ ret = "Mat4"
 cases = 4
 tolerance = 768
 justification = "as `look_at_rh`."
+
+# ------------------------------------------------------------------------------------------
+# The quaternion constructors and the affine decomposition (task X1).
+# ------------------------------------------------------------------------------------------
+
+[[function]]
+name = "from_quat"
+call = "Mat4Trait::from_quat({0})"
+args = [{ type = "Quat", constraint = "normalized" }]
+ret = "Mat4"
+cases = 8
+tolerance = 2
+justification = "every element of the 3x3 part is one exact two-term sum of raw products rescaled once (1 ULP below the exact value), plus the 0.5 of the quantization of the oracle; the fourth row and column are exact. The quantized unit quaternion is the same on both sides, so its own drift cancels."
+edges = [[[0, 0, 0, 1]], [[1, 0, 0, 0]], [[0, 0, 1, 0]], [[0.2, 0.4, 0.4, 0.8]]]
+
+[[function]]
+name = "from_rotation_translation"
+call = "Mat4Trait::from_rotation_translation({0}, {1})"
+args = [{ type = "Quat", constraint = "normalized" }, { type = "Vec3", min = -100.0, max = 100.0 }]
+ret = "Mat4"
+cases = 8
+tolerance = 2
+justification = "as `from_quat`; the translation column is copied exactly."
+edges = [[[0, 0, 0, 1], [1, 2, 3]], [[0.2, 0.4, 0.4, 0.8], [0, 0, 0]]]
+
+[[function]]
+name = "from_scale_rotation_translation"
+call = "Mat4Trait::from_scale_rotation_translation({0}, {1}, {2})"
+args = [
+    { type = "Vec3", domain = "scale", min = 0.05, max = 8.0 },
+    { type = "Quat", constraint = "normalized" },
+    { type = "Vec3", min = -100.0, max = 100.0 },
+]
+ret = "Mat4"
+cases = 10
+tolerance = 10
+justification = "the scale multiplies the element inside its single rescale, so the Cairo element is 1 ULP below the exact `scale * rotation` product; glam-rs rounds the rotation element first (<= 0.5 ULP) and the scaled one second (<= 0.5 |scale| ULP), which for |scale| <= 8 is 4.5, plus the quantization: 1 + 4.5 + 0.5 = 6, rounded up to 10."
+edges = [[[1, 1, 1], [0, 0, 0, 1], [1, 2, 3]], [[2, 3, 0.5], [0.2, 0.4, 0.4, 0.8], [0, 0, 0]]]
+
+[[function]]
+name = "to_scale_rotation_translation"
+call = "{0}.to_scale_rotation_translation()"
+args = [{ type = "Mat4", constraint = "trs", scale_min = 0.1, scale_max = 8.0, min = -100.0, max = 100.0 }]
+ret = "(Vec3, Quat, Vec3)"
+cases = 12
+tolerance = 64
+justification = "the translation is exact. Each column length is the floor of the exact one (1 ULP) over elements that are themselves 1 ULP off, so the scale carries `1 + sqrt(3) |scale| / |scale| + 1 <= 4` ULP for a column of the quantized matrix, and up to `5 |scale| + 2 = 42` ULP against the scale the oracle reports, whose own rounding is amplified the same way. The rotation is `from_rotation_axes` of the normalized columns: a square root and a shared division on top, 13 ULP measured over 20 000 random TRS triples of the Python mirror. 64 covers both, the branch boundaries excepted (the oracle and the port agree on the branch: the test is `>=` on the same quantized elements)."
+edges = [[[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [1, 2, 3, 1]]]]

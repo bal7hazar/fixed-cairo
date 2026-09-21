@@ -35,6 +35,7 @@ bench_vec3::alt_project_onto_recip: 13600 115 28 0 0
 bench_vec3::alt_reflect_unfused: 11300 95 24 0 0
 bench_vec3::alt_reject_from_normalized_sub: 10560 89 22 0 0
 bench_vec3::alt_reject_from_sub: 15570 132 32 0 0
+bench_vec3::alt_rotate_axis_mat3: 58730 472 112 0 0
 bench_vec3::alt_rotate_x_unfused: 40520 320 82 0 0
 bench_vec3::alt_rotate_y_unfused: 40820 323 82 0 0
 bench_vec3::alt_rotate_z_unfused: 40520 320 82 0 0
@@ -42,6 +43,8 @@ bench_vec3::alt_select_match_false: 1900 19 0 0 0
 bench_vec3::alt_select_match_true: 1600 16 0 0 0
 bench_vec3::angle_between: 38980 307 70 0 0
 bench_vec3::angle_to: 33800 267 56 0 0
+bench_vec3::any_orthogonal_vector_lhs: 4260 39 3 0 0
+bench_vec3::any_orthogonal_vector_rhs: 4360 40 3 0 0
 bench_vec3::any_orthonormal_pair_neg: 12820 113 20 0 0
 bench_vec3::any_orthonormal_pair_pos: 12780 112 20 0 0
 bench_vec3::any_orthonormal_vector_neg: 9140 79 16 0 0
@@ -142,6 +145,9 @@ bench_vec3::rem_assign_scalar: 8170 69 15 0 0
 bench_vec3::rem_euclid_neg: 8930 77 15 0 0
 bench_vec3::rem_euclid_pos: 8150 68 15 0 0
 bench_vec3::rem_scalar: 8170 69 15 0 0
+bench_vec3::rotate_axis: 51120 401 90 0 0
+bench_vec3::rotate_towards_far: 109970 830 196 0 0
+bench_vec3::rotate_towards_near: 109970 842 198 0 0
 bench_vec3::rotate_x: 35880 282 70 0 0
 bench_vec3::rotate_y: 35880 282 70 0 0
 bench_vec3::rotate_z: 35880 282 70 0 0
@@ -152,6 +158,9 @@ bench_vec3::select_true: 1600 16 0 0 0
 bench_vec3::signum_neg: 3530 32 3 0 0
 bench_vec3::signum_pos: 3560 32 3 0 0
 bench_vec3::signum_zero: 3560 32 3 0 0
+bench_vec3::slerp_general: 138050 1110 277 0 0
+bench_vec3::slerp_opposite: 138050 711 173 0 0
+bench_vec3::slerp_parallel: 138050 186 43 0 0
 bench_vec3::sub: 3440 29 6 0 0
 bench_vec3::sub_assign: 3440 29 6 0 0
 bench_vec3::sub_assign_scalar: 3440 29 6 0 0

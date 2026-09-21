@@ -6,6 +6,7 @@
 use fixed::fixed::Fixed;
 use fixed::wide::{det3, dot3, mul_sub};
 use glam::mat3::{Mat3, Mat3Trait};
+use glam::quat::Quat;
 use glam::vec3::{Vec3, Vec3Trait};
 
 /// Alternative to `Mat3::mul_vec3`. The literal glam-rs sum of scaled columns: one rescale per
@@ -97,6 +98,33 @@ pub fn inverse_plain(m: Mat3) -> Option<Mat3> {
     )
 }
 
+/// Alternative to `Mat3::from_quat`. The literal glam-rs expression: the twelve products of
+/// the nine elements rescaled one by one (18 rescales for the 3x3 part) instead of one fused
+/// two-term kernel per element.
+#[inline(always)]
+pub fn from_quat_unfused(rotation: Quat) -> Mat3 {
+    let x2 = rotation.x + rotation.x;
+    let y2 = rotation.y + rotation.y;
+    let z2 = rotation.z + rotation.z;
+    Mat3 {
+        x_axis: Vec3 {
+            x: F_ONE - (rotation.y * y2 + rotation.z * z2),
+            y: rotation.x * y2 + rotation.w * z2,
+            z: rotation.x * z2 - rotation.w * y2,
+        },
+        y_axis: Vec3 {
+            x: rotation.x * y2 - rotation.w * z2,
+            y: F_ONE - (rotation.x * x2 + rotation.z * z2),
+            z: rotation.y * z2 + rotation.w * x2,
+        },
+        z_axis: Vec3 {
+            x: rotation.x * z2 + rotation.w * y2,
+            y: rotation.y * z2 - rotation.w * x2,
+            z: F_ONE - (rotation.x * x2 + rotation.y * y2),
+        },
+    }
+}
+
 /// Alternative to `Mat3::determinant`. The literal glam-rs `x_axis.dot(y_axis.cross(z_axis))`:
 /// the cross product is floored before the dot product (two rescales) instead of the single
 /// one of `det3`.
@@ -108,3 +136,6 @@ pub fn determinant_cross(lhs: Mat3) -> Fixed {
 
 /// `0`.
 const F_ZERO: Fixed = Fixed { raw: 0 };
+
+/// `1`.
+const F_ONE: Fixed = Fixed { raw: 0x100000000 };
