@@ -24,7 +24,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | A2 | `affine2` | done | #14 |
 | A3 | `affine3` | todo | |
 | E1 | `euler` | done | #15 |
-| C1 | `camera` | inprogress | worktree `cli-camera`, branch `feat/camera`, uncommitted |
+| C1 | `camera` | done | #16 |
 | S2 | swizzles (Vec4, integer) | done | #10 |
 | F4 | `fixed` tier C (`exp`, `ln`, `powf`) | inprogress | brief `docs/briefs/F4-fixed-tier-c.md` |
 | P1 | physics extensions (`Rot2`, `Pose2`, `Pose3`) | todo | |

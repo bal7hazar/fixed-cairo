@@ -23,3 +23,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glam`: `Mat2`, `Mat3`, `Mat4` (fused products, adjugate inverse with one shared division) generated from `tools/codegen/fmat.py`, with glam-rs golden vectors (#13).
 - `glam`: `Affine2` (fused composition, inverse with shared reciprocal) with glam-rs golden vectors (#14).
 - `glam`: `EulerRot` (24 orders) and Euler conversions of `Quat`, `Mat3`, `Mat4` as extension traits (#15).
+- `glam`: `camera` module (`rh`/`lh` view and OpenGL / Vulkan / DirectX projection constructors) with glam-rs golden vectors (#16).
