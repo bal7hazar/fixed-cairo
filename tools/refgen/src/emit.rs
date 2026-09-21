@@ -55,7 +55,7 @@ pub fn module(spec: &Spec, registry: Option<&Registry>) -> Result<String, String
     out.push_str(&imports(spec, &layouts, &next, &check)?);
     let mut items = helpers(&layouts, &next, &check);
     for (f, fc) in &generated {
-        items.extend(function(spec, f, fc));
+        items.extend(function(spec, &layouts, f, fc));
     }
     // The formatter glues a `#[cairofmt::skip]` item (and its comment) to the previous item.
     for (i, item) in items.iter().enumerate() {
@@ -174,7 +174,7 @@ fn helpers(layouts: &Layouts, next: &BTreeSet<Ty>, check: &BTreeSet<Ty>) -> Vec<
     ));
     for ty in next {
         let name = ty.snake();
-        let cairo = ty.cairo();
+        let cairo = layouts.cairo(ty);
         let body = match ty.leaf() {
             Some(Leaf::I64) => continue,
             Some(Leaf::Fixed) => "    Fixed { raw: next_i64(ref d) }\n".to_owned(),
@@ -208,7 +208,7 @@ fn helpers(layouts: &Layouts, next: &BTreeSet<Ty>, check: &BTreeSet<Ty>) -> Vec<
     ));
     for ty in check {
         let name = ty.snake();
-        let cairo = ty.cairo();
+        let cairo = layouts.cairo(ty);
         let tol = if ty.has_fixed_leaf() {
             "tol: i128, "
         } else {
@@ -338,11 +338,11 @@ fn read_args(out: &mut String, tys: &[Ty], indent: &str) {
     }
 }
 
-fn function(spec: &Spec, f: &FunctionSpec, fc: &FunctionCases) -> Vec<Item> {
+fn function(spec: &Spec, layouts: &Layouts, f: &FunctionSpec, fc: &FunctionCases) -> Vec<Item> {
     let module = &spec.module;
     let upper = f.name.to_uppercase();
     let call = call_expr(f);
-    let ret = fc.ret.cairo();
+    let ret = layouts.cairo(&fc.ret);
     let mut items = Vec::new();
 
     if !fc.cases.is_empty() {

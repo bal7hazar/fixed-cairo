@@ -59,6 +59,9 @@ pub struct Layout {
 pub struct LayoutOverride {
     /// Import path, e.g. `glam::mat3::Mat3`.
     pub path: Option<String>,
+    /// Emitted Cairo type name when it differs from the generator slot, e.g. `Rot2` for the
+    /// two-Fixed `Vec2` layout.
+    pub cairo: Option<String>,
     /// Field names, same order and types as the default layout.
     pub fields: Option<Vec<String>>,
 }
@@ -244,6 +247,18 @@ impl Layouts {
             .get(ty)
             .and_then(|o| o.path.clone())
             .or_else(|| ty.default_path())
+    }
+
+    /// Cairo type spelling, with per-spec overrides applied recursively inside tuples.
+    pub fn cairo(&self, ty: &Ty) -> String {
+        if let Ty::Tuple(elems) = ty {
+            let inner: Vec<String> = elems.iter().map(|t| self.cairo(t)).collect();
+            return format!("({})", inner.join(", "));
+        }
+        self.overrides
+            .get(ty)
+            .and_then(|o| o.cairo.clone())
+            .unwrap_or_else(|| ty.cairo())
     }
 
     /// Struct layout; `None` for leaves (including `Fixed`) and tuples.
