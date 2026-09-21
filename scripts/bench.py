@@ -4,7 +4,8 @@
 usage:
   scripts/bench.py run      [FILTER]  run the benches, print a markdown table of net costs
   scripts/bench.py snapshot [FILTER]  same, then (re)write gas/<module>.snap for the modules that ran
-  scripts/bench.py check              same, then diff against gas/*.snap; exit 1 on ANY difference
+  scripts/bench.py check    [FILTER]  same, then diff against gas/*.snap; exit 1 on ANY difference
+                                      (with FILTER: only the snapshot entries matching it)
 
 Convention: a benchmark `X` is a pair of tests `X__base` / `X__op` sharing the same prelude; its
 cost is op - base for every metric, which removes the test overhead. Inputs MUST go through
@@ -14,6 +15,11 @@ Two snforge runs are needed: `--tracked-resource sierra-gas` gives l2_gas (what 
 north-star metric) and `--tracked-resource cairo-steps` gives steps and builtins (what provers
 pay). Results are deterministic, so the check uses exact equality.
 
+Every bench file `tests/bench_<m>.cairo` is its own snforge test crate (`[[test]]` target in
+packages/benches/Scarb.toml, checked by `check_targets`): snforge's cost per test grows with the
+size of the compiled test program, so one crate holding the 4 700 benches took ~990 s and the 31
+small crates take ~80 s, with identical numbers.
+
 One snapshot file per bench module (`bench_vec3.cairo` -> `gas/vec3.snap`) so that parallel pull
 requests touching different modules never conflict.
 """
@@ -21,13 +27,35 @@ import argparse
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 GAS = ROOT / "gas"
+BENCHES = ROOT / "packages" / "benches"
 METRICS = ["l2_gas", "steps", "range_check", "bitwise", "other_builtins"]
 HEADER = "# bench: " + " ".join(METRICS)
 PASS_RE = re.compile(r"^\[(PASS|FAIL)\] (\S+)")
+
+
+def check_targets():
+    """Every tests/bench_*.cairo must be a [[test]] target of packages/benches/Scarb.toml (and
+    vice versa), otherwise snforge would silently not run it and its snapshot would be REMOVED."""
+    files = {f.stem for f in (BENCHES / "tests").glob("bench_*.cairo")}
+    manifest = tomllib.loads((BENCHES / "Scarb.toml").read_text())
+    targets = {t["name"]: t for t in manifest.get("test", [])}
+    bad = [
+        f"bench file without a [[test]] target: tests/{n}.cairo"
+        for n in sorted(files - targets.keys())
+    ]
+    bad += [f"[[test]] target without a bench file: {n}" for n in sorted(targets.keys() - files)]
+    bad += [
+        f"[[test]] {n}: expected source-path = \"tests/{n}.cairo\" and test-type = \"integration\""
+        for n, t in sorted(targets.items())
+        if t.get("source-path") != f"tests/{n}.cairo" or t.get("test-type") != "integration"
+    ]
+    if bad:
+        sys.exit("packages/benches/Scarb.toml is out of sync with tests/:\n  " + "\n  ".join(bad))
 
 
 def run_snforge(mode, flt):
@@ -66,6 +94,7 @@ def parse(out):
 
 
 def collect(flt):
+    check_targets()
     gas = parse(run_snforge("sierra-gas", flt))
     steps = parse(run_snforge("cairo-steps", flt))
     tests = {}
@@ -123,8 +152,6 @@ def main():
     ap.add_argument("cmd", choices=["run", "snapshot", "check"])
     ap.add_argument("filter", nargs="?", default="")
     a = ap.parse_args()
-    if a.cmd == "check" and a.filter:
-        sys.exit("check always runs the whole suite (remove the filter)")
     rows = collect(a.filter)
     print("| bench | " + " | ".join(METRICS) + " |\n|---|" + "---:|" * len(METRICS))
     for name in sorted(rows):
@@ -132,7 +159,8 @@ def main():
     if a.cmd == "snapshot":
         write_snapshots(rows, partial=bool(a.filter))
     elif a.cmd == "check":
-        snap, bad = read_snapshots(), []
+        snap = {n: v for n, v in read_snapshots().items() if a.filter in n}
+        bad = []
         for name in sorted(set(rows) | set(snap)):
             new, old = rows.get(name), snap.get(name)
             if old is None:

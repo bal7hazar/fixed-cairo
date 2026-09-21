@@ -6,7 +6,12 @@ cd "$(dirname "$0")/.."
 scarb fmt --check --workspace
 scarb lint --workspace --test --deny-warnings
 scarb build --workspace
-snforge test --workspace
+# The benches package is not run here: `bench.py check` below runs every bench (twice, once per
+# metric) and fails on any failing test, so `snforge test --workspace` would only repeat it.
+for dir in packages/*/; do
+  pkg=$(basename "$dir")
+  [ "$pkg" = benches ] || snforge test -p "$pkg"
+done
 python3 scripts/bench.py check
 python3 scripts/api_parity.py --check
 python3 scripts/gas_tables.py --check
