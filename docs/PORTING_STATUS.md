@@ -30,7 +30,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | P0 | `glamx` package bootstrap + scope research (`docs/research/06-glamx-scope.md`) | done | #19 |
 | P1a | `glamx::pose3`, `glamx::rot3` | done | #22 |
 | P1b | `glamx::rot2` | done | #24 |
-| P1c | `glamx::pose2` | inprogress | brief `docs/briefs/P1c-pose2.md` |
+| P1c | `glamx::pose2` | done | #27 |
 | P1d | `glamx::sdp` | done | #23 |
 | P1e | `glamx::eigen3` | todo | |
 | X2 | `IVec*/UVec*::as_vec*` | done | covered by the `Into<IVecN, VecN>` / `Into<UVecN, VecN>` impls (`docs/API_PARITY.md`: 0 missing) |

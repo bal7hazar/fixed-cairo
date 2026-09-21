@@ -34,3 +34,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glamx`: `Rot2` (unit complex rotation, fused composition, measured norm drift and renormalisation policy) (#24).
 - `glam`: parity closure of `Vec2/3/4`: element-wise `sin`/`cos`/`exp`/`ln`/`powf`/`sqrt`..., `step`, `smoothstep`, `saturate`, `From<BVecN>`, `from/to_homogeneous`, `Vec4::project` (#25).
 - `glam`: parity closure of `Quat` (`*Assign`, `slerp_long`, `from_affine3`), `Mat3/Mat4` x `Affine`, `Affine2::to_scale_angle_translation`, camera `look_*_affine3` / `look_*_quat`: `docs/API_PARITY.md` now reports 0 missing items (#26).
+- `glamx`: `Pose2` (fused composition, `inv_mul`, point / vector transforms) (#27).
