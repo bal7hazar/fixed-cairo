@@ -22,7 +22,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | S1 | swizzles (Vec2, Vec3) | done | #10 |
 | X1 | cross-type methods | done | #17 |
 | A2 | `affine2` | done | #14 |
-| A3 | `affine3` | inprogress | brief `docs/briefs/A3-affine3.md` |
+| A3 | `affine3` | done | #21 |
 | E1 | `euler` | done | #15 |
 | C1 | `camera` | done | #16 |
 | S2 | swizzles (Vec4, integer) | done | #10 |
