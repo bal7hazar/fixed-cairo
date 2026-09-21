@@ -18,6 +18,17 @@ large directly.
   - `claude -p "$(cat brief.md)" --model <sonnet|opus|fable> --dangerously-skip-permissions --name <task>`;
     resume with context: `claude --continue -p "<follow-up>"` in the same worktree.
   - `codex exec -C <worktree> -m <model> -c model_reasoning_effort=<low|medium|high|xhigh> --dangerously-bypass-approvals-and-sandbox -o REPORT.md "$(cat brief.md)"`.
+- Launch through `scripts/agent.sh <task> <claude|codex> <model> <new|resume> "<prompt>"
+  [codex-session-id] [effort]`: it starts the CLI **detached** (`setsid nohup`) from the worktree
+  `.claude/worktrees/cli-<task>`, logs to `.claude/worktrees/logs/<task>.log` and writes
+  `<task>.pid`. An agent started as a plain background child of the orchestrator session dies
+  with it (observed 2026-09-21: five agents lost at once when the session restarted; all were
+  resumed with their context, `claude --continue` / `codex exec resume <session-id>`, the codex
+  session id being the UUID of `~/.codex/sessions/<date>/rollout-*.jsonl` whose `cwd` is the
+  worktree). To be notified of the end, block a background command on
+  `tail --pid="$(cat <task>.pid)" -f /dev/null`.
+- A shared machine needs a lock around the full gate: briefs say
+  `flock /tmp/glam-cairo-gate.lock scripts/check.sh` (the `glam_tests` compile peaks at ~12 GB).
 - The agent writes a `REPORT.md` (not committed) at the root of its worktree: the orchestrator
   reads that file and the log, not the transcript.
 
