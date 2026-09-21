@@ -211,6 +211,78 @@ tolerance = 26
 justification = "as `look_to_mat3` plus the `normalize` of `center - eye` (length >= 1): <= 25 ULP on `s` and `u` (`specs/mat4.toml`), oracle rounding 0.5 -> 26."
 
 [[function]]
+name = "lh_view_look_to_affine3"
+call = "lh::view::look_to_affine3({0}, {1}, {2})"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", constraint = "normalized" }, { type = "Vec3", constraint = "normalized" }]
+ret = "Affine3"
+cases = 3
+tolerance = 256
+justification = "the exact affine columns of the corresponding Mat4 view transforms: the rotation is <= 10 ULP and translation <= 217 ULP for |eye| <= 8 and |dir x up| >= 1/2; rounded up to 256."
+
+[[function]]
+name = "rh_view_look_to_affine3"
+call = "rh::view::look_to_affine3({0}, {1}, {2})"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", constraint = "normalized" }, { type = "Vec3", constraint = "normalized" }]
+ret = "Affine3"
+cases = 3
+tolerance = 256
+justification = "as `lh_view_look_to_affine3`: the handedness changes signs, not the error bound."
+
+[[function]]
+name = "lh_view_look_at_affine3"
+call = "lh::view::look_at_affine3({0}, {1}, {2})"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", constraint = "normalized" }]
+ret = "Affine3"
+cases = 3
+tolerance = 768
+justification = "the exact affine columns of the corresponding Mat4 look-at transforms: normalizing center-eye raises the rotation bound to 26 ULP and translation to 601 ULP; rounded up to 768."
+
+[[function]]
+name = "rh_view_look_at_affine3"
+call = "rh::view::look_at_affine3({0}, {1}, {2})"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", constraint = "normalized" }]
+ret = "Affine3"
+cases = 3
+tolerance = 768
+justification = "as `lh_view_look_at_affine3`: the handedness changes signs, not the error bound."
+
+[[function]]
+name = "lh_view_look_to_quat"
+call = "lh::view::look_to_quat({0}, {1})"
+args = [{ type = "Vec3", constraint = "normalized" }, { type = "Vec3", constraint = "normalized" }]
+ret = "Quat"
+cases = 3
+tolerance = 16
+justification = "the look-to frame is within 10 ULP per matrix element for |dir x up| >= 1/2; `Quat::from_rotation_axes` adds at most 6 ULP on this well-conditioned rotation pool."
+
+[[function]]
+name = "rh_view_look_to_quat"
+call = "rh::view::look_to_quat({0}, {1})"
+args = [{ type = "Vec3", constraint = "normalized" }, { type = "Vec3", constraint = "normalized" }]
+ret = "Quat"
+cases = 3
+tolerance = 16
+justification = "as `lh_view_look_to_quat`: the handedness changes signs, not the error bound."
+
+[[function]]
+name = "lh_view_look_at_quat"
+call = "lh::view::look_at_quat({0}, {1}, {2})"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", constraint = "normalized" }]
+ret = "Quat"
+cases = 3
+tolerance = 32
+justification = "the normalized look-at frame is within 26 ULP per element on the guarded pool; `Quat::from_rotation_axes` adds at most 6 ULP."
+
+[[function]]
+name = "rh_view_look_at_quat"
+call = "rh::view::look_at_quat({0}, {1}, {2})"
+args = [{ type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", min = -8.0, max = 8.0 }, { type = "Vec3", constraint = "normalized" }]
+ret = "Quat"
+cases = 3
+tolerance = 32
+justification = "as `lh_view_look_at_quat`: the handedness changes signs, not the error bound."
+
+[[function]]
 name = "rh_opengl_perspective"
 call = "rh::proj::opengl::perspective({0}, {1}, {2}, {3})"
 args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, max = 4.0 }, { type = "Fixed", min = 0.01, max = 8.0 }, { type = "Fixed", min = 0.02, max = 500.0 }]

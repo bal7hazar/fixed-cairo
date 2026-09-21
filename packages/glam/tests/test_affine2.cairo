@@ -84,6 +84,23 @@ fn test_basic_constructors() {
 }
 
 #[test]
+fn test_to_scale_angle_translation() {
+    let translation = Vec2 { x: f(0x300000000), y: f(-0x200000000) };
+    let cases = [
+        (Vec2 { x: f(0x200000000), y: f(0x300000000) }, f(0)),
+        (Vec2 { x: f(-0x200000000), y: f(0x300000000) }, FRAC_PI_2),
+    ];
+    for case in cases.span() {
+        let (scale, angle) = *case;
+        let a = Affine2Trait::from_scale_angle_translation(scale, angle, translation);
+        let (actual_scale, actual_angle, actual_translation) = a.to_scale_angle_translation();
+        assert_eq!(actual_scale, scale);
+        assert_eq!(actual_angle, angle);
+        assert_eq!(actual_translation, translation);
+    }
+}
+
+#[test]
 fn test_rotation_translation_and_transforms_exact() {
     let quarter = Affine2Trait::from_angle(FRAC_PI_2);
     assert_eq!(quarter.matrix2.x_axis, Vec2Trait::Y);

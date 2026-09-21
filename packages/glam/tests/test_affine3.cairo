@@ -132,6 +132,7 @@ fn test_quarter_turns_exact() {
     assert_eq!(a * a.inverse(), Affine3Trait::IDENTITY);
     assert_eq!(a.inv_mul(a), Affine3Trait::IDENTITY);
     assert_eq!(quat_from_affine3(Affine3Trait::IDENTITY), QuatTrait::IDENTITY);
+    assert_eq!(QuatTrait::from_affine3(Affine3Trait::IDENTITY), QuatTrait::IDENTITY);
 }
 #[cairofmt::skip]
 const COMPOSE: [[i64; 39]; 3] = [

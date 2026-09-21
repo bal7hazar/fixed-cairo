@@ -78,6 +78,16 @@ justification = "sine/cosine are within about 1 ULP plus oracle quantization; tr
 edges = [[0, [0, 0]], [1.5707963267948966, [4, -5]], [-1.5707963267948966, [-2, 3]]]
 
 [[function]]
+name = "to_scale_angle_translation"
+call = "{0}.to_scale_angle_translation()"
+args = [{ type = "Affine2", constraint = "trs", scale_min = 0.5, scale_max = 8.0 }]
+ret = "(Vec2, Fixed, Vec2)"
+cases = 10
+tolerance = 5
+justification = "each scale component is an integer-square-root floor (at most 1 ULP below exact); the angle uses `atan2` (3.22 ULP) and the oracle quantization adds at most 0.5 ULP, so the shared tuple bound is 5."
+edges = [[[[1, 0], [0, 1], [3, -2]]], [[[-2, 0], [0, 3], [4, -5]]]]
+
+[[function]]
 name = "mul_mat3"
 call = "{0}.mul_mat3({1})"
 args = [{ type = "Affine2", min = -100.0, max = 100.0 }, { type = "Mat3", min = -100.0, max = 100.0 }]

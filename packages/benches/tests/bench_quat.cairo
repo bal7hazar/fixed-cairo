@@ -13,6 +13,7 @@
 use benches::alt::quat as alt;
 use benches::harness::{bb, sink};
 use fixed::fixed::Fixed;
+use glam::affine3::Affine3;
 use glam::mat3::Mat3;
 use glam::mat4::Mat4;
 use glam::quat::{Quat, QuatTrait};
@@ -182,6 +183,7 @@ const ROT4: Mat4 = Mat4 {
         w: Fixed { raw: 0x100000000 },
     },
 };
+const AFFINE: Affine3 = Affine3 { matrix3: ROT_W, translation: ZEROV };
 /// The y axis: the `up` of the `look_*` constructors.
 const UP: Vec3 = Vec3 {
     x: Fixed { raw: 0x0 }, y: Fixed { raw: 0x100000000 }, z: Fixed { raw: 0x0 },
@@ -363,6 +365,20 @@ fn from_mat4__op() {
     let m = bb(ROT4);
     let _r = bb(A);
     sink(QuatTrait::from_mat4(m));
+}
+
+#[test]
+fn from_affine3__base() {
+    let _a = bb(AFFINE);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn from_affine3__op() {
+    let a = bb(AFFINE);
+    let _r = bb(A);
+    sink(QuatTrait::from_affine3(a));
 }
 
 #[test]
@@ -906,6 +922,42 @@ fn slerp__long_path__op() {
 }
 
 #[test]
+fn slerp_long__base() {
+    let _a = bb(A);
+    let _b = bb(NEG_B);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn slerp_long__op() {
+    let a = bb(A);
+    let b = bb(NEG_B);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(a.slerp_long(b, k));
+}
+
+#[test]
+fn slerp_long__near__base() {
+    let _a = bb(A);
+    let _b = bb(NEARBY);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn slerp_long__near__op() {
+    let a = bb(A);
+    let b = bb(NEARBY);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(a.slerp_long(b, k));
+}
+
+#[test]
 fn mul_quat__base() {
     let _a = bb(A);
     let _b = bb(B);
@@ -1015,6 +1067,86 @@ fn sub__op() {
     let b = bb(B);
     let _r = bb(A);
     sink(a - b);
+}
+
+#[test]
+fn add_assign__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    sink(bb(A));
+}
+
+#[test]
+fn add_assign__op() {
+    let mut a = bb(A);
+    let b = bb(B);
+    let _r = bb(A);
+    a += b;
+    sink(a);
+}
+
+#[test]
+fn sub_assign__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    sink(bb(A));
+}
+
+#[test]
+fn sub_assign__op() {
+    let mut a = bb(A);
+    let b = bb(B);
+    let _r = bb(A);
+    a -= b;
+    sink(a);
+}
+
+#[test]
+fn mul_assign__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    sink(bb(A));
+}
+
+#[test]
+fn mul_assign__op() {
+    let mut a = bb(A);
+    let b = bb(B);
+    let _r = bb(A);
+    a *= b;
+    sink(a);
+}
+
+#[test]
+fn mul_assign_scalar__base() {
+    let _a = bb(A);
+    let _k = bb(K_TWO);
+    sink(bb(A));
+}
+
+#[test]
+fn mul_assign_scalar__op() {
+    let mut a = bb(A);
+    let k = bb(K_TWO);
+    let _r = bb(A);
+    a *= k;
+    sink(a);
+}
+
+#[test]
+fn div_assign_scalar__base() {
+    let _a = bb(A);
+    let _k = bb(K_TWO);
+    sink(bb(A));
+}
+
+#[test]
+fn div_assign_scalar__op() {
+    let mut a = bb(A);
+    let k = bb(K_TWO);
+    let _r = bb(A);
+    a /= k;
+    sink(a);
 }
 
 #[test]

@@ -4,9 +4,11 @@
 // Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen camera
 
 use fixed::Fixed;
+use glam::affine3::Affine3;
 use glam::camera::{lh, rh};
 use glam::mat3::Mat3;
 use glam::mat4::Mat4;
+use glam::quat::Quat;
 use glam::vec3::Vec3;
 use glam::vec4::Vec4;
 
@@ -53,6 +55,13 @@ fn check_vec4(actual: Vec4, ref d: Span<i64>, tol: i128, name: @ByteArray, case:
     check_fixed(actual.w, ref d, tol, name, case);
 }
 
+fn check_quat(actual: Quat, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
+    check_fixed(actual.x, ref d, tol, name, case);
+    check_fixed(actual.y, ref d, tol, name, case);
+    check_fixed(actual.z, ref d, tol, name, case);
+    check_fixed(actual.w, ref d, tol, name, case);
+}
+
 fn check_mat3(actual: Mat3, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
     check_vec3(actual.x_axis, ref d, tol, name, case);
     check_vec3(actual.y_axis, ref d, tol, name, case);
@@ -64,6 +73,11 @@ fn check_mat4(actual: Mat4, ref d: Span<i64>, tol: i128, name: @ByteArray, case:
     check_vec4(actual.y_axis, ref d, tol, name, case);
     check_vec4(actual.z_axis, ref d, tol, name, case);
     check_vec4(actual.w_axis, ref d, tol, name, case);
+}
+
+fn check_affine3(actual: Affine3, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
+    check_mat3(actual.matrix3, ref d, tol, name, case);
+    check_vec3(actual.translation, ref d, tol, name, case);
 }
 // camera::lh_opengl_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
 // half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
@@ -648,6 +662,235 @@ fn golden_camera_lh_view_look_at_mat3() {
         let a2 = next_vec3(ref d);
         let actual: Mat3 = lh::view::look_at_mat3(a0, a1, a2);
         check_mat3(actual, ref d, 26, @name, case);
+        case += 1;
+    }
+}
+// camera::lh_view_look_to_affine3: 3 cases, tolerance 256 ULP - the exact affine columns of the
+// corresponding Mat4 view transforms: the rotation is <= 10 ULP and translation <= 217 ULP for
+// |eye| <= 8 and |dir x up| >= 1/2; rounded up to 256.
+#[cairofmt::skip]
+const LH_VIEW_LOOK_TO_AFFINE3_CASES: [i64; 63] = [
+    -4294967296, -13215017892, -797963194, -202131640, -1110335309, 4144036966, -3866734716, -1,
+        -1869520450,
+        -521952610, -4258339154, -202131640, 4124180900, -452804020, -1110335309, 1079556137,
+        -329029249, 4144036966, 12368150300, -5712684677, -2848557379,
+    -2033898537, 17468168449, 19327352832, -3801972709, -4440, -1997935833, 0, 3, -4294967296,
+        -5017, 1997935833, -3801972709, 4294967296, 2337, -4440, 3, -3801972709, -1997935833,
+        -17468170838, 18054998004, 7190290282,
+    -174909, 31, -21474836480, -1961951097, 754789521, -3745368439, 0, -3840061807, 1923712399,
+        3598322950, -1284353501, -1961951097, -1050303657, -4095595082, 754789521, -2096587287,
+        -152581382, -3745368439, -10482789887, -762959182, -18726922099,
+];
+
+#[test]
+fn golden_camera_lh_view_look_to_affine3() {
+    let name: ByteArray = "camera::lh_view_look_to_affine3";
+    let mut d = LH_VIEW_LOOK_TO_AFFINE3_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Affine3 = lh::view::look_to_affine3(a0, a1, a2);
+        check_affine3(actual, ref d, 256, @name, case);
+        case += 1;
+    }
+}
+// camera::rh_view_look_to_affine3: 3 cases, tolerance 256 ULP - as `lh_view_look_to_affine3`: the
+// handedness changes signs, not the error bound.
+#[cairofmt::skip]
+const RH_VIEW_LOOK_TO_AFFINE3_CASES: [i64; 63] = [
+    0, 13511919557, 1772554138, -3738048727, 863867079, 1930665548, 4, 0, -4294967296,
+        -967082626, -1881086649, 3738048727, -4184673854, 434721148, -863867079, -1, -3836570684,
+        -1930665548, 13164937611, 215743683, 3514511438,
+    -3319379679, 29898596639, -17179869184, 61, 2092248059, -3750898843, 0, 2206410397, 3684901252,
+        4294967296, 35, -61, -60, 3750898843, -2092248059, 36, 2092248059, 3750898843, 3319380244,
+        -17742175485, 29568381614,
+    0, -12277379484, -20155148983, 1841138509, -808862571, 3795088195, -22540449, -3036958676,
+        -3036958676,
+        3743916032, 1019826363, -1841138509, 1474301581, -3952077968, 808862571, -1502089101,
+        -1337078158, -3795088195, -2834543032, -17571768362, -15497173937,
+];
+
+#[test]
+fn golden_camera_rh_view_look_to_affine3() {
+    let name: ByteArray = "camera::rh_view_look_to_affine3";
+    let mut d = RH_VIEW_LOOK_TO_AFFINE3_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Affine3 = rh::view::look_to_affine3(a0, a1, a2);
+        check_affine3(actual, ref d, 256, @name, case);
+        case += 1;
+    }
+}
+// camera::lh_view_look_at_affine3: 3 cases, tolerance 768 ULP - the exact affine columns of the
+// corresponding Mat4 look-at transforms: normalizing center-eye raises the rotation bound to 26
+// ULP and translation to 601 ULP; rounded up to 768.
+#[cairofmt::skip]
+const LH_VIEW_LOOK_AT_AFFINE3_CASES: [i64; 63] = [
+    5764130, 4, -25883397127, 72871, -33202977124, -147115827, 4462, 4132488942, 1170162049,
+        4294967236, -423599, -581864, -200378, 2631229131, -3394610035, 691267, 3394610015,
+        2631229074, -1598246, 20457441346, 15856966012,
+    -23762266788, -1052289235, -31971593325, -8589934592, 21474836480, 21474836480, 4027532054,
+        572856113, 1377521506,
+        -8438512, 4155141592, 1086955020, -3956909164, -430209224, 1613856859, 1670192423,
+        -998229657, 3828934434, 11416706682, 15452477589, 34911533340,
+    -4294967296, 30306124938, 25769803776, -214, 17179869184, 12884901888, 0, -3380139369,
+        2649792807,
+        4180615554, -124099813, 976625262, 607376850, -3028046108, -2984756976, 774784503,
+        3043399428, -2929875931, -4753860703, 2981986141, 39616906827,
+];
+
+#[test]
+fn golden_camera_lh_view_look_at_affine3() {
+    let name: ByteArray = "camera::lh_view_look_at_affine3";
+    let mut d = LH_VIEW_LOOK_AT_AFFINE3_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Affine3 = lh::view::look_at_affine3(a0, a1, a2);
+        check_affine3(actual, ref d, 768, @name, case);
+        case += 1;
+    }
+}
+// camera::rh_view_look_at_affine3: 3 cases, tolerance 768 ULP - as `lh_view_look_at_affine3`: the
+// handedness changes signs, not the error bound.
+#[cairofmt::skip]
+const RH_VIEW_LOOK_AT_AFFINE3_CASES: [i64; 63] = [
+    21308654616, 0, -24666358244, -8271890, 25769803776, -25242854274, 4291560915, 171023344, 0,
+        3705933, 3309771233, 2737178241, -92994542, 2736599413, -3308945412, -4293958821, -56410187,
+        74024386, -24678952761, -16744762181, -13154855403,
+    9039001172, -8589934592, 18371664979, -24734057184, -5, 30064771072, 0, -2795613946,
+        -3260565402,
+        138540337, -1689653832, 3946215982, -3258868688, -2611344863, -1003691664, 2794159180,
+        -2961873058, -1366282013, -18761281739, 11002654424, -4468164693,
+    7141463709, -32481376438, 16151735349, 6037977994, 25769803776, -11993, 3423171764, 2593962056,
+        -1,
+        841532658, 4210988214, 78390830, -1110544710, 298967935, -4138121880, -4062666280,
+        790531790, 1147408496, 5480208169, -7713723396, -35740518516,
+];
+
+#[test]
+fn golden_camera_rh_view_look_at_affine3() {
+    let name: ByteArray = "camera::rh_view_look_at_affine3";
+    let mut d = RH_VIEW_LOOK_AT_AFFINE3_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Affine3 = rh::view::look_at_affine3(a0, a1, a2);
+        check_affine3(actual, ref d, 768, @name, case);
+        case += 1;
+    }
+}
+// camera::lh_view_look_to_quat: 3 cases, tolerance 16 ULP - the look-to frame is within 10 ULP
+// per matrix element for |dir x up| >= 1/2; `Quat::from_rotation_axes` adds at most 6 ULP on this
+// well-conditioned rotation pool.
+#[cairofmt::skip]
+const LH_VIEW_LOOK_TO_QUAT_CASES: [i64; 30] = [
+    -106, 28, -4294967296, -9987, -3744092984, -2104402955, 4294967296, -5698, -53, 14,
+    -227232, -4294967290, -1, -2710881997, -390264559, 3308406935,
+        2859838074, -1022104804, 1021953498, -2859892145,
+    1973515826, 1519282423, -3499108497, -3611168230, 276512958, -2308624845,
+        2971441168, -2812150014, 204223840, 1291273162,
+];
+
+#[test]
+fn golden_camera_lh_view_look_to_quat() {
+    let name: ByteArray = "camera::lh_view_look_to_quat";
+    let mut d = LH_VIEW_LOOK_TO_QUAT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let actual: Quat = lh::view::look_to_quat(a0, a1);
+        check_quat(actual, ref d, 16, @name, case);
+        case += 1;
+    }
+}
+// camera::rh_view_look_to_quat: 3 cases, tolerance 16 ULP - as `lh_view_look_to_quat`: the
+// handedness changes signs, not the error bound.
+#[cairofmt::skip]
+const RH_VIEW_LOOK_TO_QUAT_CASES: [i64; 30] = [
+    63643, 927, 4294967296, -1010, 4294855409, -31001418, -275, 4294967296, -463, 31822,
+    1929291149, -3837262010, 510, 4294967280, -371939, 0,
+        1593777264, 2585197703, 1593776921, 2585197491,
+    2454466665, -3296277474, 1247754894, 43016370, 300, 4294751875,
+        -1071569258, 3279427480, 2424807431, 814952593,
+];
+
+#[test]
+fn golden_camera_rh_view_look_to_quat() {
+    let name: ByteArray = "camera::rh_view_look_to_quat";
+    let mut d = RH_VIEW_LOOK_TO_QUAT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let actual: Quat = rh::view::look_to_quat(a0, a1);
+        check_quat(actual, ref d, 16, @name, case);
+        case += 1;
+    }
+}
+// camera::lh_view_look_at_quat: 3 cases, tolerance 32 ULP - the normalized look-at frame is
+// within 26 ULP per element on the guarded pool; `Quat::from_rotation_axes` adds at most 6 ULP.
+#[cairofmt::skip]
+const LH_VIEW_LOOK_AT_QUAT_CASES: [i64; 39] = [
+    -25769803776, -25769803776, -14299166271, 30064771072, -480, -2555129, 3167662676, -751513265,
+        -2801407692,
+        2554734082, -779810652, 2509254970, 2239556359,
+    10737418240, 8483155290, -15897612783, -8589934592, 1, 27079344342, 0, -3075885247, -2997611386,
+        -821966437, -518587276, 4137059985, -622026664,
+    21474836480, -30064771072, 14686788516, -21474836480, -31324647976, 7186706531, 1201376,
+        -4028243227, -1489966152,
+        3230294663, 611986384, -2729203702, 434580587,
+];
+
+#[test]
+fn golden_camera_lh_view_look_at_quat() {
+    let name: ByteArray = "camera::lh_view_look_at_quat";
+    let mut d = LH_VIEW_LOOK_AT_QUAT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Quat = lh::view::look_at_quat(a0, a1, a2);
+        check_quat(actual, ref d, 32, @name, case);
+        case += 1;
+    }
+}
+// camera::rh_view_look_at_quat: 3 cases, tolerance 32 ULP - as `lh_view_look_at_quat`: the
+// handedness changes signs, not the error bound.
+#[cairofmt::skip]
+const RH_VIEW_LOOK_AT_QUAT_CASES: [i64; 39] = [
+    -19739138465, 12964432404, 382, -30016429109, -665961, 1721741639, 0, -4795956, -4294964618,
+        3013186727, -1048227196, 946694842, 2715223461,
+    909463708, -32104660054, -6608959235, 702649, 29743023454, -12213686, -2610081498, -2263508280,
+        2551616922,
+        2973955169, -1164939966, 1086473976, -2657973646,
+    0, 5446930637, 24548590804, 12884901888, -8762020052, 23544814927, -2992898, -3844226264,
+        1915374519,
+        -2155714935, 2023425809, 3105264523, -250434477,
+];
+
+#[test]
+fn golden_camera_rh_view_look_at_quat() {
+    let name: ByteArray = "camera::rh_view_look_at_quat";
+    let mut d = RH_VIEW_LOOK_AT_QUAT_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec3(ref d);
+        let a1 = next_vec3(ref d);
+        let a2 = next_vec3(ref d);
+        let actual: Quat = rh::view::look_at_quat(a0, a1, a2);
+        check_quat(actual, ref d, 32, @name, case);
         case += 1;
     }
 }

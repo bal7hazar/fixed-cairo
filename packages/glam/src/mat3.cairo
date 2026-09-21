@@ -18,6 +18,7 @@ use fixed::wide::{
     RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, det3, dot2, dot2_add, dot3,
     mul_sub, wide_from, wide_mul,
 };
+use crate::affine2::Affine2;
 use crate::mat2::Mat2;
 use crate::mat4::Mat4;
 use crate::quat::Quat;
@@ -1193,6 +1194,16 @@ pub impl Mat3DivAssignScalar of DivAssign<Mat3, Fixed> {
     #[inline(always)]
     fn div_assign(ref self: Mat3, rhs: Fixed) {
         self = Mat3Trait::div_scalar(self, rhs);
+    }
+}
+
+/// Multiplies by a 2D affine transform embedded in a 3x3 matrix.
+///
+/// Mirrors `impl MulAssign<Affine2> for glam::Mat3`.
+pub impl Mat3MulAssignAffine2 of MulAssign<Mat3, Affine2> {
+    #[inline(always)]
+    fn mul_assign(ref self: Mat3, rhs: Affine2) {
+        self = self * Into::<Affine2, Mat3>::into(rhs);
     }
 }
 

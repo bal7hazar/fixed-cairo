@@ -89,6 +89,13 @@ pub fn register(r: &mut Registry) {
         }
         p.slerp(q, s).into()
     });
+    r.add("slerp_long", |a| -> Out {
+        let (p, q, s) = (a[0].dquat(), a[1].dquat(), a[2].f());
+        if p.dot(q).abs() > MAX_DOT {
+            return skip("slerp_long: too close to the nlerp band");
+        }
+        p.slerp_long(q, s).into()
+    });
     r.add("rotate_towards", |a| -> Out {
         let (p, q, m) = (a[0].dquat(), a[1].dquat(), a[2].f());
         if p.dot(q).abs() > MAX_DOT {
@@ -102,6 +109,7 @@ pub fn register(r: &mut Registry) {
     });
     r.add("from_mat3", |a| DQuat::from_mat3(&a[0].dmat3()));
     r.add("from_mat4", |a| DQuat::from_mat4(&a[0].dmat4()));
+    r.add("from_affine3", |a| DQuat::from_affine3(&a[0].daffine3()));
     // `look_to_*` / `look_at_*` are deprecated in glam-rs 0.33.1 (moved to `glam::camera`,
     // task C1 of `docs/PLAN.md`); they are still the oracle of the `Quat` methods of the same
     // name. A `dir` nearly parallel to `up` makes the normalized side axis ill-conditioned.

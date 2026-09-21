@@ -16,6 +16,7 @@ pub fn register(r: &mut Registry) {
     });
     r.add("neg", |a| -a[0].dmat4());
     r.add("mul_mat4", |a| a[0].dmat4() * a[1].dmat4());
+    r.add("mul_affine3", |a| a[0].dmat4() * a[1].daffine3());
     r.add("mul_vec4", |a| a[0].dmat4() * a[1].dvec4());
     r.add("mul_transpose_vec4", |a| a[0].dmat4().mul_transpose_vec4(a[1].dvec4()));
     r.add("mul_scalar", |a| a[0].dmat4() * a[1].f());

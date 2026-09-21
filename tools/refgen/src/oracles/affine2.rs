@@ -13,5 +13,8 @@ pub fn register(r: &mut Registry) {
     r.add("from_angle_translation", |a| {
         DAffine2::from_angle_translation(a[0].f(), a[1].dvec2())
     });
+    r.add("to_scale_angle_translation", |a| {
+        a[0].daffine2().to_scale_angle_translation()
+    });
     r.add("mul_mat3", |a| a[0].daffine2() * a[1].dmat3());
 }

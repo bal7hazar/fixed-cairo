@@ -8,7 +8,8 @@
 //! (docs/DESIGN.md section 3).
 
 use core::ops::MulAssign;
-use fixed::fixed::Fixed;
+use fixed::fixed::{Fixed, FixedTrait};
+use fixed::trig::TrigTrait;
 use fixed::wide::{RecipTrait, dot2, dot2_add, mul_sub};
 use crate::mat2::{Mat2, Mat2Trait};
 use crate::mat3::{Mat3, Mat3Trait};
@@ -27,7 +28,6 @@ use crate::vec3::Vec3;
 ///   collapsed f32/f64 variants, and `from_mat3a` (there is no distinct `Mat3A`).
 /// * Heterogeneous `Mul` is not a core Cairo operator. `Affine2 * Mat3` is `mul_mat3`; spell
 ///   `Mat3 * Affine2` as `mat3 * Into::<Affine2, Mat3>::into(affine)`.
-/// * `to_scale_angle_translation` is deferred with the other cross-type decomposition APIs.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Affine2 {
     pub matrix2: Mat2,
@@ -148,6 +148,21 @@ pub trait Affine2Trait {
     /// #### Deviations
     /// * The glam-rs precondition that `m` is affine is not checked.
     fn from_mat3(m: Mat3) -> Affine2;
+    /// Extracts `scale`, rotation `angle` in radians, and `translation` from `self`.
+    ///
+    /// #### Preconditions
+    /// * The linear transform must be non-degenerate and contain no shear; it is not checked.
+    ///
+    /// Mirrors `glam::Affine2::to_scale_angle_translation`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the determinant or a column length leaves the scalar range.
+    /// #### Deviations
+    /// * The determinant sign is applied by exact negation instead of multiplication by
+    ///   `signum(det)`. The column lengths are integer-square-root floors (at most 1 ULP low),
+    ///   and `atan2` is accurate to 3.22 ULP.
+    /// * The `glam_assert!` checks for a nonzero determinant and scale are not performed
+    ///   (docs/DESIGN.md section 3).
+    fn to_scale_angle_translation(self: Affine2) -> (Vec2, Fixed, Vec2);
     /// Transforms a 2D point, applying the linear transform and translation.
     ///
     /// Mirrors `glam::Affine2::transform_point2`.
@@ -305,6 +320,20 @@ pub impl Affine2Impl of Affine2Trait {
             },
             translation: Vec2 { x: m.z_axis.x, y: m.z_axis.y },
         }
+    }
+
+    fn to_scale_angle_translation(self: Affine2) -> (Vec2, Fixed, Vec2) {
+        let det = self.matrix2.determinant();
+        let len_x = self.matrix2.x_axis.length();
+        let scale = Vec2 {
+            x: if det.is_negative() {
+                -len_x
+            } else {
+                len_x
+            }, y: self.matrix2.y_axis.length(),
+        };
+        let angle = (-self.matrix2.y_axis.x).atan2(self.matrix2.y_axis.y);
+        (scale, angle, self.translation)
     }
 
     #[inline(always)]

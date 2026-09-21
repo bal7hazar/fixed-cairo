@@ -183,6 +183,18 @@ fn from_scale_angle_translation__op() {
 }
 
 #[test]
+fn to_scale_angle_translation__base() {
+    let _a = bb(A);
+    sink(bb((SCALE, ANGLE, V)));
+}
+#[test]
+fn to_scale_angle_translation__op() {
+    let a = bb(A);
+    let _r = bb((SCALE, ANGLE, V));
+    sink(a.to_scale_angle_translation());
+}
+
+#[test]
 fn from_angle_translation__base() {
     let _a = bb(ANGLE);
     let _t = bb(V);

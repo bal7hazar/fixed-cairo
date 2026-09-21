@@ -282,6 +282,19 @@ tolerance = 48
 justification = "`(a sin(theta (1 - s)) + b sin(theta s)) / sin(theta)`: three sines at 1.02 ULP each and one floored sum, divided by `sin(theta) >= 0.141` (the oracle keeps `|dot| <= 0.99`), i.e. an amplification of at most 7.1, plus the 2.96 ULP of `acos` propagated through the weights: |diff| <= 48."
 
 [[function]]
+name = "slerp_long"
+call = "{0}.slerp_long({1}, {2})"
+args = [
+    { type = "Quat", constraint = "normalized" },
+    { type = "Quat", constraint = "normalized" },
+    { type = "Fixed", domain = "t" },
+]
+ret = "Quat"
+cases = 12
+tolerance = 48
+justification = "the same shared spherical interpolation kernel as `slerp`, without the shortest-path sign flip; the oracle keeps `|dot| <= 0.99`, so the same 48 ULP bound applies."
+
+[[function]]
 name = "rotate_towards"
 call = "{0}.rotate_towards({1}, {2})"
 args = [
@@ -374,6 +387,15 @@ cases = 8
 tolerance = 6
 justification = "as `from_mat3`: the same function on the upper 3x3 block."
 edges = [[[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]]]
+
+[[function]]
+name = "from_affine3"
+call = "QuatTrait::from_affine3({0})"
+args = [{ type = "Affine3", constraint = "rotation" }]
+ret = "Quat"
+cases = 8
+tolerance = 6
+justification = "as `from_mat3`: the exact same kernel on the affine transform's 3x3 linear part."
 
 [[function]]
 name = "look_to"

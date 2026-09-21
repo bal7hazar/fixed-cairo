@@ -9,8 +9,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 
 | Type/module | Ported | Dropped | Renamed | Missing | Extra | Parity |
 |---|---:|---:|---:|---:|---:|---:|
-| [Affine2](#affine2) | 22 | 15 | 1 | 1 | 1 | 59.0% |
-| [Affine3](#affine3) | 31 | 11 | 0 | 1 | 4 | 72.1% |
+| [Affine2](#affine2) | 23 | 15 | 1 | 0 | 1 | 61.5% |
+| [Affine3](#affine3) | 31 | 11 | 1 | 0 | 3 | 74.4% |
 | [BVec2](#bvec2) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [BVec3](#bvec3) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [BVec4](#bvec4) | 19 | 4 | 0 | 0 | 0 | 82.6% |
@@ -20,9 +20,9 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [IVec3](#ivec3) | 221 | 73 | 10 | 0 | 9 | 76.0% |
 | [IVec4](#ivec4) | 474 | 72 | 10 | 0 | 9 | 87.1% |
 | [Mat2](#mat2) | 45 | 19 | 3 | 0 | 4 | 71.6% |
-| [Mat3](#mat3) | 58 | 20 | 8 | 1 | 4 | 75.9% |
-| [Mat4](#mat4) | 63 | 21 | 16 | 2 | 4 | 77.5% |
-| [Quat](#quat) | 49 | 15 | 3 | 7 | 11 | 70.3% |
+| [Mat3](#mat3) | 58 | 20 | 9 | 0 | 4 | 77.0% |
+| [Mat4](#mat4) | 63 | 21 | 18 | 0 | 4 | 79.4% |
+| [Quat](#quat) | 56 | 15 | 3 | 0 | 11 | 79.7% |
 | [UVec2](#uvec2) | 106 | 69 | 10 | 0 | 9 | 62.7% |
 | [UVec3](#uvec3) | 206 | 71 | 10 | 0 | 9 | 75.3% |
 | [UVec4](#uvec4) | 458 | 70 | 10 | 0 | 9 | 87.0% |
@@ -32,13 +32,13 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [camera::lh::proj::directx](#camera-lh-proj-directx) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::lh::proj::opengl](#camera-lh-proj-opengl) | 3 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::lh::proj::vulkan](#camera-lh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
-| [camera::lh::view](#camera-lh-view) | 4 | 0 | 4 | 4 | 0 | 66.7% |
+| [camera::lh::view](#camera-lh-view) | 8 | 0 | 4 | 0 | 0 | 100.0% |
 | [camera::rh::proj::directx](#camera-rh-proj-directx) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::proj::opengl](#camera-rh-proj-opengl) | 3 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::proj::vulkan](#camera-rh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
-| [camera::rh::view](#camera-rh-view) | 4 | 0 | 4 | 4 | 0 | 66.7% |
+| [camera::rh::view](#camera-rh-view) | 8 | 0 | 4 | 0 | 0 | 100.0% |
 | [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 34 | 100.0% |
-| **Total** | **2853** | **655** | **120** | **20** | **241** | **81.5%** |
+| **Total** | **2869** | **655** | **124** | **0** | **240** | **82.0%** |
 
 ## Affine2
 
@@ -81,7 +81,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `is_nan` | dropped | Fixed values are always finite and never NaN. |
 | method `to_cols_array` | ported | Same public name. |
 | method `to_cols_array_2d` | ported | Same public name. |
-| method `to_scale_angle_translation` | missing | Not found in the Cairo public surface. |
+| method `to_scale_angle_translation` | ported | Same public name. |
 | method `transform_point2` | ported | Same public name. |
 | method `transform_vector2` | ported | Same public name. |
 | method `write_cols_to_slice` | dropped | Slice APIs are deliberately omitted from fixed-size Cairo math types. |
@@ -105,7 +105,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `Display` | dropped | Display is deliberately omitted. |
 | impl `From<Affine3A> for Affine3` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
 | impl `Mul<Affine3>` | ported | Same public name. |
-| impl `Mul<Mat4>` | missing | Not found in the Cairo public surface. |
+| impl `Mul<Mat4>` | renamed | mul_mat4 — Heterogeneous multiplication is the named mul_mat4 method. |
 | impl `MulAssign<Affine3>` | ported | Same public name. |
 | impl `Product<Affine3>` | dropped | Iterator Sum/Product traits are deliberately omitted. |
 | method `abs_diff_eq` | ported | Same public name. |
@@ -144,7 +144,6 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 
 - method `inv_mul`
 - method `inverse_rigid`
-- method `mul_mat4`
 - method `quat_from_affine3`
 
 ## BVec2
@@ -1608,7 +1607,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `Mul<Mat3> for Fixed` | dropped | Scalar-on-the-left matrix operators are deliberately omitted. |
 | impl `Mul<Vec3>` | renamed | mul_vec3 — Matrix/vector multiplication is a named method. |
 | impl `Mul<Vec3A>` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
-| impl `MulAssign<Affine2> for Mat3` | missing | Not found in the Cairo public surface. |
+| impl `MulAssign<Affine2> for Mat3` | renamed | MulAssign<Affine2> — Cairo's assignment trait encodes the target as a generic parameter. |
 | impl `MulAssign<Fixed>` | ported | Same public name. |
 | impl `MulAssign<Mat3>` | ported | Same public name. |
 | impl `Neg` | ported | Same public name. |
@@ -1702,12 +1701,12 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | impl `Div<Mat4> for Fixed` | dropped | Scalar-on-the-left matrix operators are deliberately omitted. |
 | impl `DivAssign<Fixed>` | ported | Same public name. |
 | impl `From<Affine3> for Mat4` | ported | Same public name. |
-| impl `Mul<Affine3> for Mat4` | missing | Not found in the Cairo public surface. |
+| impl `Mul<Affine3> for Mat4` | renamed | mul_affine3 — Heterogeneous multiplication is the named mul_affine3 method. |
 | impl `Mul<Fixed>` | renamed | Mul_scalar — Heterogeneous scalar operators are named mul_scalar/div_scalar methods. |
 | impl `Mul<Mat4>` | ported | Same public name. |
 | impl `Mul<Mat4> for Fixed` | dropped | Scalar-on-the-left matrix operators are deliberately omitted. |
 | impl `Mul<Vec4>` | renamed | mul_vec4 — Matrix/vector multiplication is a named method. |
-| impl `MulAssign<Affine3> for Mat4` | missing | Not found in the Cairo public surface. |
+| impl `MulAssign<Affine3> for Mat4` | renamed | MulAssign<Affine3> — Cairo's assignment trait encodes the target as a generic parameter. |
 | impl `MulAssign<Fixed>` | ported | Same public name. |
 | impl `MulAssign<Mat4>` | ported | Same public name. |
 | impl `Neg` | ported | Same public name. |
@@ -1808,32 +1807,32 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | const `IDENTITY` | ported | Same public name. |
 | const `NAN` | dropped | NaN and infinity do not exist in the fixed-point scalar. |
 | impl `Add<Quat>` | ported | Same public name. |
-| impl `AddAssign<Quat>` | missing | Not found in the Cairo public surface. |
+| impl `AddAssign<Quat>` | ported | Same public name. |
 | impl `AsRef<[Fixed;4]>` | dropped | Borrowed slice views are deliberately omitted. |
 | impl `Default` | ported | Same public name. |
 | impl `Display` | dropped | Display is deliberately omitted. |
 | impl `Div<Fixed>` | renamed | Div_scalar — Quaternion/scalar operators are named mul_scalar/div_scalar methods. |
-| impl `DivAssign<Fixed>` | missing | Not found in the Cairo public surface. |
+| impl `DivAssign<Fixed>` | ported | Same public name. |
 | impl `From<Quat> for (Fixed,Fixed,Fixed,Fixed)` | ported | Same public name. |
 | impl `From<Quat> for [Fixed;4]` | ported | Same public name. |
 | impl `Mul<Fixed>` | renamed | Mul_scalar — Quaternion/scalar operators are named mul_scalar/div_scalar methods. |
 | impl `Mul<Quat>` | ported | Same public name. |
 | impl `Mul<Vec3>` | renamed | mul_vec3 — Quaternion/vector multiplication is the named mul_vec3 method. |
 | impl `Mul<Vec3A>` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
-| impl `MulAssign<Fixed>` | missing | Not found in the Cairo public surface. |
-| impl `MulAssign<Quat>` | missing | Not found in the Cairo public surface. |
+| impl `MulAssign<Fixed>` | ported | Same public name. |
+| impl `MulAssign<Quat>` | ported | Same public name. |
 | impl `Neg` | ported | Same public name. |
 | impl `Product` | dropped | Iterator Sum/Product traits are deliberately omitted. |
 | impl `Product<Quat>` | dropped | Iterator Sum/Product traits are deliberately omitted. |
 | impl `Sub<Quat>` | ported | Same public name. |
-| impl `SubAssign<Quat>` | missing | Not found in the Cairo public surface. |
+| impl `SubAssign<Quat>` | ported | Same public name. |
 | impl `Sum<Quat>` | dropped | Iterator Sum/Product traits are deliberately omitted. |
 | method `abs_diff_eq` | ported | Same public name. |
 | method `angle_between` | ported | Same public name. |
 | method `as_dquat` | dropped | Only Fixed, i32 and u32 vector families are in scope. |
 | method `conjugate` | ported | Same public name. |
 | method `dot` | ported | Same public name. |
-| method `from_affine3` | missing | Not found in the Cairo public surface. |
+| method `from_affine3` | ported | Same public name. |
 | method `from_affine3a` | dropped | Aligned SIMD types collapse into their unaligned Cairo type. |
 | method `from_array` | ported | Same public name. |
 | method `from_axis_angle` | ported | Same public name. |
@@ -1872,7 +1871,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | method `quat` | ported | Same public name. |
 | method `rotate_towards` | ported | Same public name. |
 | method `slerp` | ported | Same public name. |
-| method `slerp_long` | missing | Not found in the Cairo public surface. |
+| method `slerp_long` | ported | Same public name. |
 | method `to_array` | ported | Same public name. |
 | method `to_axis_angle` | ported | Same public name. |
 | method `to_euler` | ported | Same public name. |
@@ -4100,18 +4099,18 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 
 | Item | Status | Rule/detail |
 |---|---|---|
-| function `look_at_affine3` | missing | Not found in the Cairo public surface. |
+| function `look_at_affine3` | ported | Same public name. |
 | function `look_at_affine3a` | renamed | look_at — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_at_mat3` | ported | Same public name. |
 | function `look_at_mat3a` | renamed | look_at — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_at_mat4` | ported | Same public name. |
-| function `look_at_quat` | missing | Not found in the Cairo public surface. |
-| function `look_to_affine3` | missing | Not found in the Cairo public surface. |
+| function `look_at_quat` | ported | Same public name. |
+| function `look_to_affine3` | ported | Same public name. |
 | function `look_to_affine3a` | renamed | look_to — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_to_mat3` | ported | Same public name. |
 | function `look_to_mat3a` | renamed | look_to — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_to_mat4` | ported | Same public name. |
-| function `look_to_quat` | missing | Not found in the Cairo public surface. |
+| function `look_to_quat` | ported | Same public name. |
 
 ### Cairo-only items
 
@@ -4169,18 +4168,18 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 
 | Item | Status | Rule/detail |
 |---|---|---|
-| function `look_at_affine3` | missing | Not found in the Cairo public surface. |
+| function `look_at_affine3` | ported | Same public name. |
 | function `look_at_affine3a` | renamed | look_at — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_at_mat3` | ported | Same public name. |
 | function `look_at_mat3a` | renamed | look_at — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_at_mat4` | ported | Same public name. |
-| function `look_at_quat` | missing | Not found in the Cairo public surface. |
-| function `look_to_affine3` | missing | Not found in the Cairo public surface. |
+| function `look_at_quat` | ported | Same public name. |
+| function `look_to_affine3` | ported | Same public name. |
 | function `look_to_affine3a` | renamed | look_to — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_to_mat3` | ported | Same public name. |
 | function `look_to_mat3a` | renamed | look_to — Aligned Mat3A/Affine3A variants collapse into Mat3/Affine3. |
 | function `look_to_mat4` | ported | Same public name. |
-| function `look_to_quat` | missing | Not found in the Cairo public surface. |
+| function `look_to_quat` | ported | Same public name. |
 
 ### Cairo-only items
 

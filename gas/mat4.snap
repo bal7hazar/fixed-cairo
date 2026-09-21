@@ -46,7 +46,9 @@ bench_mat4::look_at_rh: 43890 370 82 0 0
 bench_mat4::look_to_lh: 33570 285 56 0 0
 bench_mat4::look_to_rh: 32970 279 56 0 0
 bench_mat4::mul: 36480 320 64 0 0
+bench_mat4::mul_affine3: 35280 308 64 0 0
 bench_mat4::mul_assign: 36480 320 64 0 0
+bench_mat4::mul_assign_affine3: 35280 308 64 0 0
 bench_mat4::mul_assign_scalar: 27800 232 64 0 0
 bench_mat4::mul_diagonal_scale: 27800 232 64 0 0
 bench_mat4::mul_mat4: 36480 320 64 0 0

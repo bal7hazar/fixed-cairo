@@ -533,6 +533,15 @@ def gen_tests(t):
             "vec2(f(0), f(0x100000000)), f(2)));",
             "assert!(Mat2Trait::from_angle(f(0)).abs_diff_eq(Mat2Trait::IDENTITY, f(0)));"])
     if n == 3:
+        test("test_mul_assign_affine2", [
+            f"let lhs = {M(mats[3])};",
+            f"let rhs_mat = {M(mats[4])};",
+            "let rhs = glam::affine2::Affine2Trait::from_mat3(rhs_mat);",
+            "let expected = lhs * Into::<glam::affine2::Affine2, Mat3>::into(rhs);",
+            "let mut actual = lhs;",
+            "actual *= rhs;",
+            eq("actual", "expected"),
+        ])
         rows = []
         for m in up[3:6]:
             for i in range(4):
@@ -636,6 +645,16 @@ def gen_tests(t):
             eq("Mat3Trait::from_scale(scale).transform_vector2(tr)",
                "vec2(scale.x * tr.x, scale.y * tr.y)")])
     if n == 4:
+        test("test_mul_affine3", [
+            f"let lhs = {M(mats[3])};",
+            f"let rhs_mat = {M(mats[4])};",
+            "let rhs = glam::affine3::Affine3Trait::from_mat4(rhs_mat);",
+            "let expected = lhs * Into::<glam::affine3::Affine3, Mat4>::into(rhs);",
+            eq("lhs.mul_affine3(rhs)", "expected"),
+            "let mut actual = lhs;",
+            "actual *= rhs;",
+            eq("actual", "expected"),
+        ])
         rows = [{"m": raws(b, 3), "t": rawv(VECS[0], 3),
                  "e": [[raws(b, 3)[i][j] if i < 3 and j < 3 else (ONE if i == j == 3 else 0)
                         for j in range(4)] for i in range(4)],

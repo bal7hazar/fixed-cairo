@@ -58,6 +58,66 @@ pub fn register(r: &mut Registry) {
         }
         lh::view::look_at_mat3(eye, center, up).into()
     });
+    r.add("lh_view_look_to_affine3", |a| -> Out {
+        let (eye, dir, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        if dir.cross(up).length() < 0.5 {
+            return skip("look_to_affine3: dir and up are nearly parallel");
+        }
+        lh::view::look_to_affine3(eye, dir, up).into()
+    });
+    r.add("rh_view_look_to_affine3", |a| -> Out {
+        let (eye, dir, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        if dir.cross(up).length() < 0.5 {
+            return skip("look_to_affine3: dir and up are nearly parallel");
+        }
+        rh::view::look_to_affine3(eye, dir, up).into()
+    });
+    r.add("lh_view_look_at_affine3", |a| -> Out {
+        let (eye, center, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        let d = center - eye;
+        if d.length() < 1.0 || d.normalize().cross(up).length() < 0.5 {
+            return skip("look_at_affine3: degenerate direction or nearly parallel up");
+        }
+        lh::view::look_at_affine3(eye, center, up).into()
+    });
+    r.add("rh_view_look_at_affine3", |a| -> Out {
+        let (eye, center, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        let d = center - eye;
+        if d.length() < 1.0 || d.normalize().cross(up).length() < 0.5 {
+            return skip("look_at_affine3: degenerate direction or nearly parallel up");
+        }
+        rh::view::look_at_affine3(eye, center, up).into()
+    });
+    r.add("lh_view_look_to_quat", |a| -> Out {
+        let (dir, up) = (a[0].dvec3(), a[1].dvec3());
+        if dir.cross(up).length() < 0.5 {
+            return skip("look_to_quat: dir and up are nearly parallel");
+        }
+        lh::view::look_to_quat(dir, up).into()
+    });
+    r.add("rh_view_look_to_quat", |a| -> Out {
+        let (dir, up) = (a[0].dvec3(), a[1].dvec3());
+        if dir.cross(up).length() < 0.5 {
+            return skip("look_to_quat: dir and up are nearly parallel");
+        }
+        rh::view::look_to_quat(dir, up).into()
+    });
+    r.add("lh_view_look_at_quat", |a| -> Out {
+        let (eye, center, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        let d = center - eye;
+        if d.length() < 1.0 || d.normalize().cross(up).length() < 0.5 {
+            return skip("look_at_quat: degenerate direction or nearly parallel up");
+        }
+        lh::view::look_at_quat(eye, center, up).into()
+    });
+    r.add("rh_view_look_at_quat", |a| -> Out {
+        let (eye, center, up) = (a[0].dvec3(), a[1].dvec3(), a[2].dvec3());
+        let d = center - eye;
+        if d.length() < 1.0 || d.normalize().cross(up).length() < 0.5 {
+            return skip("look_at_quat: degenerate direction or nearly parallel up");
+        }
+        rh::view::look_at_quat(eye, center, up).into()
+    });
     r.add("rh_opengl_perspective", |a| rh::proj::opengl::perspective(a[0].f(), a[1].f(), a[2].f(), a[3].f()));
     r.add("rh_opengl_orthographic", |a| rh::proj::opengl::orthographic(a[0].f(), a[1].f(), a[2].f(), a[3].f(), a[4].f(), a[5].f()));
     r.add("rh_opengl_frustum", |a| rh::proj::opengl::frustum(a[0].f(), a[1].f(), a[2].f(), a[3].f(), a[4].f(), a[5].f()));

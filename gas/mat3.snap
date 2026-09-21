@@ -45,6 +45,7 @@ bench_mat3::inverse_or_zero_none: 39530 61 4 0 0
 bench_mat3::inverse_or_zero_some: 39530 328 80 0 0
 bench_mat3::mul: 19640 170 36 0 0
 bench_mat3::mul_assign: 19640 170 36 0 0
+bench_mat3::mul_assign_affine2: 19040 164 36 0 0
 bench_mat3::mul_assign_scalar: 16040 134 36 0 0
 bench_mat3::mul_diagonal_scale: 16040 134 36 0 0
 bench_mat3::mul_mat3: 19640 170 36 0 0

@@ -754,6 +754,14 @@ def per_dimension(t):
             [GLAM_ASSERT + " The 3rd row of `self` must be `(0, 0, 1)`.", DOT_DEV.format(n=2)])
     if n == 4:
         v3 = Ty(3)
+        add("mul_affine3", "(self: Mat4, rhs: Affine3) -> Mat4",
+            "Multiplies this matrix by a 3D affine transform.",
+            "Self::mul_mat4(self, Into::<Affine3, Mat4>::into(rhs))", [OVF],
+            ["Cairo's core `Mul` is homogeneous, so the heterogeneous operator is named "
+             "`mul_affine3`.",
+             "The affine transform is embedded with the exact 4th row `(0, 0, 0, 1)`, then "
+             "the fused `Mat4` product is used."],
+            mirrors="impl Mul<Affine3> for glam::Mat4")
         add("from_mat3", "(m: Mat3) -> Mat4",
             "Creates an affine transformation matrix from the given 3x3 linear transformation "
             "matrix.\n\nThe resulting matrix can be used to transform 3D points and vectors. See "
@@ -968,6 +976,18 @@ def operators(t):
         impl(f"Mirrors `impl {tr}Assign<f32> for glam::{T}` (see `{T}Trait::{fn}_scalar`).",
              f"{T}{tr}AssignScalar of {tr}Assign<{T}, Fixed>",
              f"{fn}_assign(ref self: {T}, rhs: Fixed)", f"self = {T}Trait::{fn}_scalar(self, rhs);")
+    if n == 3:
+        impl("Multiplies by a 2D affine transform embedded in a 3x3 matrix.\n///\n"
+             "/// Mirrors `impl MulAssign<Affine2> for glam::Mat3`.",
+             "Mat3MulAssignAffine2 of MulAssign<Mat3, Affine2>",
+             "mul_assign(ref self: Mat3, rhs: Affine2)",
+             "self = self * Into::<Affine2, Mat3>::into(rhs);")
+    if n == 4:
+        impl("Multiplies by a 3D affine transform through `Mat4Trait::mul_affine3`.\n///\n"
+             "/// Mirrors `impl MulAssign<Affine3> for glam::Mat4`.",
+             "Mat4MulAssignAffine3 of MulAssign<Mat4, Affine3>",
+             "mul_assign(ref self: Mat4, rhs: Affine3)",
+             "self = Mat4Trait::mul_affine3(self, rhs);")
 
     def into(docline, name, src, dst, body):
         impl(docline, f"{name} of Into<{src}, {dst}>", f"into(self: {src}) -> {dst}", body)
@@ -1034,6 +1054,14 @@ def module_uses(t, code):
     if quat:
         uses.append("use crate::quat::"
                     + (quat[0] if len(quat) == 1 else "{" + ", ".join(quat) + "}") + ";")
+    for k in (2, 3):
+        items = [x for x in (f"Affine{k}", f"Affine{k}Trait")
+                 if re.search(rf"\b{x}\b(?!Trait)" if not x.endswith("Trait")
+                              else rf"\b{x}\b", code)]
+        if items:
+            uses.append(f"use crate::affine{k}::"
+                        + (items[0] if len(items) == 1 else "{" + ", ".join(items) + "}")
+                        + ";")
     for k in (2, 3, 4):
         for kind in ("Mat", "Vec"):
             if kind == "Mat" and k == t.n:
@@ -1246,6 +1274,20 @@ def bench_consts(t):
     out["CENTER"] = ("Vec3", vec_const(3, CENTER))
     out["M4"] = ("Mat4", mat_const(Ty(4), lambda i, j: ((5 + 2 * i, 2) if i == j
                                                         else OFF_A[(i + 2 * j) % 4])))
+    out["AFFINE2"] = (
+        "Affine2",
+        "Affine2 { matrix2: "
+        + mat_const(Ty(2), lambda i, j: ((5 + 2 * i, 2) if i == j
+                                         else OFF_A[(i + 2 * j) % 4]))
+        + ", translation: " + vec_const(2, [3, -2]) + " }",
+    )
+    out["AFFINE3"] = (
+        "Affine3",
+        "Affine3 { matrix3: "
+        + mat_const(Ty(3), lambda i, j: ((5 + 2 * i, 2) if i == j
+                                         else OFF_A[(i + 2 * j) % 4]))
+        + ", translation: " + vec_const(3, [3, -2, 1]) + " }",
+    )
     out["ROT"] = ("Quat", quat_const(ROT_Q))
     for branch, q in BRANCH_Q.items():
         out[f"TRS_{branch.upper()}"] = ("Mat4", trs_const(q, [3, -2, 1]))
@@ -1320,6 +1362,8 @@ def lib_benches(t):
         b("from_mat3_minor_last", [("m", "M3"), ("i", "2_usize"), ("j", "2_usize")], "A",
           "Mat2Trait::from_mat3_minor(m, i, j)")
     if n == 3:
+        b("mul_assign_affine2", [("a", "A"), ("c", "AFFINE2")], "A", "a",
+          pre="let mut a = a;\n    a *= c;")
         b("from_mat2", [("m", "M2")], "A", "Mat3Trait::from_mat2(m)")
         b("from_mat4", [("m", "M4")], "A", "Mat3Trait::from_mat4(m)")
         b("from_mat4_minor_first", [("m", "M4"), ("i", "0_usize"), ("j", "0_usize")], "A",
@@ -1340,6 +1384,9 @@ def lib_benches(t):
         b("transform_point2", [("a", "A"), ("v", "V2")], "V2", "a.transform_point2(v)")
         b("transform_vector2", [("a", "A"), ("v", "V2")], "V2", "a.transform_vector2(v)")
     if n == 4:
+        b("mul_affine3", [("a", "A"), ("c", "AFFINE3")], "A", "a.mul_affine3(c)")
+        b("mul_assign_affine3", [("a", "A"), ("c", "AFFINE3")], "A", "a",
+          pre="let mut a = a;\n    a *= c;")
         b("from_mat3", [("m", "M3")], "A", "Mat4Trait::from_mat3(m)")
         b("from_mat3_translation", [("m", "M3"), ("p", "TRANS3")], "A",
           "Mat4Trait::from_mat3_translation(m, p)")
@@ -1496,6 +1543,9 @@ def gen_bench(t):
                         + (items[0] if len(items) == 1 else "{" + ", ".join(items) + "}") + ";")
     if re.search(r"\bQuat\b(?!Trait)", body + decls):
         glam.append("use glam::quat::Quat;")
+    for k in (2, 3):
+        if re.search(rf"\bAffine{k}\b", body + decls):
+            glam.append(f"use glam::affine{k}::Affine{k};")
     uses += sorted(glam)
     return (f"{HEADER}//! Gas benchmarks of `glam::{t.mod}` and of the alternatives kept in "
             f"`benches::alt::{t.mod}`\n//! (the `alt_*` benches).\n//!\n"

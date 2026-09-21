@@ -23,7 +23,7 @@
 
 module = "mat4"
 package = "glam"
-imports = ["glam::mat4::Mat4Trait", "glam::mat3::Mat3"]
+imports = ["glam::affine3::Affine3", "glam::mat4::Mat4Trait", "glam::mat3::Mat3"]
 
 [[function]]
 name = "add_sub"
@@ -54,6 +54,15 @@ justification = "one `dot4` fused kernel per element: the exact sum of the four 
 edges = [
     [[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]]],
 ]
+
+[[function]]
+name = "mul_affine3"
+call = "{0}.mul_affine3({1})"
+args = [{ type = "Mat4", min = -100.0, max = 100.0 }, { type = "Affine3", min = -100.0, max = 100.0 }]
+ret = "Mat4"
+cases = 6
+tolerance = 1
+justification = "the affine operand is embedded exactly, then each result element uses one `dot4` fused kernel and one floor rescale: |diff| <= 1."
 
 [[function]]
 name = "mul_vec4"

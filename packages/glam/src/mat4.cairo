@@ -18,6 +18,7 @@ use fixed::wide::{
     RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideSub, dot3, dot3_add, dot4, mul_sub,
     wide_from, wide_mul,
 };
+use crate::affine3::Affine3;
 use crate::mat3::{Mat3, Mat3Trait};
 use crate::quat::{Quat, QuatTrait};
 use crate::vec3::{Vec3, Vec3Trait};
@@ -366,6 +367,17 @@ pub trait Mat4Trait {
     /// * The differences are computed exactly on 65 bits: unlike `(self - rhs).abs()` it
     ///   never overflows.
     fn abs_diff_eq(self: Mat4, rhs: Mat4, max_abs_diff: Fixed) -> bool;
+    /// Multiplies this matrix by a 3D affine transform.
+    ///
+    /// Mirrors `impl Mul<Affine3> for glam::Mat4`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// #### Deviations
+    /// * Cairo's core `Mul` is homogeneous, so the heterogeneous operator is named
+    ///   `mul_affine3`.
+    /// * The affine transform is embedded with the exact 4th row `(0, 0, 0, 1)`, then the
+    ///   fused `Mat4` product is used.
+    fn mul_affine3(self: Mat4, rhs: Affine3) -> Mat4;
     /// Creates an affine transformation matrix from the given 3x3 linear transformation
     /// matrix.
     ///
@@ -1241,6 +1253,11 @@ pub impl Mat4Impl of Mat4Trait {
     }
 
     #[inline(always)]
+    fn mul_affine3(self: Mat4, rhs: Affine3) -> Mat4 {
+        Self::mul_mat4(self, Into::<Affine3, Mat4>::into(rhs))
+    }
+
+    #[inline(always)]
     fn from_mat3(m: Mat3) -> Mat4 {
         Mat4 {
             x_axis: Vec4 { x: m.x_axis.x, y: m.x_axis.y, z: m.x_axis.z, w: Fixed { raw: 0 } },
@@ -1759,6 +1776,16 @@ pub impl Mat4DivAssignScalar of DivAssign<Mat4, Fixed> {
     #[inline(always)]
     fn div_assign(ref self: Mat4, rhs: Fixed) {
         self = Mat4Trait::div_scalar(self, rhs);
+    }
+}
+
+/// Multiplies by a 3D affine transform through `Mat4Trait::mul_affine3`.
+///
+/// Mirrors `impl MulAssign<Affine3> for glam::Mat4`.
+pub impl Mat4MulAssignAffine3 of MulAssign<Mat4, Affine3> {
+    #[inline(always)]
+    fn mul_assign(ref self: Mat4, rhs: Affine3) {
+        self = Mat4Trait::mul_affine3(self, rhs);
     }
 }
 

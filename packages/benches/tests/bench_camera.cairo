@@ -10,12 +10,14 @@
 use benches::alt::camera as alt;
 use benches::harness::{bb, sink};
 use fixed::fixed::Fixed;
+use glam::affine3::Affine3;
 use glam::camera::lh::proj::{directx as lh_directx, opengl as lh_opengl, vulkan as lh_vulkan};
 use glam::camera::lh::view as lh_view;
 use glam::camera::rh::proj::{directx as rh_directx, opengl as rh_opengl, vulkan as rh_vulkan};
 use glam::camera::rh::view as rh_view;
 use glam::mat3::Mat3;
 use glam::mat4::Mat4;
+use glam::quat::Quat;
 use glam::vec3::Vec3;
 use glam::vec4::Vec4;
 
@@ -33,6 +35,10 @@ const Z4: Vec4 = Vec4 {
 const Z3: Vec3 = Vec3 { x: Fixed { raw: 0 }, y: Fixed { raw: 0 }, z: Fixed { raw: 0 } };
 const M4: Mat4 = Mat4 { x_axis: Z4, y_axis: Z4, z_axis: Z4, w_axis: Z4 };
 const M3: Mat3 = Mat3 { x_axis: Z3, y_axis: Z3, z_axis: Z3 };
+const A3: Affine3 = Affine3 { matrix3: M3, translation: Z3 };
+const Q: Quat = Quat {
+    x: Fixed { raw: 0 }, y: Fixed { raw: 0 }, z: Fixed { raw: 0 }, w: Fixed { raw: 0x100000000 },
+};
 const AXIS: Vec3 = Vec3 {
     x: Fixed { raw: 0x6db6db6d }, y: Fixed { raw: 0xdb6db6db }, z: Fixed { raw: 0x49249249 },
 };
@@ -734,6 +740,138 @@ fn rh_view_look_to_mat3__op() {
     let u = bb(UP);
     let _r = bb(M3);
     sink(rh_view::look_to_mat3(d, u));
+}
+
+#[test]
+fn lh_view_look_at_affine3__base() {
+    let _e = bb(EYE);
+    let _c = bb(CENTER);
+    let _u = bb(UP);
+    sink(bb(A3));
+}
+
+#[test]
+fn lh_view_look_at_affine3__op() {
+    let e = bb(EYE);
+    let c = bb(CENTER);
+    let u = bb(UP);
+    let _r = bb(A3);
+    sink(lh_view::look_at_affine3(e, c, u));
+}
+
+#[test]
+fn lh_view_look_to_affine3__base() {
+    let _e = bb(EYE);
+    let _d = bb(AXIS);
+    let _u = bb(UP);
+    sink(bb(A3));
+}
+
+#[test]
+fn lh_view_look_to_affine3__op() {
+    let e = bb(EYE);
+    let d = bb(AXIS);
+    let u = bb(UP);
+    let _r = bb(A3);
+    sink(lh_view::look_to_affine3(e, d, u));
+}
+
+#[test]
+fn lh_view_look_at_quat__base() {
+    let _e = bb(EYE);
+    let _c = bb(CENTER);
+    let _u = bb(UP);
+    sink(bb(Q));
+}
+
+#[test]
+fn lh_view_look_at_quat__op() {
+    let e = bb(EYE);
+    let c = bb(CENTER);
+    let u = bb(UP);
+    let _r = bb(Q);
+    sink(lh_view::look_at_quat(e, c, u));
+}
+
+#[test]
+fn lh_view_look_to_quat__base() {
+    let _d = bb(AXIS);
+    let _u = bb(UP);
+    sink(bb(Q));
+}
+
+#[test]
+fn lh_view_look_to_quat__op() {
+    let d = bb(AXIS);
+    let u = bb(UP);
+    let _r = bb(Q);
+    sink(lh_view::look_to_quat(d, u));
+}
+
+#[test]
+fn rh_view_look_at_affine3__base() {
+    let _e = bb(EYE);
+    let _c = bb(CENTER);
+    let _u = bb(UP);
+    sink(bb(A3));
+}
+
+#[test]
+fn rh_view_look_at_affine3__op() {
+    let e = bb(EYE);
+    let c = bb(CENTER);
+    let u = bb(UP);
+    let _r = bb(A3);
+    sink(rh_view::look_at_affine3(e, c, u));
+}
+
+#[test]
+fn rh_view_look_to_affine3__base() {
+    let _e = bb(EYE);
+    let _d = bb(AXIS);
+    let _u = bb(UP);
+    sink(bb(A3));
+}
+
+#[test]
+fn rh_view_look_to_affine3__op() {
+    let e = bb(EYE);
+    let d = bb(AXIS);
+    let u = bb(UP);
+    let _r = bb(A3);
+    sink(rh_view::look_to_affine3(e, d, u));
+}
+
+#[test]
+fn rh_view_look_at_quat__base() {
+    let _e = bb(EYE);
+    let _c = bb(CENTER);
+    let _u = bb(UP);
+    sink(bb(Q));
+}
+
+#[test]
+fn rh_view_look_at_quat__op() {
+    let e = bb(EYE);
+    let c = bb(CENTER);
+    let u = bb(UP);
+    let _r = bb(Q);
+    sink(rh_view::look_at_quat(e, c, u));
+}
+
+#[test]
+fn rh_view_look_to_quat__base() {
+    let _d = bb(AXIS);
+    let _u = bb(UP);
+    sink(bb(Q));
+}
+
+#[test]
+fn rh_view_look_to_quat__op() {
+    let d = bb(AXIS);
+    let u = bb(UP);
+    let _r = bb(Q);
+    sink(rh_view::look_to_quat(d, u));
 }
 
 #[test]

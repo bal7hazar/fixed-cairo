@@ -8,12 +8,14 @@
 //! `tools/refgen` with `glam::dcamera` as the oracle).
 
 use fixed::fixed::{FRAC_PI_2, Fixed, FixedTrait, MAX, ONE, PI};
+use glam::affine3::Affine3Trait;
 use glam::camera::lh::proj::{directx as lh_directx, opengl as lh_opengl, vulkan as lh_vulkan};
 use glam::camera::lh::view as lh_view;
 use glam::camera::rh::proj::{directx as rh_directx, opengl as rh_opengl, vulkan as rh_vulkan};
 use glam::camera::rh::view as rh_view;
 use glam::mat3::Mat3;
 use glam::mat4::{Mat4, Mat4Trait};
+use glam::quat::QuatTrait;
 use glam::vec3::Vec3;
 use glam::vec4::Vec4;
 
@@ -542,6 +544,30 @@ fn test_view_matches_mat4() {
         assert_eq!(lh_view::look_to_mat3(d, u), rot(Mat4Trait::look_to_lh(e, d, u)));
         assert_eq!(rh_view::look_at_mat3(e, d, u), rot(Mat4Trait::look_at_rh(e, d, u)));
         assert_eq!(lh_view::look_at_mat3(e, d, u), rot(Mat4Trait::look_at_lh(e, d, u)));
+        assert_eq!(
+            rh_view::look_to_affine3(e, d, u),
+            Affine3Trait::from_mat4(rh_view::look_to_mat4(e, d, u)),
+        );
+        assert_eq!(
+            lh_view::look_to_affine3(e, d, u),
+            Affine3Trait::from_mat4(lh_view::look_to_mat4(e, d, u)),
+        );
+        assert_eq!(
+            rh_view::look_at_affine3(e, d, u),
+            Affine3Trait::from_mat4(rh_view::look_at_mat4(e, d, u)),
+        );
+        assert_eq!(
+            lh_view::look_at_affine3(e, d, u),
+            Affine3Trait::from_mat4(lh_view::look_at_mat4(e, d, u)),
+        );
+        assert_eq!(rh_view::look_to_quat(d, u), QuatTrait::from_mat3(rh_view::look_to_mat3(d, u)));
+        assert_eq!(lh_view::look_to_quat(d, u), QuatTrait::from_mat3(lh_view::look_to_mat3(d, u)));
+        assert_eq!(
+            rh_view::look_at_quat(e, d, u), QuatTrait::from_mat3(rh_view::look_at_mat3(e, d, u)),
+        );
+        assert_eq!(
+            lh_view::look_at_quat(e, d, u), QuatTrait::from_mat3(lh_view::look_at_mat3(e, d, u)),
+        );
     }
 }
 
@@ -839,4 +865,18 @@ fn test_look_at_center_is_eye() {
 #[should_panic(expected: 'Vec3: normalize zero')]
 fn test_look_to_parallel_up() {
     let _ = lh_view::look_to_mat3(v3(q(0), ONE, q(0)), v3(q(0), ONE, q(0)));
+}
+
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_at_affine3_center_is_eye() {
+    let e = v3(ONE, ONE, ONE);
+    let _ = rh_view::look_at_affine3(e, e, v3(q(0), ONE, q(0)));
+}
+
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_to_quat_parallel_up() {
+    let y = v3(q(0), ONE, q(0));
+    let _ = lh_view::look_to_quat(y, y);
 }

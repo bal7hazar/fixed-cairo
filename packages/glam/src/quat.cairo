@@ -15,12 +15,14 @@
 //! There is no NaN and no infinity: overflow, division by zero and the normalization of the zero
 //! quaternion panic.
 
+use core::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
 use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
     NormTrait, Recip, RecipTrait, WideAdd, WideMul, WideNarrow, WideSub, dot4, mul_sub, norm2_wide,
     norm3_wide, norm4, norm4_squared, norm4_wide, wide_mul,
 };
+use crate::affine3::Affine3;
 use crate::mat3::Mat3;
 use crate::mat4::Mat4;
 use crate::vec2::{Vec2, Vec2Trait};
@@ -45,8 +47,7 @@ use crate::vec4::{Vec4, Vec4Trait};
 /// * Not ported: `from_slice` / `write_to_slice` (no `Span` in fixed-size math), `Sum` /
 ///   `Product` (no iterator trait to implement), the by-reference operator overloads and
 ///   `as_dquat`. `from_euler` / `to_euler` are the extension trait
-///   `glam::euler::QuatEulerTrait`; `from_affine3` (task A3) is not ported yet: see
-///   `docs/PORTING_STATUS.md`.
+///   `glam::euler::QuatEulerTrait`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Quat {
     pub x: Fixed,
@@ -235,6 +236,19 @@ pub trait QuatTrait {
     /// #### Deviations
     /// * Takes the matrix by value; glam-rs takes `&Mat4`.
     fn from_mat4(mat: Mat4) -> Quat;
+    /// Creates a quaternion from the 3x3 rotation matrix inside a 3D affine transform.
+    ///
+    /// #### Preconditions
+    /// * Each column of `a.matrix3` must be normalized and the columns must be orthogonal; it
+    ///   is not checked. Scales, shears and other non-rotation transforms give an ill-defined
+    ///   quaternion, as in glam-rs.
+    ///
+    /// Mirrors `glam::Quat::from_affine3`.
+    /// #### Panics
+    /// * As [`QuatTrait::from_rotation_axes`].
+    /// #### Deviations
+    /// * Takes the affine transform by value; glam-rs takes `&Affine3`.
+    fn from_affine3(a: Affine3) -> Quat;
     /// Creates a quaternion rotation from a facing direction and an up direction, for a
     /// left-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=forward`.
     ///
@@ -540,6 +554,24 @@ pub trait QuatTrait {
     /// * `end` is not negated on the long path: the sign is folded into the interpolation
     ///   weight, which is exact and cannot overflow.
     fn slerp(self: Quat, end: Quat, s: Fixed) -> Quat;
+    /// Performs a spherical linear interpolation between `self` and `end`, preserving the
+    /// rotation direction even when that selects the longer arc.
+    ///
+    /// When `s` is zero the result is `self` and when `s` is one the result is `end`.
+    ///
+    /// #### Preconditions
+    /// * Both quaternions must be normalized; it is not checked.
+    ///
+    /// Mirrors `glam::Quat::slerp_long`.
+    /// #### Panics
+    /// * As [`QuatTrait::slerp`]. Antipodal inputs at `s = 0.5` reach a zero linear
+    ///   interpolant and panic with `'Quat: normalize zero'`, where glam-rs produces NaNs when
+    ///   assertions are disabled.
+    /// #### Deviations
+    /// * Shares the implementation and Q32.32 threshold of [`QuatTrait::slerp`], but does not
+    ///   flip `end` when the dot product is negative. The linear fallback tests `abs(dot)` as
+    ///   in glam-rs.
+    fn slerp_long(self: Quat, end: Quat, s: Fixed) -> Quat;
     /// Multiplies two quaternions: the combined rotation, `self` applied after `rhs`.
     ///
     /// #### Preconditions
@@ -733,6 +765,11 @@ pub impl QuatImpl of QuatTrait {
     }
 
     #[inline(always)]
+    fn from_affine3(a: Affine3) -> Quat {
+        Self::from_mat3(a.matrix3)
+    }
+
+    #[inline(always)]
     fn look_to_lh(dir: Vec3, up: Vec3) -> Quat {
         Self::look_to_rh(-dir, up)
     }
@@ -897,39 +934,11 @@ pub impl QuatImpl of QuatTrait {
     }
 
     fn slerp(self: Quat, end: Quat, s: Fixed) -> Quat {
-        // A rotation is represented by both `q` and `-q`, and the two paths to `end` differ:
-        // the dot product is made non-negative so that the short one is taken.
-        let d0 = Self::dot(self, end);
-        let neg = d0.is_negative();
-        let d = if neg {
-            -d0
-        } else {
-            d0
-        };
-        if d > NEAR_ONE {
-            // Above the threshold `sin(theta)` is too small to divide by: interpolate linearly.
-            lerp_impl(self, end, s, if neg {
-                -s
-            } else {
-                s
-            })
-        } else {
-            let theta = d.acos();
-            let scale1 = (theta * (F_ONE - s)).sin();
-            let sin2 = (theta * s).sin();
-            let scale2 = if neg {
-                -sin2
-            } else {
-                sin2
-            };
-            let r = RecipTrait::new(theta.sin());
-            Quat {
-                x: r.mul(wide_mul(self.x, scale1).add(wide_mul(end.x, scale2)).narrow()),
-                y: r.mul(wide_mul(self.y, scale1).add(wide_mul(end.y, scale2)).narrow()),
-                z: r.mul(wide_mul(self.z, scale1).add(wide_mul(end.z, scale2)).narrow()),
-                w: r.mul(wide_mul(self.w, scale1).add(wide_mul(end.w, scale2)).narrow()),
-            }
-        }
+        slerp_impl(self, end, s, true)
+    }
+
+    fn slerp_long(self: Quat, end: Quat, s: Fixed) -> Quat {
+        slerp_impl(self, end, s, false)
     }
 
     #[inline(always)]
@@ -1005,6 +1014,16 @@ pub impl QuatAdd of Add<Quat> {
     }
 }
 
+/// Component-wise `+=`, delegating to [`QuatAdd`].
+///
+/// Mirrors `impl AddAssign for glam::Quat`.
+pub impl QuatAddAssign of AddAssign<Quat, Quat> {
+    #[inline(always)]
+    fn add_assign(ref self: Quat, rhs: Quat) {
+        self = self + rhs;
+    }
+}
+
 /// Component-wise `-`. The difference is not normalized. Exact.
 ///
 /// Mirrors `impl Sub for glam::Quat`.
@@ -1014,6 +1033,16 @@ pub impl QuatSub of Sub<Quat> {
     #[inline(always)]
     fn sub(lhs: Quat, rhs: Quat) -> Quat {
         Quat { x: lhs.x - rhs.x, y: lhs.y - rhs.y, z: lhs.z - rhs.z, w: lhs.w - rhs.w }
+    }
+}
+
+/// Component-wise `-=`, delegating to [`QuatSub`].
+///
+/// Mirrors `impl SubAssign for glam::Quat`.
+pub impl QuatSubAssign of SubAssign<Quat, Quat> {
+    #[inline(always)]
+    fn sub_assign(ref self: Quat, rhs: Quat) {
+        self = self - rhs;
     }
 }
 
@@ -1029,6 +1058,36 @@ pub impl QuatMul of Mul<Quat> {
     #[inline(always)]
     fn mul(lhs: Quat, rhs: Quat) -> Quat {
         QuatImpl::mul_quat(lhs, rhs)
+    }
+}
+
+/// Hamilton-product `*=`, delegating to [`QuatTrait::mul_quat`].
+///
+/// Mirrors `impl MulAssign for glam::Quat`.
+pub impl QuatMulAssign of MulAssign<Quat, Quat> {
+    #[inline(always)]
+    fn mul_assign(ref self: Quat, rhs: Quat) {
+        self = QuatTrait::mul_quat(self, rhs);
+    }
+}
+
+/// Scalar `*=`, delegating to [`QuatTrait::mul_scalar`].
+///
+/// Mirrors `impl MulAssign<f32> for glam::Quat`.
+pub impl QuatMulAssignScalar of MulAssign<Quat, Fixed> {
+    #[inline(always)]
+    fn mul_assign(ref self: Quat, rhs: Fixed) {
+        self = QuatTrait::mul_scalar(self, rhs);
+    }
+}
+
+/// Scalar `/=`, delegating to [`QuatTrait::div_scalar`].
+///
+/// Mirrors `impl DivAssign<f32> for glam::Quat`.
+pub impl QuatDivAssignScalar of DivAssign<Quat, Fixed> {
+    #[inline(always)]
+    fn div_assign(ref self: Quat, rhs: Fixed) {
+        self = QuatTrait::div_scalar(self, rhs);
     }
 }
 
@@ -1167,6 +1226,47 @@ pub const ROTATE_TOWARDS_EPS: Fixed = Fixed { raw: 429497 };
 fn recip_of_twice_sqrt(v: Fixed) -> Recip {
     let s = v.sqrt();
     RecipTrait::new(s + s)
+}
+
+/// Shared body of `slerp` and `slerp_long`. A rotation is represented by both `q` and `-q`:
+/// the short path folds a negative dot into the second weight, while the long path preserves it.
+fn slerp_impl(a: Quat, b: Quat, s: Fixed, shortest: bool) -> Quat {
+    let d0 = QuatImpl::dot(a, b);
+    let flip = shortest && d0.is_negative();
+    let d = if flip {
+        -d0
+    } else {
+        d0
+    };
+    let near = if shortest {
+        d > NEAR_ONE
+    } else {
+        d.abs() > NEAR_ONE
+    };
+    if near {
+        // `sin(theta)` is too small to divide by: interpolate linearly as glam-rs does.
+        lerp_impl(a, b, s, if flip {
+            -s
+        } else {
+            s
+        })
+    } else {
+        let theta = d.acos();
+        let scale1 = (theta * (F_ONE - s)).sin();
+        let sin2 = (theta * s).sin();
+        let scale2 = if flip {
+            -sin2
+        } else {
+            sin2
+        };
+        let r = RecipTrait::new(theta.sin());
+        Quat {
+            x: r.mul(wide_mul(a.x, scale1).add(wide_mul(b.x, scale2)).narrow()),
+            y: r.mul(wide_mul(a.y, scale1).add(wide_mul(b.y, scale2)).narrow()),
+            z: r.mul(wide_mul(a.z, scale1).add(wide_mul(b.z, scale2)).narrow()),
+            w: r.mul(wide_mul(a.w, scale1).add(wide_mul(b.w, scale2)).narrow()),
+        }
+    }
 }
 
 /// `(a (1 - s) + b t).normalize()`: the `lerp_impl` of glam-rs with the sign of the shortest

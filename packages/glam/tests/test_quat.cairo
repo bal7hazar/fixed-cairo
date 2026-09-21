@@ -10,6 +10,7 @@
 use core::hash::{HashStateExTrait, HashStateTrait};
 use core::poseidon::PoseidonTrait;
 use fixed::fixed::{Fixed, FixedTrait};
+use glam::affine3::Affine3Trait;
 use glam::mat3::{Mat3Trait, mat3};
 use glam::mat4::Mat4Trait;
 use glam::quat::{Quat, QuatTrait, quat};
@@ -95,6 +96,23 @@ fn test_new_array_tuple() {
     let to_vec4: glam::vec4::Vec4 = q.into();
     assert_eq!(to_vec4, v);
     assert_eq!(q.xyz(), vec3(f(1), f(2), f(3)));
+
+    let rhs = quat(f(5), f(6), f(7), f(8));
+    let mut assigned = q;
+    assigned += rhs;
+    assert_eq!(assigned, q + rhs);
+    assigned = q;
+    assigned -= rhs;
+    assert_eq!(assigned, q - rhs);
+    assigned = q;
+    assigned *= rhs;
+    assert_eq!(assigned, q * rhs);
+    assigned = q;
+    assigned *= f(0x200000000);
+    assert_eq!(assigned, q.mul_scalar(f(0x200000000)));
+    assigned = q;
+    assigned /= f(0x200000000);
+    assert_eq!(assigned, q.div_scalar(f(0x200000000)));
 }
 
 #[test]
@@ -354,6 +372,15 @@ fn test_lerp_slerp_ends() {
     assert!(a.slerp(b, h).is_normalized());
     // The identity is the neutral end of an interpolation towards itself.
     assert!(a.slerp(a, h).abs_diff_eq(a, f(2)));
+
+    // `slerp_long` agrees on the positive-dot path and preserves a negative end instead of
+    // flipping it to the equivalent short-path representation.
+    let turn = QuatTrait::from_rotation_z(f(0x200000000));
+    assert_eq!(QuatTrait::IDENTITY.slerp_long(turn, h), QuatTrait::IDENTITY.slerp(turn, h));
+    let long = QuatTrait::IDENTITY.slerp_long(-turn, h);
+    let short = QuatTrait::IDENTITY.slerp(-turn, h);
+    assert!(!long.abs_diff_eq(short, f(1024)));
+    assert!(long.is_normalized());
 }
 /// from(3), to(3), from_rotation_arc(4), from_rotation_arc_colinear(4)
 #[cairofmt::skip]
@@ -549,6 +576,7 @@ fn test_from_rotation_axes_exact() {
     // The identity and the three half turns, exactly.
     assert_eq!(QuatTrait::from_mat3(Mat3Trait::IDENTITY), QuatTrait::IDENTITY);
     assert_eq!(QuatTrait::from_mat4(Mat4Trait::IDENTITY), QuatTrait::IDENTITY);
+    assert_eq!(QuatTrait::from_affine3(Affine3Trait::IDENTITY), QuatTrait::IDENTITY);
     assert_eq!(
         QuatTrait::from_rotation_axes(vec3(o, z, z), vec3(z, -o, z), vec3(z, z, -o)),
         quat(o, z, z, z),
@@ -655,6 +683,12 @@ fn test_normalize_zero() {
 #[should_panic(expected: 'Quat: normalize zero')]
 fn test_lerp_zero() {
     let _ = QuatTrait::ZERO.lerp(QuatTrait::ZERO, f(0x80000000));
+}
+
+#[test]
+#[should_panic(expected: 'Quat: normalize zero')]
+fn test_slerp_long_antipodal_midpoint() {
+    let _ = QuatTrait::IDENTITY.slerp_long(-QuatTrait::IDENTITY, f(0x80000000));
 }
 
 #[test]

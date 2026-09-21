@@ -10,6 +10,7 @@
 use benches::alt::mat3 as alt;
 use benches::harness::{bb, sink};
 use fixed::fixed::Fixed;
+use glam::affine2::Affine2;
 use glam::mat2::Mat2;
 use glam::mat3::{Mat3, Mat3Trait};
 use glam::mat4::Mat4;
@@ -99,6 +100,13 @@ const M4: Mat4 = Mat4 {
         z: Fixed { raw: -0x60000000 },
         w: Fixed { raw: 0x580000000 },
     },
+};
+const AFFINE2: Affine2 = Affine2 {
+    matrix2: Mat2 {
+        x_axis: Vec2 { x: Fixed { raw: 0x280000000 }, y: Fixed { raw: 0xc0000000 } },
+        y_axis: Vec2 { x: Fixed { raw: 0x40000000 }, y: Fixed { raw: 0x380000000 } },
+    },
+    translation: Vec2 { x: Fixed { raw: 0x300000000 }, y: Fixed { raw: -0x200000000 } },
 };
 const ROT: Quat = Quat {
     x: Fixed { raw: 0x33333333 },
@@ -763,6 +771,24 @@ fn div_assign_scalar__op() {
     let k = bb(K_THREE);
     let _r = bb(A);
     let a = Mat3Trait::div_scalar(a, k);
+    sink(a);
+}
+
+#[test]
+fn mul_assign_affine2__base() {
+    let _a = bb(A);
+    let _c = bb(AFFINE2);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn mul_assign_affine2__op() {
+    let a = bb(A);
+    let c = bb(AFFINE2);
+    let _r = bb(A);
+    let mut a = a;
+    a *= c;
     sink(a);
 }
 

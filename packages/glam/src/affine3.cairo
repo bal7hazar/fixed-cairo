@@ -33,10 +33,8 @@ use crate::vec4::Vec4;
 /// * Not ported: `from_cols_slice` / `write_cols_to_slice` (no `Span` in fixed-size math),
 ///   `Product` (no iterator trait to implement), by-reference operator overloads, casts to the
 ///   collapsed f32/f64 variants and the `Affine3A` conversions (there is no distinct type).
-/// * Heterogeneous `Mul` is not a core Cairo operator. `Affine3 * Mat4` is `mul_mat4`; spell
-///   `Mat4 * Affine3` as `mat4 * Into::<Affine3, Mat4>::into(affine)`.
-/// * `Quat::from_affine3` is the free function `affine3::quat_from_affine3`: `quat.cairo` is
-///   not part of this module.
+/// * Heterogeneous `Mul` is not a core Cairo operator. `Affine3 * Mat4` is `mul_mat4` and
+///   `Mat4 * Affine3` is `Mat4Trait::mul_affine3`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Affine3 {
     pub matrix3: Mat3,
@@ -640,12 +638,11 @@ pub impl Affine3IntoMat4 of Into<Affine3, Mat4> {
 /// #### Panics
 /// * As `QuatTrait::from_rotation_axes`.
 /// #### Deviations
-/// * A free function of this module instead of an associated function of `Quat`
-///   (`quat.cairo` belongs to another module); the numerics of `Quat::from_rotation_axes`.
+/// * Kept as a compatibility alias; new code should call `QuatTrait::from_affine3`.
 /// * The `glam_assert!` precondition (normalized columns) is not checked.
 #[inline(always)]
 pub fn quat_from_affine3(a: Affine3) -> Quat {
-    QuatTrait::from_rotation_axes(a.matrix3.x_axis, a.matrix3.y_axis, a.matrix3.z_axis)
+    QuatTrait::from_affine3(a)
 }
 
 /// One column of `Mat4::from(a) * c`: three `dot4` (the translation times `c.w` is the fourth
