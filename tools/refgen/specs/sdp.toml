@@ -1,0 +1,279 @@
+# Golden vectors of `glamx::sdp` (parry `SdpMatrix2/3`, rapier `AngularInertiaOps`, the
+# world-inertia kernel `R diag(d) R^T`). Oracles: tools/refgen/src/oracles/sdp.rs.
+# Format: tools/refgen/README.md. Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen sdp
+#
+# There is no f64 symmetric-matrix type to use as an oracle: a symmetric matrix travels as a full
+# `Mat3` / `Mat2` (the Cairo call reads its upper triangle with `from_sdp_matrix` and returns
+# `into_matrix()`), and the oracles are
+#
+# * integer oracles (tolerance 0): every output of the module is an exactly defined integer
+#   computation (fused sums floored once, one `Recip` rounded to nearest), recomputed in `i128`;
+# * `*_f64` entries: the literal parry formula on glam's `DMat3` / `DMat2`, with the propagated
+#   error bound of the fixed-point formulation as tolerance.
+#
+# Domains: f64 resolves half a raw ULP only below 2^20, and the integer oracles need their Q96.96
+# sums inside `i128`: the inputs of `quadform` are kept within |x| <= 16, the others within
+# |x| <= 100 (products) or the default domain (additions).
+#
+# Not covered here: `quadform3x2` (its call does not fit the 100-column golden line; it is checked
+# in `tests/test_sdp.cairo` to equal `quadform` of the zero-padded matrix bit for bit, both being
+# the floor of the same exact values), the constructors, `is_zero`, `from_sdp_matrix` /
+# `into_matrix` alone, the determinant returned by `inverse_and_get_determinant_unchecked` (the
+# code path of `inverse_unchecked`, plus one `mul_sub`) and the singular path of
+# `SdpMatrix2::inverse` (unit tests).
+
+module = "sdp"
+package = "glamx"
+imports = ["glamx::sdp::SdpMatrix3Trait as S3", "glamx::sdp::SdpMatrix2Trait as S2"]
+
+# ------------------------------------------------------------------------------------------------
+# SdpMatrix3
+
+[[function]]
+name = "add"
+call = "(S3::from_sdp_matrix({0}) + S3::from_sdp_matrix({1})).into_matrix()"
+args = ["Mat3", "Mat3"]
+ret = "Mat3"
+cases = 3
+tolerance = 0
+justification = "exact: component-wise i64 addition."
+
+[[function]]
+name = "sub"
+call = "(S3::from_sdp_matrix({0}) - S3::from_sdp_matrix({1})).into_matrix()"
+args = ["Mat3", "Mat3"]
+ret = "Mat3"
+cases = 3
+tolerance = 0
+justification = "exact: component-wise i64 subtraction."
+
+[[function]]
+name = "mul_scalar"
+call = "S3::from_sdp_matrix({0}).mul_scalar({1}).into_matrix()"
+args = [{ type = "Mat3", min = -100.0, max = 100.0 }, { type = "Fixed", min = -100.0, max = 100.0 }]
+ret = "Mat3"
+cases = 4
+tolerance = 0
+justification = "exact integer oracle: one floored `Fixed * Fixed` per component."
+
+[[function]]
+name = "add_diagonal"
+call = "S3::from_sdp_matrix({0}).add_diagonal({1}).into_matrix()"
+args = ["Mat3", "Fixed"]
+ret = "Mat3"
+cases = 3
+tolerance = 0
+justification = "exact: i64 additions on the diagonal."
+
+[[function]]
+name = "mul_vec"
+call = "S3::from_sdp_matrix({0}).mul_vec({1})"
+args = [{ type = "Mat3", min = -100.0, max = 100.0 }, { type = "Vec3", min = -100.0, max = 100.0 }]
+ret = "Vec3"
+cases = 8
+tolerance = 0
+justification = "exact integer oracle: one `dot3` kernel (floor of the exact sum) per component."
+edges = [[[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [3, -4, 5]], [[[2, 1, 0.5], [1, 3, -1], [0.5, -1, 4]], ["raw:1", "raw:-1", "raw:3"]]]
+
+[[function]]
+name = "transform_vector"
+oracle = "mul_vec"
+call = "S3::from_sdp_matrix({0}).transform_vector({1})"
+args = [{ type = "Mat3", min = -100.0, max = 100.0 }, { type = "Vec3", min = -100.0, max = 100.0 }]
+ret = "Vec3"
+cases = 3
+tolerance = 0
+justification = "the same function as `mul_vec`: exact integer oracle."
+
+[[function]]
+name = "mul_mat"
+call = "S3::from_sdp_matrix({0}).mul_mat({1})"
+args = [{ type = "Mat3", min = -100.0, max = 100.0 }, { type = "Mat3", min = -100.0, max = 100.0 }]
+ret = "Mat3"
+cases = 6
+tolerance = 0
+justification = "exact integer oracle: one `dot3` kernel per element."
+
+[[function]]
+name = "quadform"
+call = "S3::from_sdp_matrix({0}).quadform({1}).into_matrix()"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }, { type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Mat3"
+cases = 10
+tolerance = 0
+justification = "exact integer oracle: `s * m` kept at Q64.64, each output the floor of the exact sum of 9 triple products."
+edges = [
+    [[[2, 1, 0.5], [1, 3, -1], [0.5, -1, 4]], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
+    [[[2, 1, 0.5], [1, 3, -1], [0.5, -1, 4]], [[0, 1, 0], [-1, 0, 0], [0, 0, 1]]],
+]
+
+[[function]]
+name = "quadform_f64"
+call = "S3::from_sdp_matrix({0}).quadform({1}).into_matrix()"
+args = [{ type = "Mat3", min = -16.0, max = 16.0 }, { type = "Mat3", min = -16.0, max = 16.0 }]
+ret = "Mat3"
+cases = 6
+tolerance = 1
+justification = "glam `m^T * s * m` in f64 (|result| <= 9 * 16^3 < 2^20, f64 error below 1/4 ULP) vs one floor rescale of the exact value: |diff| <= 1."
+
+[[function]]
+name = "inverse_unchecked"
+oracle = "inverse"
+call = "S3::from_sdp_matrix({0}).inverse_unchecked().into_matrix()"
+args = [{ type = "Mat3", custom = "spd3" }]
+ret = "Mat3"
+cases = 10
+tolerance = 0
+justification = "exact integer oracle: floored cofactors and determinant (fused), one truncated 96-bit reciprocal, each output rounded to nearest."
+edges = [[[[1, 0, 0], [0, 1, 0], [0, 0, 1]]], [[[2, 0, 0], [0, 4, 0], [0, 0, 8]]], [[[2, 1, 0.5], [1, 3, -1], [0.5, -1, 4]]]]
+
+[[function.panics]]
+name = "singular"
+args = [[[1, 2, 3], [2, 4, 6], [3, 6, 9]]]
+expected = "SdpMatrix3: singular"
+
+[[function]]
+name = "inverse"
+call = "S3::from_sdp_matrix({0}).inverse().into_matrix()"
+args = [{ type = "Mat3", custom = "spd3" }]
+ret = "Mat3"
+cases = 4
+tolerance = 0
+justification = "exact integer oracle: the code path of `inverse_unchecked` on a regular matrix."
+
+[[function]]
+name = "inverse_singular"
+oracle = "inverse_zero"
+call = "S3::from_sdp_matrix({0}).inverse().into_matrix()"
+args = ["Mat3"]
+ret = "Mat3"
+cases = 0
+tolerance = 0
+justification = "exact: a zero floored determinant returns the zero matrix."
+edges = [[[[1, 2, 3], [2, 4, 6], [3, 6, 9]]], [[[0, 0, 0], [0, 0, 0], [0, 0, 0]]], [[[1, 0, 0], [0, 1, 0], [0, 0, 0]]], [[["raw:1", 0, 0], [0, "raw:1", 0], [0, 0, "raw:1"]]]]
+
+[[function]]
+name = "inverse_f64"
+call = "S3::from_sdp_matrix({0}).inverse_unchecked().into_matrix()"
+args = [{ type = "Mat3", custom = "spd3" }]
+ret = "Mat3"
+cases = 8
+tolerance = 18
+justification = "glam `DMat3::inverse` in f64. Eigenvalues in [1, 4] (generator `spd3`): det >= 1 - 3 ULP, |cofactor| <= 16. Floored cofactor (1 ULP / det) + floored determinant (|cofactor| / det^2 <= 16 ULP) + round to nearest (1/2) + f64 quantization (1/2): |diff| <= 18."
+
+[[function]]
+name = "from_rotated_diagonal_mat3"
+call = "S3::from_rotated_diagonal_mat3({0}, {1}).into_matrix()"
+args = [{ type = "Mat3", min = -100.0, max = 100.0 }, { type = "Vec3", min = -100.0, max = 100.0 }]
+ret = "Mat3"
+cases = 8
+tolerance = 0
+justification = "exact integer oracle: `r_ik * d_k` kept at Q64.64, each output the floor of the exact sum of 3 triple products (any matrix, not only rotations)."
+edges = [
+    [[[0, 1, 0], [-1, 0, 0], [0, 0, 1]], [2, 3, 5]],
+    [[[0, 0, 1], [1, 0, 0], [0, 1, 0]], ["raw:7", 3, 0.25]],
+]
+
+[[function]]
+name = "from_rotated_diagonal_mat3_f64"
+call = "S3::from_rotated_diagonal_mat3({0}, {1}).into_matrix()"
+args = [{ type = "Mat3", constraint = "rotation" }, { type = "Vec3", min = 0.0, max = 100.0 }]
+ret = "Mat3"
+cases = 6
+tolerance = 1
+justification = "glam `m * diag(d) * m^T` in f64 on the same quantized rotation (|result| <= 300, f64 error far below 1/2 ULP) vs one floor rescale of the exact value: |diff| <= 1."
+
+[[function]]
+name = "from_rotated_diagonal"
+call = "S3::from_rotated_diagonal({0}, {1}).into_matrix()"
+args = [{ type = "Quat", constraint = "normalized" }, { type = "Vec3", min = -100.0, max = 100.0 }]
+ret = "Mat3"
+cases = 10
+tolerance = 0
+justification = "exact integer oracle: `Mat3::from_quat` (one floor rescale per element), then the fused kernel of `from_rotated_diagonal_mat3`."
+edges = [
+    [[0, 0, 0, 1], [2, 3, 5]],
+    [[1, 0, 0, 0], [2, 3, 5]],
+    [[0, 0, 0.7071067811865476, 0.7071067811865476], [2, 3, 5]],
+]
+
+[[function]]
+name = "from_rotated_diagonal_f64"
+call = "S3::from_rotated_diagonal({0}, {1}).into_matrix()"
+args = [{ type = "Quat", constraint = "normalized" }, { type = "Vec3", min = 0.0, max = 4.0 }]
+ret = "Mat3"
+cases = 8
+tolerance = 16
+justification = "glam `from_quat(q) * diag(d) * from_quat(q)^T` in f64 on the same quantized quaternion. Each floored rotation element is within 1 ULP of glam's: output (i, j) moves by at most `sum_k d_k (|r_ik| + |r_jk|) <= 4 * 2 * sqrt(3) < 14` ULP, plus one floor rescale and the quantization: |diff| <= 16."
+
+# ------------------------------------------------------------------------------------------------
+# SdpMatrix2
+
+[[function]]
+name = "add2"
+call = "(S2::from_sdp_matrix({0}) + S2::from_sdp_matrix({1})).into_matrix()"
+args = ["Mat2", "Mat2"]
+ret = "Mat2"
+cases = 3
+tolerance = 0
+justification = "exact: component-wise i64 addition."
+
+[[function]]
+name = "sub2"
+call = "(S2::from_sdp_matrix({0}) - S2::from_sdp_matrix({1})).into_matrix()"
+args = ["Mat2", "Mat2"]
+ret = "Mat2"
+cases = 3
+tolerance = 0
+justification = "exact: component-wise i64 subtraction."
+
+[[function]]
+name = "mul_scalar2"
+call = "S2::from_sdp_matrix({0}).mul_scalar({1}).into_matrix()"
+args = [{ type = "Mat2", min = -100.0, max = 100.0 }, { type = "Fixed", min = -100.0, max = 100.0 }]
+ret = "Mat2"
+cases = 3
+tolerance = 0
+justification = "exact integer oracle: one floored `Fixed * Fixed` per component."
+
+[[function]]
+name = "add_diagonal2"
+call = "S2::from_sdp_matrix({0}).add_diagonal({1}).into_matrix()"
+args = ["Mat2", "Fixed"]
+ret = "Mat2"
+cases = 3
+tolerance = 0
+justification = "exact: i64 additions on the diagonal."
+
+[[function]]
+name = "mul_vec2"
+call = "S2::from_sdp_matrix({0}).mul_vec({1})"
+args = [{ type = "Mat2", min = -100.0, max = 100.0 }, { type = "Vec2", min = -100.0, max = 100.0 }]
+ret = "Vec2"
+cases = 6
+tolerance = 0
+justification = "exact integer oracle: one `dot2` kernel per component."
+
+[[function]]
+name = "inverse_unchecked2"
+call = "S2::from_sdp_matrix({0}).inverse_unchecked().into_matrix()"
+args = [{ type = "Mat2", custom = "spd2" }]
+ret = "Mat2"
+cases = 8
+tolerance = 0
+justification = "exact integer oracle: floored determinant (fused `mul_sub`), one truncated 96-bit reciprocal, each output rounded to nearest."
+edges = [[[[1, 0], [0, 1]]], [[[2, 1], [1, 3]]]]
+
+[[function.panics]]
+name = "singular"
+args = [[[1, 2], [2, 4]]]
+expected = "SdpMatrix2: singular"
+
+[[function]]
+name = "inverse2_f64"
+call = "S2::from_sdp_matrix({0}).inverse_unchecked().into_matrix()"
+args = [{ type = "Mat2", custom = "spd2" }]
+ret = "Mat2"
+cases = 6
+tolerance = 6
+justification = "glam `DMat2::inverse` in f64. Eigenvalues in [1, 4] (generator `spd2`): det >= 1 - 1 ULP, |cofactor| <= 4. Floored determinant (|cofactor| / det^2 <= 4 ULP) + round to nearest (1/2) + f64 quantization (1/2): |diff| <= 6."

@@ -125,7 +125,12 @@ fn imports(
         let (parent, item) = path
             .rsplit_once("::")
             .ok_or_else(|| format!("import {path:?} must be a full path such as `fixed::Fixed`"))?;
-        if item.contains(['{', '}', ' ']) {
+        // One item, optionally renamed (`path::Item as Alias`) to keep long calls within 100
+        // columns.
+        let bare = item.split_once(" as ").map_or(item, |(name, alias)| {
+            if alias.contains(' ') { " " } else { name }
+        });
+        if item.contains(['{', '}']) || bare.contains(' ') {
             return Err(format!(
                 "import {path:?}: list one item per entry, without braces"
             ));
