@@ -1,7 +1,7 @@
 # fixed
 
 Signed Q32.32 fixed-point scalar for provable game math: `Fixed { raw: i64 }`, fused kernels that
-rescale once per output (`wide`), and loop-free transcendental functions (`trig`).
+rescale once per output (`wide`), and loop-free transcendental functions (`trig`, `exp`).
 Shared by the Cairo ports of glam, nalgebra and rapier. No dependencies.
 
 Design, rounding and overflow policy: [`docs/DESIGN.md`](../../docs/DESIGN.md).
@@ -90,7 +90,43 @@ let rad = 45.into::<Fixed>().to_radians();
   regenerates the test vectors, `gen_trig.py check` verifies that the committed constants are up
   to date).
 
-## Gas (Sierra gas, inlined marginal cost, see `gas/fixed.snap` and `gas/wide.snap`)
+## Exponentials and logarithms (`fixed::exp`)
+
+```cairo
+use fixed::exp::ExpTrait;
+use fixed::{Fixed, HALF, TWO};
+
+let g = (-t / tau).exp();                     // decay factor
+let db = power.log10();                       // ln, log2, log10 share one core
+let r = TWO.powf(HALF);                       // sqrt(2) = exp2(0.5 * log2(2))
+let steps = x.log(TWO);                       // log(self, base), Rust argument order
+```
+
+- `exp exp2 exp_m1 ln log2 log10 ln_1p log powf`, named after Rust's `f32` (`sqrt` and `powi`
+  live in `FixedTrait`). `ExpTrait` is not re-exported at the crate root yet:
+  `use fixed::exp::ExpTrait;`.
+- **Domain**: `exp` / `exp2` panic with `'Fixed: exp overflow'` from `31 ln 2` (21.487) / `31`
+  on, and return `0` below `-33 ln 2` / `-33` (the result is below half an ULP); the logarithms
+  panic with `'Fixed: ln domain'` for `x <= 0`; `powf` panics with `'Fixed: powf domain'` for a
+  negative base and a non-integer exponent (Rust returns NaN), accepts `0^0 = 1` and `0^n = 0`
+  like Rust, and computes a negative base with an integer exponent as `(-1)^n |x|^n`.
+- **Loop-free**: `exp2` is one `DivRem` (`x = k/16 + g`), one lookup in a 1 024-entry `const`
+  table of `2^(k/16)` (the power of two and the segment together) and a degree-6 polynomial;
+  `exp` multiplies by a 56-bit `log2(e)` and reuses it. `log2` finds the exponent with an
+  unrolled binary search on constant thresholds (6 comparisons), then evaluates one of 32
+  degree-4 segments in the exact 62-bit mantissa; `ln` / `log10` rescale the same accumulator.
+  `powf` chains the two on the wide accumulators (`n * log2(x)` is never rounded to 32 bits).
+- **Accurate**: `exp2` / `exp` within 2.02 ULP below `2^16` and `7.2e-6 * 2^-30` relative
+  above; `log2` 0.75, `ln` 0.66, `log10` 0.57 ULP over the whole positive range; `powf` within
+  `0.44 * 2^-30` relative for `x` in `[2^-8, 2^8]`, `n` in `[-4, 4]`.
+- **Exact and monotone by construction**: `exp2(k) = 2^k`, `log2(2^k) = k`, `exp(0) = 1`,
+  `ln(1) = 0`; every function is non-decreasing (the table and the final rescale of `exp2` floor,
+  and every segment is sealed so that it ends at or below the start of the next one). The
+  logarithms round their final rescale to nearest; `exp2` / `exp` / `powf` floor.
+- Generated and mirrored bit for bit by [`scripts/gen_exp.py`](../../scripts/gen_exp.py)
+  (`sweep`, `tables`, `check`), like `trig`.
+
+## Gas (Sierra gas, inlined marginal cost, see `gas/fixed.snap`, `gas/wide.snap`, `gas/trig.snap` and `gas/exp.snap`)
 
 | op | gas | | kernel | gas |
 |---|---:|---|---|---:|
@@ -109,6 +145,9 @@ let rad = 45.into::<Fixed>().to_radians();
 | `sin_cos` | 31 300 | | `atan2` | 28 120 |
 | `tan` | 39 850 | | `acos` / `asin` | 27 390 / 27 660 |
 | `to_radians` / `to_degrees` | 1 680 | | `acos_clamped` | 28 930 |
+| `exp2` / `exp` | 19 160 / 20 840 | | `log2` / `ln` / `log10` | 19 520 |
+| `exp_m1` | 21 680 | | `ln_1p` | 21 280 |
+| `powf` | 47 630 | | `log` (two logarithms, one `/`) | 40 710 |
 
 ## Internals
 
