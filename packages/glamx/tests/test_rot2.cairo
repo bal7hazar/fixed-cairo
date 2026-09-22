@@ -141,15 +141,45 @@ fn test_interpolation() {
     let one = f(ONE_RAW);
     let half = f(0x80000000);
 
-    assert!(close_rot(a.lerp(b, zero), a, 3));
-    assert!(close_rot(a.lerp(b, one), b, 3));
-    assert!(drift(a.lerp(b, half)) <= 2);
+    assert_eq!(a.lerp(b, zero), a);
+    assert_eq!(a.lerp(b, one), b);
+    assert!(a.lerp(b, half).length_squared() < f(ONE_RAW));
+    assert!(drift(a.lerp(b, half).normalize()) <= 2);
     assert_eq!(a.slerp(b, zero), a);
     assert!(close_rot(a.slerp(b, one), b, 10));
     assert!(close_fixed(a.slerp(b, half).angle(), f(0x9999999a), 12));
 
-    // The normalized midpoint of opposite rotations is the documented near-zero fallback.
-    assert_eq!(Rot2Trait::IDENTITY.lerp(rot(-ONE_RAW, 0), half), Rot2Trait::IDENTITY);
+    // Not normalized, as upstream: the midpoint of `(1, 0)` and `(0, 1)` is `(0.5, 0.5)` and the
+    // midpoint of opposite rotations is the zero complex number, not a fallback.
+    let quarter = rot(0, ONE_RAW);
+    assert_eq!(Rot2Trait::IDENTITY.lerp(quarter, half), rot(0x80000000, 0x80000000));
+    assert_eq!(Rot2Trait::IDENTITY.lerp(rot(-ONE_RAW, 0), half), rot(0, 0));
+    assert_eq!(quarter.lerp(rot(0, -ONE_RAW), half), rot(0, 0));
+    // A normalized blend is spelled `lerp(..).normalize()`; the floored length puts it 1 ULP
+    // above `round(sqrt(0.5) * 2^32) = 3037000500`.
+    let mid = Rot2Trait::IDENTITY.lerp(quarter, half).normalize();
+    assert_eq!(mid, rot(3037000501, 3037000501));
+    // Extrapolation is not clamped.
+    assert_eq!(Rot2Trait::IDENTITY.lerp(quarter, f(2 * ONE_RAW)), rot(-ONE_RAW, 2 * ONE_RAW));
+}
+
+#[test]
+fn test_is_normalized_threshold_and_long_rotations() {
+    assert!(Rot2Trait::IDENTITY.is_normalized());
+    assert!(rot(0, -ONE_RAW).is_normalized());
+    assert!(Rot2Trait::new(f(0x33333333)).is_normalized());
+    assert!(!rot(0, 0).is_normalized());
+    assert!(!rot(0x80000000, 0x80000000).is_normalized());
+    // The floored squared lengths are 1 - 1025, 1 - 1024, 1 + 1024 and 1 + 1025 ULP.
+    assert!(!rot(4294966783, 65536).is_normalized());
+    assert!(rot(4294966784, 0).is_normalized());
+    assert!(rot(4294967808, 0).is_normalized());
+    assert!(!rot(4294967808, 65536).is_normalized());
+    // Total on long rotations: the wide sum of squares is compared without narrowing.
+    assert!(!MAX_ROT.is_normalized());
+    assert!(!rot(-0x8000000000000000, -0x8000000000000000).is_normalized());
+    assert!(!rot(0x7fffffffffffffff, 0).is_normalized());
+    assert!(!rot(0, -0x8000000000000000).is_normalized());
 }
 
 #[test]
@@ -249,15 +279,17 @@ fn fuzz_normalize(re: i64, im: i64) {
 fn fuzz_interpolation(a: i64, b: i64, t: u64) {
     let p = unit(a);
     let candidate = unit(b);
-    // Normalized lerp is ill-conditioned at the zero midpoint of opposite rotations. Keep the
-    // random property away from that region; the exact opposite case is pinned in the table.
+    // The raw blend of two unit rotations stays inside the unit circle (convexity). Its
+    // normalization is ill-conditioned at the zero midpoint of opposite rotations: keep that
+    // property away from the region; the exact opposite case is pinned in the table.
+    let s = f((t % 4294967297_u64).try_into().unwrap());
+    assert!(p.lerp(candidate, s).length_squared() <= f(ONE_RAW + 8));
     let q = if p.dot(candidate) < f(-0xf0000000) {
         p
     } else {
         candidate
     };
-    let s = f((t % 4294967297_u64).try_into().unwrap());
-    assert!(drift(p.lerp(q, s)) <= 32);
+    assert!(drift(p.lerp(q, s).normalize()) <= 32);
     assert!(drift(p.slerp(q, s)) <= 32);
 }
 
@@ -328,9 +360,9 @@ fn test_dot_panics_overflow() {
 }
 
 #[test]
-#[should_panic(expected: 'i64_sub Overflow')]
-fn test_lerp_panics_weight_overflow() {
-    let _ = Rot2Trait::IDENTITY.lerp(Rot2Trait::IDENTITY, f(-0x8000000000000000));
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_lerp_panics_overflow() {
+    let _ = Rot2Trait::IDENTITY.lerp(rot(-ONE_RAW, 0), f(0x7fffffffffffffff));
 }
 
 #[test]

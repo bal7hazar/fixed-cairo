@@ -37,6 +37,15 @@ fn check_fixed(actual: Fixed, ref d: Span<i64>, tol: i128, name: @ByteArray, cas
     check_raw(actual.raw, ref d, tol, name, case);
 }
 
+fn check_bool(actual: bool, ref d: Span<i64>, name: @ByteArray, case: usize) {
+    let value = if actual {
+        1
+    } else {
+        0
+    };
+    check_raw(value, ref d, 0, name, case);
+}
+
 fn check_vec2(actual: Rot2, ref d: Span<i64>, tol: i128, name: @ByteArray, case: usize) {
     check_fixed(actual.re, ref d, tol, name, case);
     check_fixed(actual.im, ref d, tol, name, case);
@@ -482,26 +491,66 @@ fn golden_rot2_dot() {
         case += 1;
     }
 }
-// rot2::lerp: 15 cases, tolerance 12 ULP - each linear component floors one fused two-product
-// sum, then normalization uses a floored length and one rounded shared division; the oracle
-// applies the same normalization and cases near the zero midpoint are skipped.
+// rot2::is_normalized: 15 cases, tolerance 0 ULP - exact comparison; random cases are far from
+// both thresholds (1024 raw ULP here, 2e-4 upstream), edge cases at the Q32.32 band are in the
+// unit tests.
 #[cairofmt::skip]
-const LERP_CASES: [i64; 105] = [
+const IS_NORMALIZED_CASES: [i64; 45] = [
+    4294967296, 0, 1,
+    0, -4294967296, 1,
+    2576980378, 3435973837, 1,
+    2147483648, 2147483648, 0,
+    0, 0, 0,
+    -4294967296, 951190876, 0,
+    -1422073081, 2952039725, 0,
+    -4294967296, -3495665134, 0,
+    -124628340, 71500044, 0,
+    0, 869795430, 0,
+    2903693000, -610262601, 0,
+    0, -2899974014, 0,
+    0, 0, 0,
+    -645551, -4294967296, 1,
+    -4193379434, -313, 0,
+];
+
+#[test]
+fn golden_rot2_is_normalized() {
+    let name: ByteArray = "rot2::is_normalized";
+    let mut d = IS_NORMALIZED_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_vec2(ref d);
+        let actual: bool = a0.is_normalized();
+        check_bool(actual, ref d, @name, case);
+        case += 1;
+    }
+}
+// rot2::lerp: 20 cases, tolerance 1 ULP - each component is `re + (rhs.re - re) * s` as upstream,
+// evaluated exactly and floored once (`Fixed::lerp`), versus round-to-nearest quantization of the
+// f64 oracle: |diff| <= 1, and exact at `s = 0`, `s = 1` and on dyadic midpoints. Not normalized:
+// the midpoint of antipodes is `(0, 0)`.
+#[cairofmt::skip]
+const LERP_CASES: [i64; 140] = [
     4294967296, 0, 0, 4294967296, 0, 4294967296, 0,
-    4294967296, 0, 0, 4294967296, 2147483648, 3037000500, 3037000500,
+    4294967296, 0, 0, 4294967296, 2147483648, 2147483648, 2147483648,
     4294967296, 0, 0, 4294967296, 4294967296, 0, 4294967296,
-    -2911525532, -3157493175, -4294967296, 13, 1648974115, -3739330635, -2112853632,
+    4294967296, 0, -4294967296, 0, 2147483648, 0, 0,
+    0, 4294967296, 0, -4294967296, 2147483648, 0, 0,
+    2576980378, 3435973837, -2576980378, -3435973837, 2147483648, 0, 0,
+    2576980378, 3435973837, 3435973837, -2576980378, 1073741824, 2791728743, 1932735283,
+    4294967296, 0, 0, 4294967296, 8589934592, -4294967296, 8589934592,
+    -2911525532, -3157493175, -4294967296, 13, 1648974115, -3442672687, -1945231433,
     -2990727860, -3082578619, 1502660314, -4023525327, 0, -2990727860, -3082578619,
-    -644878029, -4246277947, -869164, -4294967208, 308077293, -599134582, -4252973292,
-    0, -4294967296, 4294951356, 11701264, 4083361554, 4289800046, -210617281,
-    -3522783985, 2456977222, 0, -4294967296, 125, -3522784044, 2456977138,
+    -644878029, -4246277947, -869164, -4294967208, 308077293, -598683380, -4249770420,
+    0, -4294967296, 4294951356, 11701264, 4083361554, 4083346399, -200480979,
+    -3522783985, 2456977222, 0, -4294967296, 125, -3522783882, 2456977025,
     6, 4294967296, -3798603212, 2004334730, 0, 6, 4294967296,
-    -2704831033, -3336260355, -1673212281, 3955642140, 211474, -2704976030, -3336142795,
-    -4269666063, -465505943, -3407023794, -2615135358, 2254955634, -3963185121, -1655266678,
-    3448515702, -2560172557, 1679043660, -3953170431, 133, 3448515662, -2560172611,
-    3167637281, -2900485844, 1639285362, 3969822109, 3032250782, 3139423860, 2931000154,
-    -2813629779, -3245031824, 4271943606, -444119240, 1599020373, -341506678, -4281368620,
-    2795793136, 3260411755, 99924217, 4293804749, 2100943301, 1568263124, 3998411541,
+    -2704831033, -3336260355, -1673212281, 3955642140, 211474, -2704780239, -3335901319,
+    -4269666063, -465505943, -3407023794, -2615135358, 2254955634, -3816759228, -1594110337,
+    -56117610, -4294600667, 0, 4294967296, 26136, -56117269, -4294548397,
+    3448515702, -2560172557, 1679043660, -3953170431, 133, 3448515647, -2560172600,
+    3167637281, -2900485844, 1639285362, 3969822109, 3032250782, 2088619449, 1949957763,
+    -2813629779, -3245031824, 4271943606, -444119240, 1599020373, -175664128, -2202249429,
 ];
 
 #[test]
@@ -514,7 +563,7 @@ fn golden_rot2_lerp() {
         let a1 = next_vec2(ref d);
         let a2 = next_fixed(ref d);
         let actual: Rot2 = a0.lerp(a1, a2);
-        check_vec2(actual, ref d, 12, @name, case);
+        check_vec2(actual, ref d, 1, @name, case);
         case += 1;
     }
 }

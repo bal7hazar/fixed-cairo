@@ -328,6 +328,34 @@ fn length_squared__op() {
 }
 
 #[test]
+fn is_normalized_true__base() {
+    let _a = bb(A);
+    let r = bb(true);
+    sink(r);
+}
+
+#[test]
+fn is_normalized_true__op() {
+    let a = bb(A);
+    let _r = bb(true);
+    sink(a.is_normalized());
+}
+
+#[test]
+fn is_normalized_false__base() {
+    let _a = bb(WIDE);
+    let r = bb(true);
+    sink(r);
+}
+
+#[test]
+fn is_normalized_false__op() {
+    let a = bb(WIDE);
+    let _r = bb(true);
+    sink(a.is_normalized());
+}
+
+#[test]
 fn dot__base() {
     let _a = bb(A);
     let _b = bb(B);
@@ -359,6 +387,24 @@ fn lerp__op() {
     let s = bb(HALF);
     let _r = bb(A);
     sink(a.lerp(b, s));
+}
+
+#[test]
+fn alt_lerp_two_product__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _s = bb(HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_lerp_two_product__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let s = bb(HALF);
+    let _r = bb(A);
+    sink(alt::lerp_two_product(a, b, s));
 }
 
 #[test]

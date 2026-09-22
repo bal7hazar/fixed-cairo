@@ -10,7 +10,7 @@
 use core::ops::MulAssign;
 use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
-use fixed::wide::{WideAdd, WideNarrow, dot2, mul_sub, norm2, norm2_squared, normalize2, wide_mul};
+use fixed::wide::{dot2, is_unit2, mul_sub, norm2, norm2_squared, normalize2};
 use glam::mat2::Mat2;
 use glam::vec2::Vec2;
 
@@ -28,7 +28,8 @@ use glam::vec2::Vec2;
 /// Mirrors `glamx::Rot2`.
 /// #### Deviations
 /// * `Debug` is the derived Cairo formatting.
-/// * No `is_finite` / `is_nan`, `powf`, reference operator overloads, f32/f64 conversions,
+/// * No `identity()` function (use [`Rot2Trait::IDENTITY`]), `length_recip`, `is_finite` /
+///   `is_nan`, `powf`, reference operator overloads, f32/f64 conversions,
 ///   `approx`, serde-feature, bytemuck, rkyv or nalgebra glue.
 /// * `Rot2 * Vec2` is [`Rot2Trait::mul_vec2`] because Cairo's core `Mul<T>` is homogeneous.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
@@ -209,6 +210,22 @@ pub trait Rot2Trait {
     /// * The exact sum of the two products is rescaled once (floored).
     fn length_squared(self: Rot2) -> Fixed;
 
+    /// Returns whether `self` is of length `1` or not.
+    ///
+    /// Uses a precision threshold of `1024` raw ULP (`2^-22`) on the squared length.
+    ///
+    /// Mirrors `glamx::Rot2::is_normalized`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * The threshold is re-derived for Q32.32: `|length_squared - 1| <= 1024` raw ULP
+    ///   (inclusive), about `2.4e-7`, where glamx uses `< 2e-4`, as `glam::Vec2::is_normalized`.
+    ///   The squared length of the output of `normalize` is within 5 ULP of 1, so the margin is a
+    ///   hundredfold.
+    /// * The exact wide sum of squares is compared without narrowing, so long rotations return
+    ///   `false` instead of panicking.
+    fn is_normalized(self: Rot2) -> bool;
+
     /// Computes the dot product of `self` and `rhs`.
     ///
     /// Mirrors `glamx::Rot2::dot`.
@@ -218,17 +235,21 @@ pub trait Rot2Trait {
     /// * The exact sum of the two products is rescaled once (floored).
     fn dot(self: Rot2, rhs: Rot2) -> Fixed;
 
-    /// Performs normalized linear interpolation between `self` and `rhs` by `s`.
+    /// Performs a linear interpolation between `self` and `rhs` based on the value `s`.
+    ///
+    /// When `s` is `0`, the result is `self`; when `s` is `1`, the result is `rhs`. The result is
+    /// the component-wise blend and is **not** normalized: between distinct unit rotations its
+    /// length is below one, and the midpoint of opposite rotations is the zero complex number
+    /// `(0, 0)`. For rotations, [`Rot2Trait::slerp`] is usually preferred; a normalized linear
+    /// blend is spelled `a.lerp(b, s).normalize()`.
     ///
     /// Mirrors `glamx::Rot2::lerp`.
     /// #### Panics
-    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if `1 - s` leaves the scalar range.
-    /// * `'Fixed: overflow'` if an interpolated or normalized component does not fit the scalar
-    ///   range.
+    /// * `'Fixed: overflow'` if an interpolated component does not fit the scalar range.
     /// #### Deviations
-    /// * The interpolated complex number is normalized, as required by the brief; glamx 0.3.1
-    ///   returns the unnormalized linear combination.
-    /// * Each interpolated component is one exact two-product Q64.64 sum, floored once.
+    /// * None in semantics. Each component is `Fixed::lerp`: `re + (rhs.re - re) * s` (upstream's
+    ///   formula) evaluated exactly and floored once, so `s = 0` and `s = 1` return `self` and
+    ///   `rhs` exactly.
     fn lerp(self: Rot2, rhs: Rot2, s: Fixed) -> Rot2;
 
     /// Spherically interpolates between two rotations along the shortest signed arc.
@@ -371,18 +392,18 @@ pub impl Rot2Impl of Rot2Trait {
     }
 
     #[inline(always)]
+    fn is_normalized(self: Rot2) -> bool {
+        is_unit2(self.re, self.im, 1024)
+    }
+
+    #[inline(always)]
     fn dot(self: Rot2, rhs: Rot2) -> Fixed {
         dot2(self.re, rhs.re, self.im, rhs.im)
     }
 
+    #[inline(always)]
     fn lerp(self: Rot2, rhs: Rot2, s: Fixed) -> Rot2 {
-        let t = F_ONE - s;
-        Self::normalize(
-            Rot2 {
-                re: wide_mul(self.re, t).add(wide_mul(rhs.re, s)).narrow(),
-                im: wide_mul(self.im, t).add(wide_mul(rhs.im, s)).narrow(),
-            },
-        )
+        Rot2 { re: self.re.lerp(rhs.re, s), im: self.im.lerp(rhs.im, s) }
     }
 
     fn slerp(self: Rot2, other: Rot2, t: Fixed) -> Rot2 {

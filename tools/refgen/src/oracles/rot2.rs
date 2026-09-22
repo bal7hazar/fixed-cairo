@@ -70,13 +70,8 @@ pub fn register(r: &mut Registry) {
         (p.length(), p.length_squared())
     });
     r.add("dot", |a| rot(&a[0]).dot(rot(&a[1])));
-    r.add("lerp", |a| -> Out {
-        let (p, q, s) = (rot(&a[0]), rot(&a[1]), a[2].f());
-        if p.dot(q) < -0.9 {
-            return skip("normalized lerp is ill-conditioned near opposite rotations");
-        }
-        out(p.lerp(q, s).normalize()).into()
-    });
+    r.add("is_normalized", |a| rot(&a[0]).is_normalized());
+    r.add("lerp", |a| out(rot(&a[0]).lerp(rot(&a[1]), a[2].f())));
     r.add("slerp", |a| out(rot(&a[0]).slerp(&rot(&a[1]), a[2].f())));
     r.add("angle_between", |a| rot(&a[0]).angle_between(&rot(&a[1])));
     r.add("rotate_towards", |a| -> Out {
