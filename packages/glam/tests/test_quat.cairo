@@ -51,12 +51,17 @@ fn v2(r: Span<i64>, o: u32) -> Vec2 {
 
 // Fuzz helpers.
 
-/// A unit quaternion from four raw fuzz inputs: a rotation of `|d| mod tau` around the
+/// A rotation quaternion from four raw fuzz inputs: a rotation of `|d| mod tau` around the
 /// normalized `(a, b, c)` (the X axis when it is zero).
-fn unit_q(a: i64, b: i64, c: i64, d: i64) -> Quat {
+fn rotation_q(a: i64, b: i64, c: i64, d: i64) -> Quat {
     let axis = vec3(f(a % 0x400000000), f(b % 0x400000000), f(c % 0x400000000))
         .normalize_or(Vec3Trait::X);
     QuatTrait::from_axis_angle(axis, f(d % 26986075409))
+}
+
+/// A unit quaternion from four raw fuzz inputs.
+fn unit_q(a: i64, b: i64, c: i64, d: i64) -> Quat {
+    rotation_q(a, b, c, d).normalize()
 }
 
 /// `|q.length_squared() - 1|`, in raw ULP.
@@ -331,6 +336,25 @@ fn test_norm() {
         assert!(qt(r, 8).is_normalized());
         assert_eq!(qt(r, 0).dot(qt(r, 0)), qt(r, 0).length_squared());
     }
+}
+
+#[test]
+fn test_is_normalized_boundaries_and_extremes() {
+    // These have squared lengths exactly `1 +- 1024` and `1 +- 1025` raw ULP.
+    let upper_in = quat(f(0), f(0), f(0), f(0x100000200));
+    let upper_out = quat(f(0x10000), f(0), f(0), f(0x100000200));
+    let lower_in = quat(f(0), f(0), f(0), f(0xfffffe00));
+    let lower_out = quat(f(0x10000), f(0), f(0), f(0xfffffdff));
+    assert!(upper_in.is_normalized());
+    assert!(!upper_out.is_normalized());
+    assert!(lower_in.is_normalized());
+    assert!(!lower_out.is_normalized());
+    assert!(!MAXQ.is_normalized());
+    assert!(!MINQ.is_normalized());
+
+    // The signed comparison preserves `abs(w) > threshold` without overflowing at `MIN`.
+    assert!(MAXQ.is_near_identity());
+    assert!(MINQ.is_near_identity());
 }
 /// a(4), b(4), s, lerp(4), slerp(4)
 #[cairofmt::skip]
@@ -723,12 +747,6 @@ fn test_length_overflow() {
 
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
-fn test_is_normalized_overflow() {
-    let _ = MAXQ.is_normalized();
-}
-
-#[test]
-#[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_quat_overflow() {
     let _ = MAXQ * MAXQ;
 }
@@ -781,12 +799,6 @@ fn test_neg_underflow() {
 #[should_panic(expected: 'i64_neg Underflow')]
 fn test_conjugate_underflow() {
     let _ = MINQ.conjugate();
-}
-
-#[test]
-#[should_panic(expected: 'Fixed: overflow')]
-fn test_is_near_identity_overflow() {
-    let _ = MINQ.is_near_identity();
 }
 
 #[test]
@@ -921,6 +933,18 @@ fn fuzz_mul_quat_drift(a: i64, b: i64, c: i64, d: i64) {
     }
     assert!(drift(q) <= 1024);
     assert!(q.is_normalized());
+}
+
+#[test]
+fn test_mul_quat_drift_reported_fuzz_case() {
+    let q = rotation_q(
+        301970536359324718, 6315160356890705506, 7487908446869867027, 5900780714928847550,
+    );
+    // The normalized axis is 1 ULP short and `sin^2 + cos^2` is 2 ULP short. The component
+    // multiplies make this constructor result 5 ULP short, within `from_axis_angle`'s documented
+    // per-component bound but outside the old fuzz helper's assumed 4-ULP length bound.
+    assert_eq!(drift(q), 5);
+    assert_eq!(drift(q.normalize()), 1);
 }
 
 /// All `Fixed::MAX`.

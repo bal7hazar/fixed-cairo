@@ -958,6 +958,78 @@ fn slerp_long__near__op() {
 }
 
 #[test]
+fn alt_slerp_shared_call__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_slerp_shared_call__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::slerp_shared_call(a, b, k));
+}
+
+#[test]
+fn alt_slerp_hoisted_match__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_slerp_hoisted_match__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::slerp_hoisted_match(a, b, k));
+}
+
+#[test]
+fn alt_slerp_duplicated_body__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_HALF);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_slerp_duplicated_body__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_HALF);
+    let _r = bb(A);
+    sink(alt::slerp_duplicated_body(a, b, k));
+}
+
+#[test]
+fn alt_rotate_towards_recompute__base() {
+    let _a = bb(A);
+    let _b = bb(B);
+    let _k = bb(K_TENTH);
+    let r = bb(A);
+    sink(r);
+}
+
+#[test]
+fn alt_rotate_towards_recompute__op() {
+    let a = bb(A);
+    let b = bb(B);
+    let k = bb(K_TENTH);
+    let _r = bb(A);
+    sink(alt::rotate_towards_recompute(a, b, k));
+}
+
+#[test]
 fn mul_quat__base() {
     let _a = bb(A);
     let _b = bb(B);

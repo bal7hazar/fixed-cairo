@@ -63,7 +63,7 @@ Same operations on a sign-magnitude `{mag, sign}` scalar (prototype figures of [
 | `glam` | `Mat4 * Mat4` | 36 480 | 320 | 64 |
 | `glam` | `Mat4::inverse` | 102 610 | 868 | 208 |
 | `glam` | `Quat * Quat` | 10 040 | 88 | 16 |
-| `glam` | `Quat::slerp` | 124 060 | 932 | 225 |
+| `glam` | `Quat::slerp` | 122 180 | 923 | 225 |
 | `glam` | `Affine3::transform_point3` | 7 760 | 68 | 12 |
 | `glamx` | `Pose3::transform_point` | 10 260 | 93 | 12 |
 

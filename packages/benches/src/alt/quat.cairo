@@ -4,7 +4,7 @@
 
 use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
-use fixed::wide::{NormTrait, RecipTrait, mul_add, norm3_wide};
+use fixed::wide::{NormTrait, RecipTrait, WideAdd, WideNarrow, mul_add, norm3_wide, wide_mul};
 use glam::quat::{Quat, QuatTrait};
 use glam::vec3::{Vec3, Vec3Trait};
 
@@ -113,6 +113,137 @@ pub fn slerp_fixed_recip(lhs: Quat, end: Quat, s: Fixed) -> Quat {
     }
 }
 
+/// Alternative organization of `slerp` / `slerp_long`: the pre-#R1d non-inlined shared helper.
+/// It saves bytecode when both entry points are linked, at the cost of a second call boundary:
+/// 125 260 gas / 944 steps against 122 180 / 923 for the shipped inlined template.
+#[inline(never)]
+pub fn slerp_shared_call(lhs: Quat, end: Quat, s: Fixed) -> Quat {
+    slerp_shared_impl(lhs, end, s, true)
+}
+
+#[inline(never)]
+fn slerp_shared_impl(a: Quat, b: Quat, s: Fixed, shortest: bool) -> Quat {
+    let d0 = QuatTrait::dot(a, b);
+    let flip = shortest && d0.is_negative();
+    let d = if flip {
+        -d0
+    } else {
+        d0
+    };
+    let near = if shortest {
+        d > NEAR_ONE
+    } else {
+        d.abs() > NEAR_ONE
+    };
+    if near {
+        alt_lerp_impl(a, b, s, if flip {
+            -s
+        } else {
+            s
+        })
+    } else {
+        alt_slerp_weights(a, b, s, d.acos(), flip)
+    }
+}
+
+/// Alternative organization with the `shortest` match hoisted around the specialized bodies.
+/// The helper remains non-inlined, so this tests whether removing its internal boolean branches
+/// offsets the call boundary: 123 580 gas / 938 steps, still slower than the inlined template.
+#[inline(never)]
+pub fn slerp_hoisted_match(lhs: Quat, end: Quat, s: Fixed) -> Quat {
+    slerp_match_impl(lhs, end, s, true)
+}
+
+#[inline(never)]
+fn slerp_match_impl(a: Quat, b: Quat, s: Fixed, shortest: bool) -> Quat {
+    match shortest {
+        true => alt_slerp_short_body(a, b, s),
+        false => alt_slerp_long_body(a, b, s),
+    }
+}
+
+/// Alternative organization with a duplicated, specialized `slerp` body. This has one call
+/// boundary like the shipped inlined-template form and ties it at 122 180 gas / 923 steps, but
+/// requires maintaining two large bodies.
+#[inline(never)]
+pub fn slerp_duplicated_body(lhs: Quat, end: Quat, s: Fixed) -> Quat {
+    alt_slerp_short_body(lhs, end, s)
+}
+
+#[inline(always)]
+fn alt_slerp_short_body(a: Quat, b: Quat, s: Fixed) -> Quat {
+    let d0 = QuatTrait::dot(a, b);
+    let flip = d0.is_negative();
+    let d = if flip {
+        -d0
+    } else {
+        d0
+    };
+    if d > NEAR_ONE {
+        alt_lerp_impl(a, b, s, if flip {
+            -s
+        } else {
+            s
+        })
+    } else {
+        alt_slerp_weights(a, b, s, d.acos(), flip)
+    }
+}
+
+#[inline(always)]
+fn alt_slerp_long_body(a: Quat, b: Quat, s: Fixed) -> Quat {
+    let d = QuatTrait::dot(a, b);
+    if d.abs() > NEAR_ONE {
+        alt_lerp_impl(a, b, s, s)
+    } else {
+        alt_slerp_weights(a, b, s, d.acos(), false)
+    }
+}
+
+#[inline(always)]
+fn alt_slerp_weights(a: Quat, b: Quat, s: Fixed, theta: Fixed, flip: bool) -> Quat {
+    let scale1 = (theta * (F_ONE - s)).sin();
+    let sin2 = (theta * s).sin();
+    let scale2 = if flip {
+        -sin2
+    } else {
+        sin2
+    };
+    let r = RecipTrait::new(theta.sin());
+    Quat {
+        x: r.mul(wide_mul(a.x, scale1).add(wide_mul(b.x, scale2)).narrow()),
+        y: r.mul(wide_mul(a.y, scale1).add(wide_mul(b.y, scale2)).narrow()),
+        z: r.mul(wide_mul(a.z, scale1).add(wide_mul(b.z, scale2)).narrow()),
+        w: r.mul(wide_mul(a.w, scale1).add(wide_mul(b.w, scale2)).narrow()),
+    }
+}
+
+#[inline(always)]
+fn alt_lerp_impl(a: Quat, b: Quat, s: Fixed, t: Fixed) -> Quat {
+    let u = F_ONE - s;
+    QuatTrait::normalize(
+        Quat {
+            x: wide_mul(a.x, u).add(wide_mul(b.x, t)).narrow(),
+            y: wide_mul(a.y, u).add(wide_mul(b.y, t)).narrow(),
+            z: wide_mul(a.z, u).add(wide_mul(b.z, t)).narrow(),
+            w: wide_mul(a.w, u).add(wide_mul(b.w, t)).narrow(),
+        },
+    )
+}
+
+/// The pre-#R1d `rotate_towards`: `angle_between` and `slerp` each compute their own dot and
+/// inverse cosine. It costs 160 840 gas / 1 259 steps against 129 100 / 1 007 when those values
+/// are shared. (The committed pre-R1d row was 162 720 / 1 268 before `slerp` was inlined.)
+#[inline(never)]
+pub fn rotate_towards_recompute(lhs: Quat, rhs: Quat, max_angle: Fixed) -> Quat {
+    let angle = QuatTrait::angle_between(lhs, rhs);
+    if angle <= ROTATE_TOWARDS_EPS {
+        rhs
+    } else {
+        QuatTrait::slerp(lhs, rhs, (max_angle / angle).clamp(F_NEG_ONE, F_ONE))
+    }
+}
+
 /// Alternative to `Quat::lerp`. The literal glam-rs `self * (1 - s) + end * s` (two rounded
 /// products per component) before the shared normalization, with `end` negated on the long
 /// path: 31 140 gas against 24 120.
@@ -198,6 +329,9 @@ pub fn from_rotation_axes_fixed_recip(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) 
 /// `1`.
 const F_ONE: Fixed = Fixed { raw: 0x100000000 };
 
+/// `-1`.
+const F_NEG_ONE: Fixed = Fixed { raw: -0x100000000 };
+
 /// `1 / 2`.
 const F_HALF: Fixed = Fixed { raw: 0x80000000 };
 
@@ -209,3 +343,6 @@ const AXIS_EPS: Fixed = Fixed { raw: 0x10000 };
 
 /// `2 acos(1 - 1e-6) = 2.83e-3` rad, as `fixed::trig::acos` computes it.
 const NEAR_IDENTITY_ANGLE: Fixed = Fixed { raw: 12148048 };
+
+/// `1e-4` rad quantized, the `rotate_towards` direct-target threshold.
+const ROTATE_TOWARDS_EPS: Fixed = Fixed { raw: 429497 };

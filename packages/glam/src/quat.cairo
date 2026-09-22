@@ -19,8 +19,8 @@ use core::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
 use fixed::fixed::{Fixed, FixedTrait};
 use fixed::trig::TrigTrait;
 use fixed::wide::{
-    NormTrait, Recip, RecipTrait, WideAdd, WideMul, WideNarrow, WideSub, dot4, mul_sub, norm2_wide,
-    norm3_wide, norm4, norm4_squared, norm4_wide, wide_mul,
+    NormTrait, Recip, RecipTrait, WideAdd, WideMul, WideNarrow, WideSub, dot4, is_unit4, mul_sub,
+    norm2_wide, norm3_wide, norm4, norm4_squared, norm4_wide, wide_mul,
 };
 use crate::affine3::Affine3;
 use crate::mat3::Mat3;
@@ -453,21 +453,23 @@ pub trait QuatTrait {
     ///
     /// Mirrors `glam::Quat::is_normalized`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the squared length does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * The threshold is 1024 raw ULP (`2^-22`) on the squared length, as for `Vec4`, where
     ///   glam-rs uses `2e-4`: a quaternion normalized by this module is within a few ULP of
     ///   one, and a chain of about 400 successive products stays inside the band (see [`Quat`]).
+    ///   The exact Q64.64 sum is compared without narrowing, so long inputs return `false`
+    ///   instead of overflowing.
     fn is_normalized(self: Quat) -> bool;
     /// Returns `true` if `self` is a rotation near the identity.
     ///
     /// Mirrors `glam::Quat::is_near_identity`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if `w` is `Fixed::MIN`.
+    /// * Never.
     /// #### Deviations
     /// * The threshold `1 - 1e-6` of glam-rs, quantized to `1 - 4295 ULP`: the shortest
     ///   rotation angle is `2 acos(|w|)`, i.e. `2.83e-3` rad at the threshold. Comparing `|w|`
-    ///   instead of computing that angle costs 1 770 gas instead of 32 070
+    ///   instead of computing that angle costs at most 1 340 gas instead of 32 070
     ///   (`benches::alt::quat`).
     fn is_near_identity(self: Quat) -> bool;
     /// Returns the angle (in radians) of the minimal rotation between `self` and `rhs`, in
@@ -891,14 +893,14 @@ pub impl QuatImpl of QuatTrait {
 
     #[inline(always)]
     fn is_normalized(self: Quat) -> bool {
-        Self::length_squared(self).abs_diff_eq(F_ONE, NORMALIZED_EPS)
+        is_unit4(self.x, self.y, self.z, self.w, NORMALIZED_EPS_RAW)
     }
 
     #[inline(always)]
     fn is_near_identity(self: Quat) -> bool {
         // The shortest rotation angle is `2 acos(|w|)`; `acos` decreases, so comparing `|w|` to
         // the cosine threshold avoids computing the angle.
-        self.w.abs() > NEAR_IDENTITY_W
+        self.w > NEAR_IDENTITY_W || self.w < NEG_NEAR_IDENTITY_W
     }
 
     #[inline(always)]
@@ -908,11 +910,30 @@ pub impl QuatImpl of QuatTrait {
     }
 
     fn rotate_towards(self: Quat, rhs: Quat, max_angle: Fixed) -> Quat {
-        let angle = Self::angle_between(self, rhs);
+        // Keep the dot and half-angle for the interpolation: calling `slerp` here would compute
+        // both a second time.
+        let d0 = Self::dot(self, rhs);
+        let flip = d0.is_negative();
+        let d = if flip {
+            -d0
+        } else {
+            d0
+        };
+        let theta = d.acos_clamped();
+        let angle = theta + theta;
         if angle <= ROTATE_TOWARDS_EPS {
             rhs
         } else {
-            Self::slerp(self, rhs, (max_angle / angle).clamp(F_NEG_ONE, F_ONE))
+            let s = (max_angle / angle).clamp(F_NEG_ONE, F_ONE);
+            if d > NEAR_ONE {
+                lerp_impl(self, rhs, s, if flip {
+                    -s
+                } else {
+                    s
+                })
+            } else {
+                slerp_weights(self, rhs, s, theta, flip)
+            }
         }
     }
 
@@ -1185,7 +1206,7 @@ const F_HALF: Fixed = Fixed { raw: 0x80000000 };
 const F_PI: Fixed = Fixed { raw: 13493037705 };
 
 /// The `is_normalized` threshold: 1024 raw ULP (`2^-22`) on the squared length, as for `Vec4`.
-const NORMALIZED_EPS: Fixed = Fixed { raw: 1024 };
+const NORMALIZED_EPS_RAW: u16 = 1024;
 
 /// `1 - 2^-20`, the cosine threshold of the singular branches of `from_rotation_arc`,
 /// `from_rotation_arc_2d` and `slerp`, where glam-rs uses `1 - f32::EPSILON` (`slerp`) and
@@ -1212,6 +1233,9 @@ pub const AXIS_EPS: Fixed = Fixed { raw: 0x10000 };
 /// of `2 acos(1 - 1e-6) = 2.83e-3` rad.
 pub const NEAR_IDENTITY_W: Fixed = Fixed { raw: 4294963001 };
 
+/// `-(1 - 1e-6)`: see [`NEAR_IDENTITY_W`].
+const NEG_NEAR_IDENTITY_W: Fixed = Fixed { raw: -4294963001 };
+
 /// `1e-4` rad quantized (429 497 ULP), the angle below which `rotate_towards` returns the target
 /// directly, as in glam-rs.
 pub const ROTATE_TOWARDS_EPS: Fixed = Fixed { raw: 429497 };
@@ -1230,6 +1254,7 @@ fn recip_of_twice_sqrt(v: Fixed) -> Recip {
 
 /// Shared body of `slerp` and `slerp_long`. A rotation is represented by both `q` and `-q`:
 /// the short path folds a negative dot into the second weight, while the long path preserves it.
+#[inline(always)]
 fn slerp_impl(a: Quat, b: Quat, s: Fixed, shortest: bool) -> Quat {
     let d0 = QuatImpl::dot(a, b);
     let flip = shortest && d0.is_negative();
@@ -1252,20 +1277,26 @@ fn slerp_impl(a: Quat, b: Quat, s: Fixed, shortest: bool) -> Quat {
         })
     } else {
         let theta = d.acos();
-        let scale1 = (theta * (F_ONE - s)).sin();
-        let sin2 = (theta * s).sin();
-        let scale2 = if flip {
-            -sin2
-        } else {
-            sin2
-        };
-        let r = RecipTrait::new(theta.sin());
-        Quat {
-            x: r.mul(wide_mul(a.x, scale1).add(wide_mul(b.x, scale2)).narrow()),
-            y: r.mul(wide_mul(a.y, scale1).add(wide_mul(b.y, scale2)).narrow()),
-            z: r.mul(wide_mul(a.z, scale1).add(wide_mul(b.z, scale2)).narrow()),
-            w: r.mul(wide_mul(a.w, scale1).add(wide_mul(b.w, scale2)).narrow()),
-        }
+        slerp_weights(a, b, s, theta, flip)
+    }
+}
+
+/// The trigonometric interpolation after the caller has selected the path and computed `theta`.
+#[inline(always)]
+fn slerp_weights(a: Quat, b: Quat, s: Fixed, theta: Fixed, flip: bool) -> Quat {
+    let scale1 = (theta * (F_ONE - s)).sin();
+    let sin2 = (theta * s).sin();
+    let scale2 = if flip {
+        -sin2
+    } else {
+        sin2
+    };
+    let r = RecipTrait::new(theta.sin());
+    Quat {
+        x: r.mul(wide_mul(a.x, scale1).add(wide_mul(b.x, scale2)).narrow()),
+        y: r.mul(wide_mul(a.y, scale1).add(wide_mul(b.y, scale2)).narrow()),
+        z: r.mul(wide_mul(a.z, scale1).add(wide_mul(b.z, scale2)).narrow()),
+        w: r.mul(wide_mul(a.w, scale1).add(wide_mul(b.w, scale2)).narrow()),
     }
 }
 
