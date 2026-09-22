@@ -221,20 +221,26 @@ pub trait Mat3ExtTrait {
     /// Computes the symmetric eigen-decomposition ([`SymmetricEigen3Trait::new`]). If `self` is
     /// not symmetric, only its upper triangle is taken into account.
     ///
+    /// Implementation notes:
+    /// * As [`SymmetricEigen3Trait::new`].
+    ///
     /// Mirrors `glamx::MatExt::symmetric_eigen` for `glam::Mat3`.
     /// #### Panics
     /// * As [`SymmetricEigen3Trait::new`].
     /// #### Deviations
-    /// * As [`SymmetricEigen3Trait::new`].
+    /// * None.
     fn symmetric_eigen(self: Mat3) -> SymmetricEigen3;
     /// Computes the eigenvalues of a symmetric matrix, in ascending order
     /// ([`SymmetricEigen3Trait::eigenvalues`]).
+    ///
+    /// Implementation notes:
+    /// * As [`SymmetricEigen3Trait::eigenvalues`].
     ///
     /// Mirrors `glamx::MatExt::symmetric_eigenvalues` for `glam::Mat3`.
     /// #### Panics
     /// * As [`SymmetricEigen3Trait::new`].
     /// #### Deviations
-    /// * As [`SymmetricEigen3Trait::eigenvalues`].
+    /// * None.
     fn symmetric_eigenvalues(self: Mat3) -> Vec3;
 }
 

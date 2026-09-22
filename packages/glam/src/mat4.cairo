@@ -183,11 +183,13 @@ pub trait Mat4Trait {
     fn row(self: Mat4, index: usize) -> Vec4;
     /// Returns the transpose of `self`.
     ///
+    /// Exact: a permutation of the elements.
+    ///
     /// Mirrors `glam::Mat4::transpose`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact: a permutation of the elements.
+    /// * None.
     fn transpose(self: Mat4) -> Mat4;
     /// Returns the determinant of `self`.
     ///
@@ -239,21 +241,27 @@ pub trait Mat4Trait {
     fn mul_mat4(self: Mat4, rhs: Mat4) -> Mat4;
     /// Adds two 4x4 matrices.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat4::add_mat4`.
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
     ///   range.
     /// #### Deviations
-    /// * Exact.
+    /// * Overflow panics where f32 returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn add_mat4(self: Mat4, rhs: Mat4) -> Mat4;
     /// Subtracts two 4x4 matrices.
+    ///
+    /// Exact.
     ///
     /// Mirrors `glam::Mat4::sub_mat4`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if an element difference leaves the
     ///   scalar range.
     /// #### Deviations
-    /// * Exact.
+    /// * Overflow panics where f32 returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn sub_mat4(self: Mat4, rhs: Mat4) -> Mat4;
     /// Multiplies a 4x4 matrix by a scalar.
     ///
@@ -268,6 +276,10 @@ pub trait Mat4Trait {
     fn mul_scalar(self: Mat4, rhs: Fixed) -> Mat4;
     /// Divides a 4x4 matrix by a scalar.
     ///
+    /// One division shared by the 16 elements (`Recip`) and one fused multiplication each,
+    /// rounded to nearest: cheaper than, and up to 1 ULP away from, the element-wise
+    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    ///
     /// Mirrors `glam::Mat4::div_scalar`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `rhs` is zero.
@@ -275,9 +287,6 @@ pub trait Mat4Trait {
     /// #### Deviations
     /// * glam-rs spells this with an operator (`impl Div<f32> for Mat4`); the core
     ///   operator traits of Cairo are homogeneous (docs/DESIGN.md section 3).
-    /// * One division shared by the 16 elements (`Recip`) and one fused multiplication
-    ///   each, rounded to nearest: cheaper than, and up to 1 ULP away from, the element-
-    ///   wise truncated `Fixed / Fixed` kept in `benches::alt`.
     fn div_scalar(self: Mat4, rhs: Fixed) -> Mat4;
     /// Multiplies `self` by a scaling vector `scale`. This is faster than creating a whole
     /// diagonal scaling matrix and then multiplying that. This operation is commutative.
@@ -343,7 +352,8 @@ pub trait Mat4Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if an element is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where f32 returns the finite value `2^31`: docs/DESIGN.md section
+    ///   3, "overflow".
     fn abs(self: Mat4) -> Mat4;
     /// Returns a matrix containing the reciprocal `1 / n` of each element of `self`.
     ///
@@ -384,11 +394,13 @@ pub trait Mat4Trait {
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat4::from_mat3`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat3(m: Mat3) -> Mat4;
     /// Creates an affine transformation matrix from the given 3x3 linear transformation
     /// matrix and `translation` vector.
@@ -396,22 +408,26 @@ pub trait Mat4Trait {
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat4::from_mat3_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat3_translation(mat3: Mat3, translation: Vec3) -> Mat4;
     /// Creates an affine transformation matrix from the given 3D `translation`.
     ///
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat4::from_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_translation(translation: Vec3) -> Mat4;
     /// Creates an affine transformation matrix containing the given 3D non-uniform
     /// `scale`.
@@ -419,18 +435,26 @@ pub trait Mat4Trait {
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat4::from_scale`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
     /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3). glam-
     ///   rs asserts that `scale` is not entirely zero.
-    /// * Exact.
     fn from_scale(scale: Vec3) -> Mat4;
     /// Creates an affine transformation matrix from the given `rotation` quaternion.
     ///
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
+    ///
+    /// Every element is one exact two-term sum of raw products rescaled once (floored): `1
+    /// - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling folded
+    /// into the second factor. Nine rescales for the nine elements, at most 1 ULP below
+    /// the exact value each. The literal glam-rs expression rescales the twelve products
+    /// one by one and costs 2.1x as much (43 460 against 20 660 gas for `Mat3`): it is
+    /// kept in `benches::alt`.
     ///
     /// Mirrors `glam::Mat4::from_quat`.
     /// #### Panics
@@ -442,18 +466,19 @@ pub trait Mat4Trait {
     ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
     ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
     ///   matrix by `l^2`.
-    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
-    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
-    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
-    ///   below the exact value each. The literal glam-rs expression rescales the twelve
-    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
-    ///   `Mat3`): it is kept in `benches::alt`.
     fn from_quat(rotation: Quat) -> Mat4;
     /// Creates an affine transformation matrix from the given `rotation` quaternion and 3D
     /// `translation`.
     ///
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
+    ///
+    /// Every element is one exact two-term sum of raw products rescaled once (floored): `1
+    /// - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling folded
+    /// into the second factor. Nine rescales for the nine elements, at most 1 ULP below
+    /// the exact value each. The literal glam-rs expression rescales the twelve products
+    /// one by one and costs 2.1x as much (43 460 against 20 660 gas for `Mat3`): it is
+    /// kept in `benches::alt`.
     ///
     /// Mirrors `glam::Mat4::from_rotation_translation`.
     /// #### Panics
@@ -465,18 +490,23 @@ pub trait Mat4Trait {
     ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
     ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
     ///   matrix by `l^2`.
-    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
-    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
-    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
-    ///   below the exact value each. The literal glam-rs expression rescales the twelve
-    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
-    ///   `Mat3`): it is kept in `benches::alt`.
     fn from_rotation_translation(rotation: Quat, translation: Vec3) -> Mat4;
     /// Creates an affine transformation matrix from the given 3D `scale`, `rotation` and
     /// `translation`.
     ///
     /// The resulting matrix can be used to transform 3D points and vectors. See
     /// `transform_point3` and `transform_vector3`.
+    ///
+    /// Every element is one exact two-term sum of raw products rescaled once (floored): `1
+    /// - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling folded
+    /// into the second factor. Nine rescales for the nine elements, at most 1 ULP below
+    /// the exact value each. The literal glam-rs expression rescales the twelve products
+    /// one by one and costs 2.1x as much (43 460 against 20 660 gas for `Mat3`): it is
+    /// kept in `benches::alt`. The scale of column `i` is applied inside the single
+    /// rescale of each element (`W2 * Fixed -> T2`), not after it: the elements are still
+    /// one floor rescale away from the exact product, where glam-rs rounds the rotation
+    /// matrix first and the scaled one second. The nine multiplications are free (21 360
+    /// gas, the cost of `from_quat`): a `WideMul` is one step and no range check.
     ///
     /// Mirrors `glam::Mat4::from_scale_rotation_translation`.
     /// #### Panics
@@ -488,17 +518,6 @@ pub trait Mat4Trait {
     ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
     ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
     ///   matrix by `l^2`.
-    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
-    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
-    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
-    ///   below the exact value each. The literal glam-rs expression rescales the twelve
-    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
-    ///   `Mat3`): it is kept in `benches::alt`.
-    /// * The scale of column `i` is applied inside the single rescale of each element (`W2
-    ///   * Fixed -> T2`), not after it: the elements are still one floor rescale away from
-    ///   the exact product, where glam-rs rounds the rotation matrix first and the scaled
-    ///   one second. The nine multiplications are free (21 360 gas, the cost of
-    ///   `from_quat`): a `WideMul` is one step and no range check.
     fn from_scale_rotation_translation(scale: Vec3, rotation: Quat, translation: Vec3) -> Mat4;
     /// Extracts `scale`, `rotation` and `translation` from `self`.
     ///

@@ -120,11 +120,15 @@ pub trait Pose3Trait {
     /// Called as `Pose3Trait::rotation(axisangle)`: the associated function and the public field
     /// `pose.rotation` share their name, which Cairo accepts as in Rust.
     ///
+    /// Implementation notes:
+    /// * As [`Pose3Trait::new`].
+    ///
     /// Mirrors `glamx::Pose3::rotation`.
     /// #### Panics
     /// * As `QuatTrait::from_scaled_axis`.
     /// #### Deviations
-    /// * As [`Pose3Trait::new`].
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn rotation(axisangle: Vec3) -> Pose3;
     /// Prepends a translation to this pose, i.e. applies `translation` in the local frame first:
     /// the translation becomes `self.translation + self.rotation * translation`.
@@ -143,7 +147,8 @@ pub trait Pose3Trait {
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_add Underflow'` if a component leaves the scalar range.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics with the native message where floating-point arithmetic returns infinity
+    ///   or a larger finite value: docs/DESIGN.md section 3, "overflow".
     fn append_translation(self: Pose3, translation: Vec3) -> Pose3;
     /// Returns the inverse of this pose: the rotation is conjugated (no division) and the
     /// translation becomes `conjugate(rotation) * -translation`.
@@ -151,14 +156,18 @@ pub trait Pose3Trait {
     /// #### Preconditions
     /// * The rotation must be normalized for the result to be the inverse; it is not checked.
     ///
-    /// Mirrors `glamx::Pose3::inverse`.
-    /// #### Panics
-    /// * `'Fixed: overflow'` if a component of the translation does not fit the scalar range.
-    /// #### Deviations
+    /// Implementation notes:
     /// * The rotation by the conjugate is the fused kernel of `QuatTrait::mul_vec3` with the sign
     ///   of the cross-product term flipped and the whole sum negated in place: one floor rescale
     ///   per component, bit-identical to `rotation.conjugate().mul_vec3(-translation)`:
     ///   10 360 gas against 11 560.
+    ///
+    /// Mirrors `glamx::Pose3::inverse`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if a component of the translation does not fit the scalar range.
+    /// #### Deviations
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse(self: Pose3) -> Pose3;
     /// Computes `self.inverse() * rhs`, the pose of `rhs` in the frame of `self` (the relative
     /// pose of collision detection): `(conj(qa) * qb, conj(qa) * (tb - ta))`.
@@ -166,44 +175,61 @@ pub trait Pose3Trait {
     /// #### Preconditions
     /// * The rotation of `self` must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * Fused: the conjugate of `self.rotation` is never built. The Hamilton product carries its
+    ///   signs in the add / sub chain of the kernel and the rotation of the translation flips the
+    ///   cross-product term: bit-identical to the composed glamx expression, one floor rescale
+    ///   per output scalar: 20 700 gas, against 21 600 for the composed glamx body and 31 240
+    ///   for `self.inverse() * rhs` (`gas/pose3.snap`).
+    ///
     /// Mirrors `glamx::Pose3::inv_mul`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if `rhs.translation - self.translation`
     ///   leaves the scalar range.
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
     /// #### Deviations
-    /// * Fused: the conjugate of `self.rotation` is never built. The Hamilton product carries its
-    ///   signs in the add / sub chain of the kernel and the rotation of the translation flips the
-    ///   cross-product term: bit-identical to the composed glamx expression, one floor rescale
-    ///   per output scalar: 20 700 gas, against 21 600 for the composed glamx body and 31 240
-    ///   for `self.inverse() * rhs` (`gas/pose3.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inv_mul(self: Pose3, rhs: Pose3) -> Pose3;
     /// Transforms a point by this pose: `rotation * p + translation`.
     ///
     /// #### Preconditions
     /// * The rotation must be normalized for the result to be a rigid motion; it is not checked.
     ///
-    /// Mirrors `glamx::Pose3::transform_point`.
-    /// #### Panics
-    /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
-    /// #### Deviations
+    /// Implementation notes:
     /// * The translation is lifted into the exact Q96.96 sum of the rotation and the component
     ///   is floored once: bit-identical to `rotation.mul_vec3(p) + translation`, but a rotated
     ///   vector outside the scalar range does not panic when the sum fits. 10 260 gas against
     ///   11 880 for the composed form.
+    ///
+    /// Mirrors `glamx::Pose3::transform_point`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
+    /// #### Deviations
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn transform_point(self: Pose3, p: Vec3) -> Vec3;
     /// Transforms a vector by this pose: the rotation only, the translation is ignored.
+    ///
+    /// Implementation notes:
+    /// * As `QuatTrait::mul_vec3`: at most 1 ULP below the exact rotation.
     ///
     /// Mirrors `glamx::Pose3::transform_vector`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
     /// #### Deviations
-    /// * As `QuatTrait::mul_vec3`: at most 1 ULP below the exact rotation.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn transform_vector(self: Pose3, v: Vec3) -> Vec3;
     /// Transforms a point by the inverse of this pose: `conjugate(rotation) * (p - translation)`.
     ///
     /// #### Preconditions
     /// * The rotation must be normalized; it is not checked.
+    ///
+    /// Implementation notes:
+    /// * The conjugate is not built: the cross-product term of the fused rotation changes sign.
+    ///   Bit-identical to the composed form, at most 1 ULP below the exact result: 11 580 gas
+    ///   against 12 480.
     ///
     /// Mirrors `glamx::Pose3::inverse_transform_point`.
     /// #### Panics
@@ -211,21 +237,24 @@ pub trait Pose3Trait {
     ///   range.
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
     /// #### Deviations
-    /// * The conjugate is not built: the cross-product term of the fused rotation changes sign.
-    ///   Bit-identical to the composed form, at most 1 ULP below the exact result: 11 580 gas
-    ///   against 12 480.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse_transform_point(self: Pose3, p: Vec3) -> Vec3;
     /// Transforms a vector by the inverse of this pose: `conjugate(rotation) * v`.
     ///
     /// #### Preconditions
     /// * The rotation must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * As [`Pose3Trait::inverse_transform_point`]: 9 360 gas (the cost of
+    ///   `QuatTrait::mul_vec3`) against 10 260 with the conjugate built first.
+    ///
     /// Mirrors `glamx::Pose3::inverse_transform_vector`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
     /// #### Deviations
-    /// * As [`Pose3Trait::inverse_transform_point`]: 9 360 gas (the cost of
-    ///   `QuatTrait::mul_vec3`) against 10 260 with the conjugate built first.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse_transform_vector(self: Pose3, v: Vec3) -> Vec3;
     /// Interpolates between two poses: `QuatTrait::slerp` of the rotations and `Vec3Trait::lerp`
     /// of the translations. When `t` is zero the result is `self`, when `t` is one it is `other`.
@@ -233,12 +262,16 @@ pub trait Pose3Trait {
     /// #### Preconditions
     /// * Both rotations must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * The rotation carries the re-derived thresholds and the error of `QuatTrait::slerp`
+    ///   (132 970 gas in all): [`Pose3Trait::nlerp`] is the cheap alternative.
+    ///
     /// Mirrors `glamx::Pose3::lerp`.
     /// #### Panics
     /// * As `QuatTrait::slerp` and `Vec3Trait::lerp`.
     /// #### Deviations
-    /// * The rotation carries the re-derived thresholds and the error of `QuatTrait::slerp`
-    ///   (132 970 gas in all): [`Pose3Trait::nlerp`] is the cheap alternative.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn lerp(self: Pose3, other: Pose3, t: Fixed) -> Pose3;
     /// Interpolates between two poses with a normalized linear interpolation of the rotations
     /// (`QuatTrait::lerp`, shortest path) and `Vec3Trait::lerp` of the translations.
@@ -262,11 +295,15 @@ pub trait Pose3Trait {
     /// #### Preconditions
     /// * The rotation must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * As `Mat4Trait::from_rotation_translation`.
+    ///
     /// Mirrors `glamx::Pose3::to_mat4`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a component does not fit the scalar range.
     /// #### Deviations
-    /// * As `Mat4Trait::from_rotation_translation`.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn to_mat4(self: Pose3) -> Mat4;
     /// Creates a pose from a homogeneous 4x4 matrix: the rotation is `QuatTrait::from_mat4` of
     /// the linear part and the translation is `w_axis.xyz`.
@@ -276,17 +313,24 @@ pub trait Pose3Trait {
     ///   one), no scale and no shear, as glamx documents. It is not checked; a scaled matrix
     ///   gives a rotation that is not normalized.
     ///
-    /// Mirrors `glamx::Pose3::from_mat4`.
-    /// #### Panics
-    /// * As `QuatTrait::from_mat4`.
-    /// #### Deviations
+    /// Implementation notes:
     /// * glamx decomposes the matrix with `Mat4::to_scale_rotation_translation` (three lengths, a
     ///   determinant and a division per axis) and drops the scale; the rigid-only precondition
     ///   makes that scale one, so the linear part is converted directly with
     ///   `QuatTrait::from_mat4` (19 770 gas). On a rigid matrix both give the same rotation up to
     ///   rounding.
+    ///
+    /// Mirrors `glamx::Pose3::from_mat4`.
+    /// #### Panics
+    /// * As `QuatTrait::from_mat4`.
+    /// #### Deviations
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn from_mat4(mat: Mat4) -> Pose3;
     /// Composes `self` with a rotation applied first: `(self.translation, self.rotation * rhs)`.
+    ///
+    /// Implementation notes:
+    /// * As `QuatTrait::mul_quat`: at most 1 ULP below the exact product.
     ///
     /// Mirrors `impl Mul<glamx::Rot3> for glamx::Pose3`.
     /// #### Panics
@@ -294,7 +338,6 @@ pub trait Pose3Trait {
     /// #### Deviations
     /// * glamx spells this with an operator; the core operator traits of Cairo are homogeneous
     ///   (docs/DESIGN.md section 3).
-    /// * As `QuatTrait::mul_quat`: at most 1 ULP below the exact product.
     fn mul_rot3(self: Pose3, rhs: Rot3) -> Pose3;
     /// Transforms the point `rhs`: the same as [`Pose3Trait::transform_point`].
     ///
@@ -479,13 +522,17 @@ pub impl Rot3Pose3Impl of Rot3Pose3Trait {
 /// * The rotation of `lhs` must be normalized; it is not checked. The rotation of the result is
 ///   not renormalized (see [`Pose3`]).
 ///
+/// Implementation notes:
+/// * The translation is the fused kernel of [`Pose3Trait::transform_point`] (one floor rescale
+///   per component, bit-identical to the composed form); the rotation is `QuatTrait::mul_quat`.
+///   19 380 gas against 21 000 for the composed glamx body.
+///
 /// Mirrors `impl Mul for glamx::Pose3`.
 /// #### Panics
 /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
 /// #### Deviations
-/// * The translation is the fused kernel of [`Pose3Trait::transform_point`] (one floor rescale
-///   per component, bit-identical to the composed form); the rotation is `QuatTrait::mul_quat`.
-///   19 380 gas against 21 000 for the composed glamx body.
+/// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+///   value: docs/DESIGN.md section 3, "overflow".
 pub impl Pose3Mul of Mul<Pose3> {
     #[inline(always)]
     fn mul(lhs: Pose3, rhs: Pose3) -> Pose3 {

@@ -170,12 +170,16 @@ pub trait SdpMatrix2Trait {
     fn inverse_unchecked(self: SdpMatrix2) -> SdpMatrix2;
     /// Returns the inverse of `self` and the determinant of `self`.
     ///
+    /// Implementation notes:
+    /// * As `inverse_unchecked`.
+    ///
     /// Mirrors `parry::utils::SdpMatrix2::inverse_and_get_determinant_unchecked`.
     /// #### Panics
     /// * `'SdpMatrix2: singular'` if the determinant of `self` is zero.
     /// * `'Fixed: overflow'` if a result does not fit the scalar range.
     /// #### Deviations
-    /// * As `inverse_unchecked`.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse_and_get_determinant_unchecked(self: SdpMatrix2) -> (SdpMatrix2, Fixed);
     /// Returns the inverse of `self`, or the zero matrix if the determinant is zero.
     ///
@@ -274,7 +278,8 @@ pub impl SdpMatrix2Impl of SdpMatrix2Trait {
 /// #### Panics
 /// * `'Fixed: overflow'` if a result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where floating-point arithmetic returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 pub impl SdpMatrix2Add of Add<SdpMatrix2> {
     #[inline(always)]
     fn add(lhs: SdpMatrix2, rhs: SdpMatrix2) -> SdpMatrix2 {
@@ -343,7 +348,8 @@ pub trait SdpMatrix3Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if a result does not fit the scalar range.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn add_diagonal(self: SdpMatrix3, elt: Fixed) -> SdpMatrix3;
     /// Builds a symmetric matrix from a full matrix assumed symmetric: reads the diagonal and the
     /// upper triangle (`m12` = column 1, row 0; `m13` = column 2, row 0; `m23` = column 2, row
@@ -383,11 +389,15 @@ pub trait SdpMatrix3Trait {
     /// Multiplies `self` by the vector `v`: the same function as `mul_vec`, under the name the
     /// rapier solver uses (`ii.transform_vector(torque_dir)`).
     ///
+    /// Implementation notes:
+    /// * As `mul_vec`.
+    ///
     /// Mirrors rapier's `AngularInertiaOps::transform_vector` for `SdpMatrix3<Real>`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a result does not fit the scalar range.
     /// #### Deviations
-    /// * As `mul_vec`.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn transform_vector(self: SdpMatrix3, v: Vec3) -> Vec3;
     /// Multiplies `self` by the matrix `rhs`.
     ///
@@ -661,7 +671,8 @@ pub impl SdpMatrix3Impl of SdpMatrix3Trait {
 /// #### Panics
 /// * `'Fixed: overflow'` if a result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where floating-point arithmetic returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 pub impl SdpMatrix3Add of Add<SdpMatrix3> {
     #[inline(always)]
     fn add(lhs: SdpMatrix3, rhs: SdpMatrix3) -> SdpMatrix3 {

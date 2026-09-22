@@ -71,7 +71,8 @@ pub fn wide_from(x: Fixed) -> W1 {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn dot2(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed) -> Fixed {
     wide_mul(a0, b0).add(wide_mul(a1, b1)).narrow()
@@ -83,7 +84,8 @@ pub fn dot2(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed) -> Fixed {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn dot3(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, a2: Fixed, b2: Fixed) -> Fixed {
     wide_mul(a0, b0).add(wide_mul(a1, b1)).add(wide_mul(a2, b2)).narrow()
@@ -95,7 +97,8 @@ pub fn dot3(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, a2: Fixed, b2: Fixed) ->
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn dot4(
     a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, a2: Fixed, b2: Fixed, a3: Fixed, b3: Fixed,
@@ -109,7 +112,8 @@ pub fn dot4(
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn dot2_add(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, c: Fixed) -> Fixed {
     wide_mul(a0, b0).add(wide_mul(a1, b1)).add(wide_from(c)).narrow()
@@ -122,7 +126,8 @@ pub fn dot2_add(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, c: Fixed) -> Fixed {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn dot3_add(
     a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, a2: Fixed, b2: Fixed, c: Fixed,
@@ -136,7 +141,8 @@ pub fn dot3_add(
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn mul_add(a: Fixed, b: Fixed, c: Fixed) -> Fixed {
     Fixed { raw: bounded::mul_add(a.raw, b.raw, c.raw) }
@@ -150,7 +156,8 @@ pub fn mul_add(a: Fixed, b: Fixed, c: Fixed) -> Fixed {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn mul_sub(a: Fixed, b: Fixed, c: Fixed, d: Fixed) -> Fixed {
     wide_mul(a, b).sub(wide_mul(c, d)).narrow()
@@ -189,7 +196,8 @@ pub fn det3(
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn norm2_squared(x: Fixed, y: Fixed) -> Fixed {
     wide_mul(x, x).add(wide_mul(y, y)).narrow()
@@ -201,7 +209,8 @@ pub fn norm2_squared(x: Fixed, y: Fixed) -> Fixed {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn norm3_squared(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
     wide_mul(x, x).add(wide_mul(y, y)).add(wide_mul(z, z)).narrow()
@@ -213,7 +222,8 @@ pub fn norm3_squared(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn norm4_squared(x: Fixed, y: Fixed, z: Fixed, w: Fixed) -> Fixed {
     wide_mul(x, x).add(wide_mul(y, y)).add(wide_mul(z, z)).add(wide_mul(w, w)).narrow()
@@ -377,7 +387,8 @@ pub fn distance4(
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn distance2_squared(ax: Fixed, ay: Fixed, bx: Fixed, by: Fixed) -> Fixed {
     Fixed { raw: bounded::narrow32(bounded::dist_sq2(ax.raw, bx.raw, ay.raw, by.raw)) }
@@ -389,7 +400,8 @@ pub fn distance2_squared(ax: Fixed, ay: Fixed, bx: Fixed, by: Fixed) -> Fixed {
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn distance3_squared(
     ax: Fixed, ay: Fixed, az: Fixed, bx: Fixed, by: Fixed, bz: Fixed,
@@ -405,7 +417,8 @@ pub fn distance3_squared(
 /// #### Panics
 /// * `'Fixed: overflow'` if the result does not fit the scalar range.
 /// #### Deviations
-/// * None.
+/// * Overflow panics where the floating-point analogue returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn distance4_squared(
     ax: Fixed, ay: Fixed, az: Fixed, aw: Fixed, bx: Fixed, by: Fixed, bz: Fixed, bw: Fixed,
@@ -482,7 +495,8 @@ pub trait NormTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if the length does not fit the scalar range.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn to_fixed(self: Norm) -> Fixed;
     /// Computes the wide reciprocal of the length (one division, no sign split).
     ///

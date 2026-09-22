@@ -138,54 +138,69 @@ pub trait QuatTrait {
     /// * `axis` must be a unit vector; it is not checked (glam-rs checks it under the
     ///   `glam_assert` feature, docs/DESIGN.md section 3).
     ///
+    /// Implementation notes:
+    /// * `angle * 0.5` is floored before the reduction, and `sin_cos` is accurate to 1.02 ULP:
+    ///   each component is within 3 ULP of the exact result. `sin_cos` shares the range
+    ///   reduction: 11 950 gas cheaper than the `sin` plus `cos` of `benches::alt::quat`
+    ///   (40 350 vs 52 300).
+    ///
     /// Mirrors `glam::Quat::from_axis_angle`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range (only
     ///   reachable with an axis far longer than one).
     /// #### Deviations
-    /// * `angle * 0.5` is floored before the reduction, and `sin_cos` is accurate to 1.02 ULP:
-    ///   each component is within 3 ULP of the exact result. `sin_cos` shares the range
-    ///   reduction: 11 950 gas cheaper than the `sin` plus `cos` of `benches::alt::quat`
-    ///   (40 350 vs 52 300).
+    /// * Overflow panics where f32 returns infinity or a larger finite value: docs/DESIGN.md
+    ///   section 3, "overflow".
     fn from_axis_angle(axis: Vec3, angle: Fixed) -> Quat;
     /// Creates a quaternion that rotates `v.length()` radians around `v.normalize()`.
     ///
     /// `from_scaled_axis(Vec3::ZERO)` is the identity quaternion.
     ///
-    /// Mirrors `glam::Quat::from_scaled_axis`.
-    /// #### Panics
-    /// * `'Fixed: overflow'` if `v.length()` does not fit the scalar range (`|v| >= 2^31`).
-    /// #### Deviations
+    /// Implementation notes:
     /// * The `from_axis_angle(v / length, length)` of glam-rs, with the three divisions sharing
     ///   one `Recip`: an axis-aligned input stays exactly axis-aligned, so that
     ///   `from_scaled_axis(Vec3::Z.mul_scalar(a))` is exactly `from_rotation_z(a)`. Folding the
     ///   sine into that division (`v * (sin(angle / 2) / length)`) is 4 470 gas cheaper
     ///   (44 350 vs 48 820) but loses that exactness; it is kept in `benches::alt::quat`.
+    ///
+    /// Mirrors `glam::Quat::from_scaled_axis`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `v.length()` does not fit the scalar range (`|v| >= 2^31`).
+    /// #### Deviations
     /// * The length is the floor of the exact one, so the angle is at most 1 ULP short.
     fn from_scaled_axis(v: Vec3) -> Quat;
     /// Creates a quaternion from the `angle` (in radians) around the x axis.
+    ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::from_axis_angle`]: within 2 ULP of the exact result.
     ///
     /// Mirrors `glam::Quat::from_rotation_x`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * As [`QuatTrait::from_axis_angle`]: within 2 ULP of the exact result.
+    /// * None.
     fn from_rotation_x(angle: Fixed) -> Quat;
     /// Creates a quaternion from the `angle` (in radians) around the y axis.
+    ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::from_rotation_x`].
     ///
     /// Mirrors `glam::Quat::from_rotation_y`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * As [`QuatTrait::from_rotation_x`].
+    /// * None.
     fn from_rotation_y(angle: Fixed) -> Quat;
     /// Creates a quaternion from the `angle` (in radians) around the z axis.
+    ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::from_rotation_x`].
     ///
     /// Mirrors `glam::Quat::from_rotation_z`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * As [`QuatTrait::from_rotation_x`].
+    /// * None.
     fn from_rotation_z(angle: Fixed) -> Quat;
     /// Creates a quaternion from the columns of a 3x3 rotation matrix.
     ///
@@ -193,6 +208,17 @@ pub trait QuatTrait {
     /// * Each axis must be a unit vector and the three must be orthogonal; it is not checked.
     ///   A matrix that contains scales, shears or other non-rotation transformations gives an
     ///   ill-defined quaternion, as in glam-rs.
+    ///
+    /// Implementation notes:
+    /// * `0.5 / sqrt(4 c^2)` is one `fixed::wide::Recip` of `2 sqrt(4 c^2)`, shared by the four
+    ///   components and rounded to nearest, instead of a truncated `Fixed` reciprocal
+    ///   multiplied four times: one rounding instead of two, and 130 gas cheaper as well
+    ///   (19 770 against 19 900, `alt_from_rotation_axes_fixed_recip`). The square root is the
+    ///   floor of the exact one, so each component is within `1 + |component| / |c|` ULP of the
+    ///   exact value, i.e. at most 3 ULP. Measured over 50 000 random unit quaternions of the
+    ///   Python mirror: at most 4 raw ULP per component over the `Quat -> Mat3 -> Quat` round
+    ///   trip and 16 over `Mat3 -> Quat -> Mat3`, where the matrix itself is already 1 ULP off
+    ///   per element.
     ///
     /// Mirrors `glam::Quat::from_rotation_axes`.
     /// #### Panics
@@ -204,15 +230,6 @@ pub trait QuatTrait {
     /// * The four-branch algorithm of glam-rs (`XMQuaternionRotationMatrix`), branching on
     ///   `m22 <= 0` then on `m11 -+ m00 <= 0`, so that the component the division is carried by
     ///   is the largest of the four (at least `1 / 2` in absolute value).
-    /// * `0.5 / sqrt(4 c^2)` is one `fixed::wide::Recip` of `2 sqrt(4 c^2)`, shared by the four
-    ///   components and rounded to nearest, instead of a truncated `Fixed` reciprocal
-    ///   multiplied four times: one rounding instead of two, and 130 gas cheaper as well
-    ///   (19 770 against 19 900, `alt_from_rotation_axes_fixed_recip`). The square root is the
-    ///   floor of the exact one, so each component is within `1 + |component| / |c|` ULP of the
-    ///   exact value, i.e. at most 3 ULP. Measured over 50 000 random unit quaternions of the
-    ///   Python mirror: at most 4 raw ULP per component over the `Quat -> Mat3 -> Quat` round
-    ///   trip and 16 over `Mat3 -> Quat -> Mat3`, where the matrix itself is already 1 ULP off
-    ///   per element.
     fn from_rotation_axes(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Quat;
     /// Creates a quaternion from a 3x3 rotation matrix.
     ///
@@ -255,11 +272,14 @@ pub trait QuatTrait {
     /// #### Preconditions
     /// * `dir` and `up` must be unit vectors; it is not checked.
     ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::look_to_rh`].
+    ///
     /// Mirrors `glam::Quat::look_to_lh`.
     /// #### Panics
     /// * As [`QuatTrait::look_to_rh`].
     /// #### Deviations
-    /// * As [`QuatTrait::look_to_rh`].
+    /// * None.
     fn look_to_lh(dir: Vec3, up: Vec3) -> Quat;
     /// Creates a quaternion rotation from a facing direction and an up direction, for a
     /// right-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=back`.
@@ -285,13 +305,16 @@ pub trait QuatTrait {
     /// #### Preconditions
     /// * `up` must be a unit vector; it is not checked.
     ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::look_to_rh`].
+    ///
     /// Mirrors `glam::Quat::look_at_lh`.
     /// #### Panics
     /// * `'Vec3: normalize zero'` if `center` is `eye`, or if the direction and `up` are
     ///   parallel.
     /// * As [`QuatTrait::look_to_rh`] otherwise.
     /// #### Deviations
-    /// * As [`QuatTrait::look_to_rh`].
+    /// * None.
     fn look_at_lh(eye: Vec3, center: Vec3, up: Vec3) -> Quat;
     /// Creates a quaternion rotation from a camera position, a focal point and an up direction,
     /// for a right-handed view coordinate system with `+X=right`, `+Y=up` and `+Z=back`.
@@ -299,13 +322,16 @@ pub trait QuatTrait {
     /// #### Preconditions
     /// * `up` must be a unit vector; it is not checked.
     ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::look_to_rh`].
+    ///
     /// Mirrors `glam::Quat::look_at_rh`.
     /// #### Panics
     /// * `'Vec3: normalize zero'` if `center` is `eye`, or if the direction and `up` are
     ///   parallel.
     /// * As [`QuatTrait::look_to_rh`] otherwise.
     /// #### Deviations
-    /// * As [`QuatTrait::look_to_rh`].
+    /// * None.
     fn look_at_rh(eye: Vec3, center: Vec3, up: Vec3) -> Quat;
     /// Returns the minimal rotation transforming `from` into `to`, in the plane spanned by the
     /// two vectors. Rotates at most 180 degrees.
@@ -332,12 +358,15 @@ pub trait QuatTrait {
     /// #### Preconditions
     /// * `from` and `to` must be unit vectors; it is not checked.
     ///
+    /// Implementation notes:
+    /// * As [`QuatTrait::from_rotation_arc`].
+    ///
     /// Mirrors `glam::Quat::from_rotation_arc_colinear`.
     /// #### Panics
     /// * As [`QuatTrait::from_rotation_arc`], plus `'i64_neg Underflow'` if a component of `to`
     ///   is `Fixed::MIN`.
     /// #### Deviations
-    /// * As [`QuatTrait::from_rotation_arc`].
+    /// * None.
     fn from_rotation_arc_colinear(from: Vec3, to: Vec3) -> Quat;
     /// Returns the minimal rotation transforming `from` into `to`, around the z axis. Rotates
     /// at most 180 degrees.
@@ -368,24 +397,29 @@ pub trait QuatTrait {
     fn to_axis_angle(self: Quat) -> (Vec3, Fixed);
     /// Returns the rotation axis scaled by the rotation angle in radians.
     ///
-    /// Mirrors `glam::Quat::to_scaled_axis`.
-    /// #### Panics
-    /// * As [`QuatTrait::to_axis_angle`].
-    /// #### Deviations
+    /// Implementation notes:
     /// * The `to_axis_angle().0 * angle` of glam-rs: the axis is normalized first, so an
     ///   axis-aligned quaternion gives back exactly `axis * angle`. Sharing the division
     ///   (`xyz * (angle / length)`) is 6 670 gas cheaper (40 500 vs 47 170) but loses that
     ///   exactness; it is kept in `benches::alt::quat`.
+    ///
+    /// Mirrors `glam::Quat::to_scaled_axis`.
+    /// #### Panics
+    /// * As [`QuatTrait::to_axis_angle`].
+    /// #### Deviations
     /// * `Vec3::ZERO` below the [`AXIS_EPS`] threshold of [`QuatTrait::to_axis_angle`].
     fn to_scaled_axis(self: Quat) -> Vec3;
     /// Returns the quaternion conjugate of `self`. For a unit quaternion it is also the
     /// inverse.
     ///
+    /// Implementation notes:
+    /// * Exact.
+    ///
     /// Mirrors `glam::Quat::conjugate`.
     /// #### Panics
     /// * `'i64_neg Underflow'` if `x`, `y` or `z` is `Fixed::MIN`.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn conjugate(self: Quat) -> Quat;
     /// Returns the inverse of a normalized quaternion, i.e. its conjugate.
     ///
@@ -395,11 +429,14 @@ pub trait QuatTrait {
     ///   `q.normalize().inverse()` for a quaternion that may have drifted, and
     ///   `q.conjugate().div_scalar(q.length_squared())` for a general one.
     ///
+    /// Implementation notes:
+    /// * Exact.
+    ///
     /// Mirrors `glam::Quat::inverse`.
     /// #### Panics
     /// * As [`QuatTrait::conjugate`].
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn inverse(self: Quat) -> Quat;
     /// Computes the dot product of `self` and `rhs`: the cosine of the angle between the two
     /// rotations for unit quaternions.
@@ -463,14 +500,17 @@ pub trait QuatTrait {
     fn is_normalized(self: Quat) -> bool;
     /// Returns `true` if `self` is a rotation near the identity.
     ///
-    /// Mirrors `glam::Quat::is_near_identity`.
-    /// #### Panics
-    /// * Never.
-    /// #### Deviations
+    /// Implementation notes:
     /// * The threshold `1 - 1e-6` of glam-rs, quantized to `1 - 4295 ULP`: the shortest
     ///   rotation angle is `2 acos(|w|)`, i.e. `2.83e-3` rad at the threshold. Comparing `|w|`
     ///   instead of computing that angle costs at most 1 340 gas instead of 32 070
     ///   (`benches::alt::quat`).
+    ///
+    /// Mirrors `glam::Quat::is_near_identity`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * None.
     fn is_near_identity(self: Quat) -> bool;
     /// Returns the angle (in radians) of the minimal rotation between `self` and `rhs`, in
     /// `[0, pi]`.
@@ -525,15 +565,19 @@ pub trait QuatTrait {
     /// #### Preconditions
     /// * Both quaternions must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * Each component is one fused `a (1 - s) + b s` (a single floor rescale) instead of the
+    ///   two rounded products of glam-rs, then the shared normalization: within 2 ULP and
+    ///   7 020 gas cheaper (24 120 vs 31 140).
+    ///
     /// Mirrors `glam::Quat::lerp`.
     /// #### Panics
     /// * `'Quat: normalize zero'` if the interpolant is zero, which unit inputs cannot produce
     ///   (the sign flip aligns `end` with `self`): only a zero input reaches it.
     /// * `'Fixed: overflow'` / `'i64_sub Underflow'` if `s` is far outside `[0, 1]`.
     /// #### Deviations
-    /// * Each component is one fused `a (1 - s) + b s` (a single floor rescale) instead of the
-    ///   two rounded products of glam-rs, then the shared normalization: within 2 ULP and
-    ///   7 020 gas cheaper (24 120 vs 31 140).
+    /// * Overflow panics where f32 returns infinity or a larger finite value: docs/DESIGN.md
+    ///   section 3, "overflow".
     fn lerp(self: Quat, end: Quat, s: Fixed) -> Quat;
     /// Performs a spherical linear interpolation between `self` and `end` based on `s`.
     ///
@@ -543,6 +587,10 @@ pub trait QuatTrait {
     /// #### Preconditions
     /// * Both quaternions must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * The division by `sin(theta)` is a single shared `Recip` rounded to nearest instead of
+    ///   the reciprocal-then-multiply of glam-rs: 8 570 gas cheaper (122 180 vs 130 750).
+    ///
     /// Mirrors `glam::Quat::slerp`.
     /// #### Panics
     /// * As [`QuatTrait::lerp`] on the near-identity branch.
@@ -551,8 +599,6 @@ pub trait QuatTrait {
     /// * The nlerp fallback of glam-rs is taken below [`NEAR_ONE`] (`1 - 2^-20`) instead of
     ///   `1 - f32::EPSILON`: see the const. Both branches are then accurate to about
     ///   `4e-7` (~1 600 ULP) in the worst case, at the threshold itself.
-    /// * The division by `sin(theta)` is a single shared `Recip` rounded to nearest instead of
-    ///   the reciprocal-then-multiply of glam-rs: 8 570 gas cheaper (122 180 vs 130 750).
     /// * `end` is not negated on the long path: the sign is folded into the interpolation
     ///   weight, which is exact and cannot overflow.
     fn slerp(self: Quat, end: Quat, s: Fixed) -> Quat;
@@ -580,28 +626,36 @@ pub trait QuatTrait {
     /// * Both quaternions must be normalized for the result to be a rotation; it is not
     ///   checked. The result is not perfectly normalized (see [`Quat`]).
     ///
+    /// Implementation notes:
+    /// * Each component is one exact 4-term Q64.64 sum rescaled once (floored) instead of four
+    ///   rounded products: at most 1 ULP below the exact component, 3.7x cheaper (10 040 vs
+    ///   37 080 gas), and an intermediate term outside the scalar range does not panic.
+    ///
     /// Mirrors `glam::Quat::mul_quat` and `impl Mul for glam::Quat`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
     /// #### Deviations
-    /// * Each component is one exact 4-term Q64.64 sum rescaled once (floored) instead of four
-    ///   rounded products: at most 1 ULP below the exact component, 3.7x cheaper (10 040 vs
-    ///   37 080 gas), and an intermediate term outside the scalar range does not panic.
+    /// * Overflow panics where f32 returns infinity or a larger finite value: docs/DESIGN.md
+    ///   section 3, "overflow".
     fn mul_quat(self: Quat, rhs: Quat) -> Quat;
     /// Multiplies a quaternion and a 3D vector, returning the rotated vector.
     ///
     /// #### Preconditions
     /// * `self` must be normalized; it is not checked.
     ///
-    /// Mirrors `glam::Quat::mul_vec3`.
-    /// #### Panics
-    /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
-    /// #### Deviations
+    /// Implementation notes:
     /// * The glam-rs formulation `v (w^2 - b.b) + b (2 v.b) + (b x v) 2w` with `b = self.xyz()`,
     ///   with every term kept as an exact Q96.96 triple product and one rescale per output
     ///   component: at most 1 ULP below the exact result. The `t = 2 b x v; v + w t + b x t`
     ///   formulation saves three multiplications but rounds three times and costs 2.4x as much
     ///   (22 580 vs 9 360, `benches::alt::quat`).
+    ///
+    /// Mirrors `glam::Quat::mul_vec3`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
+    /// #### Deviations
+    /// * Overflow panics where f32 returns infinity or a larger finite value: docs/DESIGN.md
+    ///   section 3, "overflow".
     fn mul_vec3(self: Quat, rhs: Vec3) -> Vec3;
     /// Returns `[self.x * rhs, self.y * rhs, ..]`.
     ///

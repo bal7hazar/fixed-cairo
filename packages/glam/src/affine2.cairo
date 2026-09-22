@@ -53,43 +53,58 @@ pub trait Affine2Trait {
     fn from_cols(x_axis: Vec2, y_axis: Vec2, z_axis: Vec2) -> Affine2;
     /// Creates an affine transform from a `[Fixed; 6]` array in column-major order.
     ///
+    /// Implementation notes:
+    /// * The array is passed by value, as fixed-size Cairo values are.
+    ///
     /// Mirrors `glam::Affine2::from_cols_array`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The array is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn from_cols_array(m: [Fixed; 6]) -> Affine2;
     /// Creates a `[Fixed; 6]` array storing the transform in column-major order.
+    ///
+    /// Implementation notes:
+    /// * The transform is passed by value, as fixed-size Cairo values are.
     ///
     /// Mirrors `glam::Affine2::to_cols_array`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The transform is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn to_cols_array(self: Affine2) -> [Fixed; 6];
     /// Creates an affine transform from a `[[Fixed; 2]; 3]` array in column-major order.
+    ///
+    /// Implementation notes:
+    /// * The array is passed by value, as fixed-size Cairo values are.
     ///
     /// Mirrors `glam::Affine2::from_cols_array_2d`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The array is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn from_cols_array_2d(m: [[Fixed; 2]; 3]) -> Affine2;
     /// Creates a `[[Fixed; 2]; 3]` array storing the transform in column-major order.
+    ///
+    /// Implementation notes:
+    /// * The transform is passed by value, as fixed-size Cairo values are.
     ///
     /// Mirrors `glam::Affine2::to_cols_array_2d`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The transform is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn to_cols_array_2d(self: Affine2) -> [[Fixed; 2]; 3];
     /// Creates an affine transform that changes scale.
+    ///
+    /// Implementation notes:
+    /// * Exact.
     ///
     /// Mirrors `glam::Affine2::from_scale`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_scale(scale: Vec2) -> Affine2;
     /// Creates an affine transform from the rotation `angle` in radians.
     ///
@@ -101,27 +116,36 @@ pub trait Affine2Trait {
     fn from_angle(angle: Fixed) -> Affine2;
     /// Creates an affine transform from a 2D translation.
     ///
+    /// Implementation notes:
+    /// * Exact.
+    ///
     /// Mirrors `glam::Affine2::from_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_translation(translation: Vec2) -> Affine2;
     /// Creates an affine transform from a 2x2 linear transform.
+    ///
+    /// Implementation notes:
+    /// * Exact.
     ///
     /// Mirrors `glam::Affine2::from_mat2`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat2(matrix2: Mat2) -> Affine2;
     /// Creates an affine transform from a 2x2 linear transform and a translation.
+    ///
+    /// Implementation notes:
+    /// * Exact.
     ///
     /// Mirrors `glam::Affine2::from_mat2_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat2_translation(matrix2: Mat2, translation: Vec2) -> Affine2;
     /// Creates an affine transform from scale, rotation angle in radians and translation.
     ///

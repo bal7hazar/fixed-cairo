@@ -126,6 +126,31 @@ def bullets(items, p):
 
 
 def doc(summary, mirrors, panics=None, dev=None, indent_="    "):
+    dev = dev or []
+    notes = [
+        item for item in dev
+        if item.startswith(("Exact", "As `", "As ["))
+        or "passed by value" in item
+        or any(word in item.lower() for word in ("gas", "bench", "inlin"))
+    ]
+    dev = [item for item in dev if item not in notes]
+    panic_text = " ".join(panics or [])
+    if not dev and ("overflow" in panic_text.lower() or "division by zero" in panic_text.lower()):
+        has_div_zero = "division by zero" in panic_text.lower()
+        has_overflow = "overflow" in panic_text.lower()
+        event = "Division by zero or overflow" if has_div_zero and has_overflow else (
+            "Division by zero" if has_div_zero else "Overflow"
+        )
+        result = "NaN, infinity or a larger finite value" if has_overflow else "NaN or infinity"
+        topics = (["\"division by zero\""] if has_div_zero else []) + (
+            ["\"overflow\""] if has_overflow else []
+        )
+        dev = [
+            f"{event} panics where f32 returns {result}: docs/DESIGN.md section 3, "
+            + " and ".join(topics) + "."
+        ]
+    if notes:
+        summary += "\n\n" + " ".join(notes)
     p = indent_ + "///"
     lines = wrap(summary, p) + [p, f"{p} Mirrors `{mirrors}`.", f"{p} #### Panics"]
     lines += bullets(panics or ["Never."], p)
@@ -758,10 +783,11 @@ def methods(t):
         ["No NaN propagation question: `Fixed` is totally ordered."])
     add("clamp", f"(self: {T}, min: {T}, max: {T}) -> {T}",
         "Component-wise clamping of values, similar to `Fixed::clamp`.\n\nEach element in `min` "
-        "must be less-or-equal to the corresponding element in `max`.", fz("clamp"), None,
+        "must be less-or-equal to the corresponding element in `max`. The direct if-chain is "
+        "measurably cheaper than composing `max` and `min`.", fz("clamp"), None,
         ["The `glam_assert!(min <= max)` precondition is not checked. When it is violated the "
          "result differs from the `self.max(min).min(max)` of glam-rs: an element below `min` "
-         "clamps to `min` (glam-rs: to `max`). The if-chain is measurably cheaper."])
+         "clamps to `min` (glam-rs: to `max`)."])
     add("min_element", f"(self: {T}) -> Fixed",
         "Returns the horizontal minimum of `self`.\n\nIn other words this computes "
         "`min(x, y, ..)`.", min_chain(t, "<", True))
@@ -833,13 +859,17 @@ def methods(t):
         ("trunc", "Returns a vector containing the integer part of each element of `self`. This "
                   "means numbers are always truncated towards zero.", None),
         ("fract", "Returns a vector containing the fractional part of the vector as "
-                  "`self - self.trunc()`.", None),
+                  "`self - self.trunc()`. This is exact integer arithmetic on the raw values, "
+                  "not an f32 approximation.", None),
         ("fract_gl", "Returns a vector containing the fractional part of the vector as "
-                     "`self - self.floor()`.", None),
+                     "`self - self.floor()`. This is exact integer arithmetic on the raw values, "
+                     "not an f32 approximation.", None),
     ]:
         add(name, f"(self: {T}) -> {T}", summary, t.cw(lambda c: f"self.{c}.{name}()"),
-            extra_panic, ["Exact (integer arithmetic on the raw values), not an f32 "
-                          "approximation."] if name in ("fract", "fract_gl") else None)
+            extra_panic,
+            (["Overflow panics where f32 returns the finite value `2^31`: docs/DESIGN.md "
+              "section 3, \"overflow\"."] if name in ("round", "ceil") else
+             None))
     add("recip", f"(self: {T}) -> {T}",
         "Returns a vector containing the reciprocal `1 / n` of each element of `self`.",
         t.cw(lambda c: f"self.{c}.recip()"),

@@ -60,35 +60,47 @@ pub trait Affine3Trait {
     fn from_cols(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3, w_axis: Vec3) -> Affine3;
     /// Creates an affine transform from a `[Fixed; 12]` array in column-major order.
     ///
+    /// Implementation notes:
+    /// * The array is passed by value, as fixed-size Cairo values are.
+    ///
     /// Mirrors `glam::Affine3::from_cols_array`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The array is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn from_cols_array(m: [Fixed; 12]) -> Affine3;
     /// Creates a `[Fixed; 12]` array storing the transform in column-major order.
+    ///
+    /// Implementation notes:
+    /// * The transform is passed by value, as fixed-size Cairo values are.
     ///
     /// Mirrors `glam::Affine3::to_cols_array`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The transform is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn to_cols_array(self: Affine3) -> [Fixed; 12];
     /// Creates an affine transform from a `[[Fixed; 3]; 4]` array in column-major order.
+    ///
+    /// Implementation notes:
+    /// * The array is passed by value, as fixed-size Cairo values are.
     ///
     /// Mirrors `glam::Affine3::from_cols_array_2d`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The array is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn from_cols_array_2d(m: [[Fixed; 3]; 4]) -> Affine3;
     /// Creates a `[[Fixed; 3]; 4]` array storing the transform in column-major order.
+    ///
+    /// Implementation notes:
+    /// * The transform is passed by value, as fixed-size Cairo values are.
     ///
     /// Mirrors `glam::Affine3::to_cols_array_2d`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * The transform is passed by value, as fixed-size Cairo values are.
+    /// * None.
     fn to_cols_array_2d(self: Affine3) -> [[Fixed; 3]; 4];
     /// Creates an affine transform that changes scale.
     ///
@@ -100,21 +112,27 @@ pub trait Affine3Trait {
     fn from_scale(scale: Vec3) -> Affine3;
     /// Creates an affine transform from the given `rotation` quaternion.
     ///
+    /// Implementation notes:
+    /// * As `Mat3Trait::from_quat`: `rotation` must be normalized (not checked) and every
+    ///   element is one fused two-term sum rescaled once.
+    ///
     /// Mirrors `glam::Affine3::from_quat`.
     /// #### Panics
     /// * As `Mat3Trait::from_quat`.
     /// #### Deviations
-    /// * As `Mat3Trait::from_quat`: `rotation` must be normalized (not checked) and every
-    ///   element is one fused two-term sum rescaled once.
+    /// * None.
     fn from_quat(rotation: Quat) -> Affine3;
     /// Creates an affine transform containing a 3D rotation around a normalized rotation
     /// `axis` of `angle` (in radians).
+    ///
+    /// Implementation notes:
+    /// * As `Mat3Trait::from_axis_angle`: `axis` must be normalized (not checked).
     ///
     /// Mirrors `glam::Affine3::from_axis_angle`.
     /// #### Panics
     /// * As `Mat3Trait::from_axis_angle`.
     /// #### Deviations
-    /// * As `Mat3Trait::from_axis_angle`: `axis` must be normalized (not checked).
+    /// * None.
     fn from_axis_angle(axis: Vec3, angle: Fixed) -> Affine3;
     /// Creates an affine transform containing a 3D rotation around the x axis of `angle`
     /// (in radians).
@@ -145,28 +163,37 @@ pub trait Affine3Trait {
     fn from_rotation_z(angle: Fixed) -> Affine3;
     /// Creates an affine transform from the given 3D `translation`.
     ///
+    /// Implementation notes:
+    /// * Exact.
+    ///
     /// Mirrors `glam::Affine3::from_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_translation(translation: Vec3) -> Affine3;
     /// Creates an affine transform from a 3x3 matrix (expressing scale, shear and rotation).
+    ///
+    /// Implementation notes:
+    /// * Exact.
     ///
     /// Mirrors `glam::Affine3::from_mat3`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat3(mat3: Mat3) -> Affine3;
     /// Creates an affine transform from a 3x3 matrix (expressing scale, shear and rotation)
     /// and a translation vector.
+    ///
+    /// Implementation notes:
+    /// * Exact.
     ///
     /// Mirrors `glam::Affine3::from_mat3_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat3_translation(mat3: Mat3, translation: Vec3) -> Affine3;
     /// Creates an affine transform from the given 3D `scale`, `rotation` and `translation`.
     ///
@@ -185,11 +212,14 @@ pub trait Affine3Trait {
     ///
     /// Equivalent to `from_translation(translation) * from_quat(rotation)`.
     ///
+    /// Implementation notes:
+    /// * As `from_quat`; the translation is copied exactly.
+    ///
     /// Mirrors `glam::Affine3::from_rotation_translation`.
     /// #### Panics
     /// * As `Mat3Trait::from_quat`.
     /// #### Deviations
-    /// * As `from_quat`; the translation is copied exactly.
+    /// * None.
     fn from_rotation_translation(rotation: Quat, translation: Vec3) -> Affine3;
     /// The given `Mat4` must be an affine transform, i.e. contain no perspective transform.
     ///
@@ -220,11 +250,14 @@ pub trait Affine3Trait {
     ///
     /// For a view coordinate system with `+X=right`, `+Y=up` and `+Z=forward`.
     ///
+    /// Implementation notes:
+    /// * As `look_to_rh`.
+    ///
     /// Mirrors `glam::Affine3::look_to_lh`.
     /// #### Panics
     /// * As `look_to_rh`.
     /// #### Deviations
-    /// * As `look_to_rh`.
+    /// * None.
     fn look_to_lh(eye: Vec3, dir: Vec3, up: Vec3) -> Affine3;
     /// Creates a right-handed view transform using a camera position, a facing direction
     /// and an up direction.
@@ -261,11 +294,14 @@ pub trait Affine3Trait {
     ///
     /// For a view coordinate system with `+X=right`, `+Y=up` and `+Z=back`.
     ///
+    /// Implementation notes:
+    /// * As `look_at_lh`.
+    ///
     /// Mirrors `glam::Affine3::look_at_rh`.
     /// #### Panics
     /// * As `look_at_lh`.
     /// #### Deviations
-    /// * As `look_at_lh`.
+    /// * None.
     fn look_at_rh(eye: Vec3, center: Vec3, up: Vec3) -> Affine3;
     /// Transforms the given 3D point, applying shear, scale, rotation and translation.
     ///
@@ -296,14 +332,7 @@ pub trait Affine3Trait {
     fn abs_diff_eq(self: Affine3, rhs: Affine3, max_abs_diff: Fixed) -> bool;
     /// Returns the inverse of `self`.
     ///
-    /// Mirrors `glam::Affine3::inverse`.
-    /// #### Panics
-    /// * `'Affine3: singular'` if the determinant of `matrix3` is zero.
-    /// * `'Fixed: overflow'` if an element of the adjugate or of the result leaves the scalar
-    ///   range.
-    /// #### Deviations
-    /// * glam-rs returns an invalid transform when assertions are disabled; there is no NaN
-    ///   here, so singular transforms panic.
+    /// Implementation notes:
     /// * The linear part is `Mat3::inverse` inlined: fused adjugate, exact `det3`, one
     ///   division shared by the nine elements (`Recip`, rounded to nearest), so `inverse` is
     ///   singular exactly when `matrix3.determinant()` is zero.
@@ -313,6 +342,15 @@ pub trait Affine3Trait {
     ///   inverse plus 1. The Cramer-rule translation (three more `det3` through the same
     ///   `Recip`, two roundings) is more accurate but costs 54 430 against 48 490 gas; it is
     ///   kept in `benches::alt::affine3` with the glam-rs two-stage formulation (54 470).
+    ///
+    /// Mirrors `glam::Affine3::inverse`.
+    /// #### Panics
+    /// * `'Affine3: singular'` if the determinant of `matrix3` is zero.
+    /// * `'Fixed: overflow'` if an element of the adjugate or of the result leaves the scalar
+    ///   range.
+    /// #### Deviations
+    /// * glam-rs returns an invalid transform when assertions are disabled; there is no NaN
+    ///   here, so singular transforms panic.
     fn inverse(self: Affine3) -> Affine3;
     /// Multiplies this affine transform by a 4x4 matrix.
     ///

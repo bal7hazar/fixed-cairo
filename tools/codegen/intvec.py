@@ -116,6 +116,16 @@ def bullets(items, p):
 
 
 def doc(summary, mirrors, panics=None, dev=None, indent="    "):
+    dev = dev or []
+    notes = [
+        item for item in dev
+        if item.startswith(("Exact", "As `", "As ["))
+        or "passed by value" in item
+        or any(word in item.lower() for word in ("gas", "bench", "inlin"))
+    ]
+    dev = [item for item in dev if item not in notes]
+    if notes:
+        summary += "\n\n" + " ".join(notes)
     p = indent + "///"
     lines = wrap(summary, p) + [p, f"{p} Mirrors `{mirrors}`.", f"{p} #### Panics"]
     lines += bullets(panics or ["Never."], p)
@@ -371,12 +381,13 @@ def methods(t):
         t.cw(lambda c: f"if self.{c} > rhs.{c} {{ self.{c} }} else {{ rhs.{c} }}"))
     add("clamp", f"(self: {T}, min: {T}, max: {T}) -> {T}",
         f"Component-wise clamping of values, similar to `{S}::clamp`.\n\nEach element in `min` "
-        "must be less-or-equal to the corresponding element in `max`.",
+        "must be less-or-equal to the corresponding element in `max`. The direct if-chain is "
+        "10 to 30 % cheaper than composing `max` and `min`.",
         t.cw(lambda c: f"if self.{c} < min.{c} {{ min.{c} }} else if self.{c} > max.{c} "
                        f"{{ max.{c} }} else {{ self.{c} }}"),
         dev=["The `glam_assert!(min <= max)` precondition is not checked. When it is violated "
              "the result differs from the `self.max(min).min(max)` of glam-rs: an element below "
-             "`min` clamps to `min` (glam-rs: to `max`). The if-chain is 10 to 30 % cheaper."])
+             "`min` clamps to `min` (glam-rs: to `max`)."])
     add("min_element", f"(self: {T}) -> {S}",
         "Returns the horizontal minimum of `self`.\n\nIn other words this computes "
         "`min(x, y, ..)`.", min_chain(t, "<"))

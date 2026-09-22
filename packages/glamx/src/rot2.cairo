@@ -67,11 +67,14 @@ pub trait Rot2Trait {
 
     /// Creates a rotation from an angle in radians.
     ///
+    /// Implementation notes:
+    /// * As [`Rot2Trait::new`].
+    ///
     /// Mirrors `glamx::Rot2::from_angle`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * As [`Rot2Trait::new`].
+    /// * None.
     fn from_angle(angle: Fixed) -> Rot2;
 
     /// Returns the rotation angle in radians.
@@ -110,7 +113,8 @@ pub trait Rot2Trait {
     /// #### Panics
     /// * `'i64_neg Underflow'` if `im` is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics with the native message where floating-point negation returns the finite
+    ///   value `2^31`: docs/DESIGN.md section 3, "overflow".
     fn inverse(self: Rot2) -> Rot2;
 
     /// Rotates a 2D vector by this rotation.
@@ -149,7 +153,8 @@ pub trait Rot2Trait {
     /// #### Panics
     /// * `'i64_neg Underflow'` if `im` is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics with the native message where floating-point negation returns the finite
+    ///   value `2^31`: docs/DESIGN.md section 3, "overflow".
     fn to_mat(self: Rot2) -> Mat2;
 
     /// Creates a normalized rotation from the first column of a 2x2 rotation matrix.
@@ -281,7 +286,8 @@ pub trait Rot2Trait {
     ///   positive scalar range).
     /// * As [`Rot2Trait::slerp`].
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn rotate_towards(self: Rot2, rhs: Rot2, max_angle: Fixed) -> Rot2;
 
     /// Gets the minimal planar rotation for transforming normalized `from` to normalized `to`.
@@ -455,7 +461,8 @@ pub impl Rot2Mul of Mul<Rot2> {
 /// #### Panics
 /// * As [`Rot2Mul`].
 /// #### Deviations
-/// * None.
+/// * Overflow panics where floating-point arithmetic returns infinity or a larger finite value:
+///   docs/DESIGN.md section 3, "overflow".
 pub impl Rot2MulAssign of MulAssign<Rot2, Rot2> {
     #[inline(always)]
     fn mul_assign(ref self: Rot2, rhs: Rot2) {

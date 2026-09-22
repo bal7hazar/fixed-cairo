@@ -37,9 +37,6 @@
 //!   (glam-rs 0.33.1 moved them here); `Mat4::look_*` exist in `glam::mat4`.
 //! * `Mat3A` / `Affine3A` collapse into `Mat3` / `Affine3` (docs/DESIGN.md section 1): there is
 //!   no `look_*_mat3a` / `look_*_affine3a`.
-//! * `look_at_affine3`, `look_to_affine3`, `look_at_quat` and `look_to_quat` are not ported yet:
-//!   they need `Affine3` (task A3) and `Quat::from_rotation_axes` / `Quat::from_mat3` (task X1),
-//!   see `docs/PORTING_STATUS.md`.
 //! * glam-rs quirks that are kept bit for bit: the Vulkan `orthographic` negates `yy` but not the
 //!   Y translation, and the left-handed `frustum` keeps the sign of the off-axis terms `zx`, `zy`
 //!   of the right-handed one (documented on the items).

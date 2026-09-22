@@ -24,6 +24,10 @@ pub mod opengl {
     ///
     /// This is the OpenGL `gluPerspective` equivalent.
     ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
+    ///
     /// Mirrors `glam::camera::lh::proj::opengl::perspective`.
     /// #### Panics
     /// * `'camera: fov out of range'` if `vertical_fov` is not in `(0, PI)` (glam-rs does not check
@@ -47,8 +51,6 @@ pub mod opengl {
     ///   is within 2 ULP of the exact value and `tz = -2 near q` (one fused product, one floor
     ///   rescale) within `2 near + 1` ULP.
     /// * `near > far` (a reversed depth range) is accepted, as in glam-rs.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective(vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed, far: Fixed) -> Mat4 {
         let (xx, h) = camera_impl::fov_scales(vertical_fov, aspect_ratio);
@@ -63,6 +65,10 @@ pub mod opengl {
     ///
     /// This is the OpenGL `glOrtho` equivalent.
     ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_orthographic_call` in
+    ///   `gas/camera.snap`).
+    ///
     /// Mirrors `glam::camera::lh::proj::opengl::orthographic`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
@@ -73,8 +79,6 @@ pub mod opengl {
     /// * Every quotient is rounded to nearest (one shared `Recip` per axis, and one for the depth)
     ///   where glam-rs multiplies by a rounded reciprocal: each element is within 1 ULP of the
     ///   exact value.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_orthographic_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn orthographic(
         left: Fixed, right: Fixed, bottom: Fixed, top: Fixed, near: Fixed, far: Fixed,
@@ -92,6 +96,13 @@ pub mod opengl {
     ///
     /// This is the OpenGL `glFrustum` equivalent.
     ///
+    /// Implementation notes:
+    /// * As in glam-rs, the off-axis terms are `zx = (right + left) / (right - left)` and `zy =
+    ///   (top + bottom) / (top - bottom)` in the left-handed matrices too (same sign as the
+    ///   right-handed ones, with `w = +z`): an off-center left-handed frustum is mirrored, and the
+    ///   box maps to the NDC cube only when `right = -left` and `top = -bottom`.
+    /// * `#[inline(always)]`: as `orthographic` (about 4k gas cheaper than a call).
+    ///
     /// Mirrors `glam::camera::lh::proj::opengl::frustum`.
     /// #### Panics
     /// * `'camera: near not positive'` if `near <= 0` (the `glam_assert!` of glam-rs, checked
@@ -108,11 +119,6 @@ pub mod opengl {
     /// * The depth terms are those of `perspective`: one truncated division and one fused product.
     ///   `zz` is within 2 ULP and `tz` within `2 near + 1` ULP.
     /// * `near > far` is accepted, as in glam-rs.
-    /// * As in glam-rs, the off-axis terms are `zx = (right + left) / (right - left)` and `zy =
-    ///   (top + bottom) / (top - bottom)` in the left-handed matrices too (same sign as the
-    ///   right-handed ones, with `w = +z`): an off-center left-handed frustum is mirrored, and the
-    ///   box maps to the NDC cube only when `right = -left` and `top = -bottom`.
-    /// * `#[inline(always)]`: as `orthographic` (about 4k gas cheaper than a call).
     #[inline(always)]
     pub fn frustum(
         left: Fixed, right: Fixed, bottom: Fixed, top: Fixed, near: Fixed, far: Fixed,
@@ -141,6 +147,10 @@ pub mod vulkan {
     /// Expects a left-handed Y-up view space input.
     /// Outputs NDC with Z in [0, 1] and Y-down.
     ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
+    ///
     /// Mirrors `glam::camera::lh::proj::vulkan::perspective`.
     /// #### Panics
     /// * `'camera: fov out of range'` if `vertical_fov` is not in `(0, PI)` (glam-rs does not check
@@ -164,8 +174,6 @@ pub mod vulkan {
     ///   within 1 ULP of the exact value and `tz = -near * q` (one fused product, one floor
     ///   rescale) within `near + 1` ULP.
     /// * `near > far` (a reversed depth range) is accepted, as in glam-rs.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective(vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed, far: Fixed) -> Mat4 {
         let (xx, h) = camera_impl::fov_scales(vertical_fov, aspect_ratio);
@@ -180,6 +188,10 @@ pub mod vulkan {
     ///
     /// Like `perspective`, but with an infinite value for `far`. Points at distance `near` map to
     /// depth `0`; as distance approaches infinity, depth approaches `1`.
+    ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
     ///
     /// Mirrors `glam::camera::lh::proj::vulkan::perspective_infinite`.
     /// #### Panics
@@ -198,8 +210,6 @@ pub mod vulkan {
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
     /// * Every other element is exact.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective_infinite(vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed) -> Mat4 {
         let (xx, h) = camera_impl::fov_scales(vertical_fov, aspect_ratio);
@@ -215,6 +225,10 @@ pub mod vulkan {
     /// Maps `near` to depth `1` and infinity to depth `0`.
     ///
     /// Reversed Z improves depth precision when used with a floating-point depth buffer.
+    ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
     ///
     /// Mirrors `glam::camera::lh::proj::vulkan::perspective_infinite_reverse`.
     /// #### Panics
@@ -233,8 +247,6 @@ pub mod vulkan {
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
     /// * Every other element is exact.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective_infinite_reverse(
         vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed,
@@ -249,6 +261,12 @@ pub mod vulkan {
     /// Expects a left-handed Y-up view space input.
     /// Outputs NDC with Z in [0, 1] and Y-down.
     ///
+    /// Implementation notes:
+    /// * As in glam-rs, `YFLIP` negates `yy` only: the Y translation `-(top + bottom) / (top -
+    ///   bottom)` is not flipped, so the box maps to the NDC cube when `bottom = -top`.
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_orthographic_call` in
+    ///   `gas/camera.snap`).
+    ///
     /// Mirrors `glam::camera::lh::proj::vulkan::orthographic`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
@@ -259,10 +277,6 @@ pub mod vulkan {
     /// * Every quotient is rounded to nearest (one shared `Recip` per axis, and one for the depth)
     ///   where glam-rs multiplies by a rounded reciprocal: each element is within 1 ULP of the
     ///   exact value.
-    /// * As in glam-rs, `YFLIP` negates `yy` only: the Y translation `-(top + bottom) / (top -
-    ///   bottom)` is not flipped, so the box maps to the NDC cube when `bottom = -top`.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_orthographic_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn orthographic(
         left: Fixed, right: Fixed, bottom: Fixed, top: Fixed, near: Fixed, far: Fixed,
@@ -277,6 +291,13 @@ pub mod vulkan {
     ///
     /// Expects a left-handed Y-up view space input.
     /// Outputs NDC with Z in [0, 1] and Y-down.
+    ///
+    /// Implementation notes:
+    /// * As in glam-rs, the off-axis terms are `zx = (right + left) / (right - left)` and `zy =
+    ///   (top + bottom) / (top - bottom)` in the left-handed matrices too (same sign as the
+    ///   right-handed ones, with `w = +z`): an off-center left-handed frustum is mirrored, and the
+    ///   box maps to the NDC cube only when `right = -left` and `top = -bottom`.
+    /// * `#[inline(always)]`: as `orthographic` (about 4k gas cheaper than a call).
     ///
     /// Mirrors `glam::camera::lh::proj::vulkan::frustum`.
     /// #### Panics
@@ -294,11 +315,6 @@ pub mod vulkan {
     /// * The depth terms are those of `perspective`: one truncated division and one fused product.
     ///   `zz` is within 1 ULP and `tz` within `near + 1` ULP.
     /// * `near > far` is accepted, as in glam-rs.
-    /// * As in glam-rs, the off-axis terms are `zx = (right + left) / (right - left)` and `zy =
-    ///   (top + bottom) / (top - bottom)` in the left-handed matrices too (same sign as the
-    ///   right-handed ones, with `w = +z`): an off-center left-handed frustum is mirrored, and the
-    ///   box maps to the NDC cube only when `right = -left` and `top = -bottom`.
-    /// * `#[inline(always)]`: as `orthographic` (about 4k gas cheaper than a call).
     #[inline(always)]
     pub fn frustum(
         left: Fixed, right: Fixed, bottom: Fixed, top: Fixed, near: Fixed, far: Fixed,
@@ -327,6 +343,10 @@ pub mod directx {
     /// Expects a left-handed Y-up view space input.
     /// Outputs NDC with Z in [0, 1] and Y-up.
     ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
+    ///
     /// Mirrors `glam::camera::lh::proj::directx::perspective`.
     /// #### Panics
     /// * `'camera: fov out of range'` if `vertical_fov` is not in `(0, PI)` (glam-rs does not check
@@ -350,8 +370,6 @@ pub mod directx {
     ///   within 1 ULP of the exact value and `tz = -near * q` (one fused product, one floor
     ///   rescale) within `near + 1` ULP.
     /// * `near > far` (a reversed depth range) is accepted, as in glam-rs.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective(vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed, far: Fixed) -> Mat4 {
         let (xx, h) = camera_impl::fov_scales(vertical_fov, aspect_ratio);
@@ -366,6 +384,10 @@ pub mod directx {
     ///
     /// Like `perspective`, but with an infinite value for `far`. Points at distance `near` map to
     /// depth `0`; as distance approaches infinity, depth approaches `1`.
+    ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
     ///
     /// Mirrors `glam::camera::lh::proj::directx::perspective_infinite`.
     /// #### Panics
@@ -384,8 +406,6 @@ pub mod directx {
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
     /// * Every other element is exact.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective_infinite(vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed) -> Mat4 {
         let (xx, h) = camera_impl::fov_scales(vertical_fov, aspect_ratio);
@@ -402,6 +422,10 @@ pub mod directx {
     /// Maps `near` to depth `1` and infinity to depth `0`.
     ///
     /// Reversed Z improves depth precision when used with a floating-point depth buffer.
+    ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
+    ///   `gas/camera.snap`).
     ///
     /// Mirrors `glam::camera::lh::proj::directx::perspective_infinite_reverse`.
     /// #### Panics
@@ -420,8 +444,6 @@ pub mod directx {
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
     /// * Every other element is exact.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_perspective_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn perspective_infinite_reverse(
         vertical_fov: Fixed, aspect_ratio: Fixed, near: Fixed,
@@ -436,6 +458,10 @@ pub mod directx {
     /// Expects a left-handed Y-up view space input.
     /// Outputs NDC with Z in [0, 1] and Y-up.
     ///
+    /// Implementation notes:
+    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_orthographic_call` in
+    ///   `gas/camera.snap`).
+    ///
     /// Mirrors `glam::camera::lh::proj::directx::orthographic`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
@@ -446,8 +472,6 @@ pub mod directx {
     /// * Every quotient is rounded to nearest (one shared `Recip` per axis, and one for the depth)
     ///   where glam-rs multiplies by a rounded reciprocal: each element is within 1 ULP of the
     ///   exact value.
-    /// * `#[inline(always)]`: measured about 4k gas cheaper than a call (`alt_orthographic_call` in
-    ///   `gas/camera.snap`).
     #[inline(always)]
     pub fn orthographic(
         left: Fixed, right: Fixed, bottom: Fixed, top: Fixed, near: Fixed, far: Fixed,
@@ -462,6 +486,13 @@ pub mod directx {
     ///
     /// Expects a left-handed Y-up view space input.
     /// Outputs NDC with Z in [0, 1] and Y-up.
+    ///
+    /// Implementation notes:
+    /// * As in glam-rs, the off-axis terms are `zx = (right + left) / (right - left)` and `zy =
+    ///   (top + bottom) / (top - bottom)` in the left-handed matrices too (same sign as the
+    ///   right-handed ones, with `w = +z`): an off-center left-handed frustum is mirrored, and the
+    ///   box maps to the NDC cube only when `right = -left` and `top = -bottom`.
+    /// * `#[inline(always)]`: as `orthographic` (about 4k gas cheaper than a call).
     ///
     /// Mirrors `glam::camera::lh::proj::directx::frustum`.
     /// #### Panics
@@ -479,11 +510,6 @@ pub mod directx {
     /// * The depth terms are those of `perspective`: one truncated division and one fused product.
     ///   `zz` is within 1 ULP and `tz` within `near + 1` ULP.
     /// * `near > far` is accepted, as in glam-rs.
-    /// * As in glam-rs, the off-axis terms are `zx = (right + left) / (right - left)` and `zy =
-    ///   (top + bottom) / (top - bottom)` in the left-handed matrices too (same sign as the
-    ///   right-handed ones, with `w = +z`): an off-center left-handed frustum is mirrored, and the
-    ///   box maps to the NDC cube only when `right = -left` and `top = -bottom`.
-    /// * `#[inline(always)]`: as `orthographic` (about 4k gas cheaper than a call).
     #[inline(always)]
     pub fn frustum(
         left: Fixed, right: Fixed, bottom: Fixed, top: Fixed, near: Fixed, far: Fixed,

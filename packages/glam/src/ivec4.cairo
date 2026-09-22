@@ -238,6 +238,7 @@ pub trait IVec4Trait {
     /// Component-wise clamping of values, similar to `i32::clamp`.
     ///
     /// Each element in `min` must be less-or-equal to the corresponding element in `max`.
+    /// The direct if-chain is 10 to 30 % cheaper than composing `max` and `min`.
     ///
     /// Mirrors `glam::IVec4::clamp`.
     /// #### Panics
@@ -245,7 +246,7 @@ pub trait IVec4Trait {
     /// #### Deviations
     /// * The `glam_assert!(min <= max)` precondition is not checked. When it is violated
     ///   the result differs from the `self.max(min).min(max)` of glam-rs: an element below
-    ///   `min` clamps to `min` (glam-rs: to `max`). The if-chain is 10 to 30 % cheaper.
+    ///   `min` clamps to `min` (glam-rs: to `max`).
     fn clamp(self: IVec4, min: IVec4, max: IVec4) -> IVec4;
     /// Returns the horizontal minimum of `self`.
     ///

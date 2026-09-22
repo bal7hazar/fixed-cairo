@@ -20,6 +20,12 @@ use crate::vec3::{Vec3, Vec3Trait};
 ///
 /// Transforms right-handed world space points into right-handed Y-up view space.
 ///
+/// Implementation notes:
+/// * Bit-identical to `Mat4::look_at_rh` (`glam::mat4`), inlined: measured 4.2k (`look_to`) to 5.1k
+///   (`look_at`) gas cheaper than calling it (`alt_look_*_mat4_delegate` in `gas/camera.snap`). `s`
+///   is normalized (one square root, one shared division), every other element is exact or one
+///   floored `dot3`.
+///
 /// Mirrors `glam::camera::rh::view::look_at_mat4`.
 /// #### Panics
 /// * `'Vec3: normalize zero'` if `center == eye`, or if the direction and `up` are parallel.
@@ -29,10 +35,6 @@ use crate::vec3::{Vec3, Vec3Trait};
 /// #### Deviations
 /// * The `glam_assert!` preconditions are not checked (docs/DESIGN.md section 3): `up` must be
 ///   normalized.
-/// * Bit-identical to `Mat4::look_at_rh` (`glam::mat4`), inlined: measured 4.2k (`look_to`) to 5.1k
-///   (`look_at`) gas cheaper than calling it (`alt_look_*_mat4_delegate` in `gas/camera.snap`). `s`
-///   is normalized (one square root, one shared division), every other element is exact or one
-///   floored `dot3`.
 #[inline(always)]
 pub fn look_at_mat4(eye: Vec3, center: Vec3, up: Vec3) -> Mat4 {
     camera_impl::look_to_mat4_rh(eye, Vec3Trait::normalize(center - eye), up)
@@ -42,6 +44,12 @@ pub fn look_at_mat4(eye: Vec3, center: Vec3, up: Vec3) -> Mat4 {
 ///
 /// Transforms right-handed world space points into right-handed Y-up view space.
 ///
+/// Implementation notes:
+/// * Bit-identical to `Mat4::look_to_rh` (`glam::mat4`), inlined: measured 4.2k (`look_to`) to 5.1k
+///   (`look_at`) gas cheaper than calling it (`alt_look_*_mat4_delegate` in `gas/camera.snap`). `s`
+///   is normalized (one square root, one shared division), every other element is exact or one
+///   floored `dot3`.
+///
 /// Mirrors `glam::camera::rh::view::look_to_mat4`.
 /// #### Panics
 /// * `'Vec3: normalize zero'` if `dir` and `up` are parallel.
@@ -50,10 +58,6 @@ pub fn look_at_mat4(eye: Vec3, center: Vec3, up: Vec3) -> Mat4 {
 /// #### Deviations
 /// * The `glam_assert!` preconditions are not checked (docs/DESIGN.md section 3): `dir` and `up`
 ///   must be normalized.
-/// * Bit-identical to `Mat4::look_to_rh` (`glam::mat4`), inlined: measured 4.2k (`look_to`) to 5.1k
-///   (`look_at`) gas cheaper than calling it (`alt_look_*_mat4_delegate` in `gas/camera.snap`). `s`
-///   is normalized (one square root, one shared division), every other element is exact or one
-///   floored `dot3`.
 #[inline(always)]
 pub fn look_to_mat4(eye: Vec3, dir: Vec3, up: Vec3) -> Mat4 {
     camera_impl::look_to_mat4_rh(eye, dir, up)

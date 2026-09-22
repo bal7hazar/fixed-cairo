@@ -172,11 +172,13 @@ pub trait Mat2Trait {
     fn row(self: Mat2, index: usize) -> Vec2;
     /// Returns the transpose of `self`.
     ///
+    /// Exact: a permutation of the elements.
+    ///
     /// Mirrors `glam::Mat2::transpose`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact: a permutation of the elements.
+    /// * None.
     fn transpose(self: Mat2) -> Mat2;
     /// Returns the determinant of `self`.
     ///
@@ -222,21 +224,27 @@ pub trait Mat2Trait {
     fn mul_mat2(self: Mat2, rhs: Mat2) -> Mat2;
     /// Adds two 2x2 matrices.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat2::add_mat2`.
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
     ///   range.
     /// #### Deviations
-    /// * Exact.
+    /// * Overflow panics where f32 returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn add_mat2(self: Mat2, rhs: Mat2) -> Mat2;
     /// Subtracts two 2x2 matrices.
+    ///
+    /// Exact.
     ///
     /// Mirrors `glam::Mat2::sub_mat2`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if an element difference leaves the
     ///   scalar range.
     /// #### Deviations
-    /// * Exact.
+    /// * Overflow panics where f32 returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn sub_mat2(self: Mat2, rhs: Mat2) -> Mat2;
     /// Multiplies a 2x2 matrix by a scalar.
     ///
@@ -251,6 +259,10 @@ pub trait Mat2Trait {
     fn mul_scalar(self: Mat2, rhs: Fixed) -> Mat2;
     /// Divides a 2x2 matrix by a scalar.
     ///
+    /// One division shared by the 4 elements (`Recip`) and one fused multiplication each,
+    /// rounded to nearest: cheaper than, and up to 1 ULP away from, the element-wise
+    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    ///
     /// Mirrors `glam::Mat2::div_scalar`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `rhs` is zero.
@@ -258,9 +270,6 @@ pub trait Mat2Trait {
     /// #### Deviations
     /// * glam-rs spells this with an operator (`impl Div<f32> for Mat2`); the core
     ///   operator traits of Cairo are homogeneous (docs/DESIGN.md section 3).
-    /// * One division shared by the 4 elements (`Recip`) and one fused multiplication
-    ///   each, rounded to nearest: cheaper than, and up to 1 ULP away from, the element-
-    ///   wise truncated `Fixed / Fixed` kept in `benches::alt`.
     fn div_scalar(self: Mat2, rhs: Fixed) -> Mat2;
     /// Multiplies `self` by a scaling vector `scale`. This is faster than creating a whole
     /// diagonal scaling matrix and then multiplying that. This operation is commutative.
@@ -320,7 +329,8 @@ pub trait Mat2Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if an element is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where f32 returns the finite value `2^31`: docs/DESIGN.md section
+    ///   3, "overflow".
     fn abs(self: Mat2) -> Mat2;
     /// Returns a matrix containing the reciprocal `1 / n` of each element of `self`.
     ///
@@ -367,21 +377,25 @@ pub trait Mat2Trait {
     fn from_scale_angle(scale: Vec2, angle: Fixed) -> Mat2;
     /// Creates a 2x2 matrix from a 3x3 matrix, discarding the 2nd row and column.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat2::from_mat3`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat3(m: Mat3) -> Mat2;
     /// Creates a 2x2 matrix from the minor of the given 3x3 matrix, discarding the `i`th
     /// column and `j`th row.
+    ///
+    /// Exact. glam-rs panics with `'index out of bounds'`; the message is the one of this
+    /// module.
     ///
     /// Mirrors `glam::Mat2::from_mat3_minor`.
     /// #### Panics
     /// * `'Mat2: index out of bounds'` if `i` or `j` is greater than 2.
     /// #### Deviations
-    /// * Exact. glam-rs panics with `'index out of bounds'`; the message is the one of
-    ///   this module.
+    /// * None.
     fn from_mat3_minor(m: Mat3, i: usize, j: usize) -> Mat2;
 }
 

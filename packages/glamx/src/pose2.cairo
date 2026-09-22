@@ -90,11 +90,14 @@ pub trait Pose2Trait {
     /// Called as `Pose2Trait::rotation(angle)`; Cairo accepts the same name as the public
     /// `pose.rotation` field.
     ///
+    /// Implementation notes:
+    /// * As [`Rot2Trait::new`]: the deterministic `sin_cos` is accurate to 1.02 raw ULP.
+    ///
     /// Mirrors `glamx::Pose2::rotation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * As [`Rot2Trait::new`]: the deterministic `sin_cos` is accurate to 1.02 raw ULP.
+    /// * None.
     fn rotation(angle: Fixed) -> Pose2;
 
     /// Creates a pose from its translation and rotation parts.
@@ -108,21 +111,28 @@ pub trait Pose2Trait {
 
     /// Creates a pose from a translation and an angle in radians.
     ///
+    /// Implementation notes:
+    /// * As [`Rot2Trait::new`].
+    ///
     /// Mirrors `glamx::Pose2::new`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * As [`Rot2Trait::new`].
+    /// * None.
     fn new(translation: Vec2, angle: Fixed) -> Pose2;
 
     /// Prepends a translation in the local frame: `self.translation + rotation * translation`.
+    ///
+    /// Implementation notes:
+    /// * The rotation products and translation are summed exactly and floored once: 5,280 gas
+    ///   (`gas/pose2.snap`).
     ///
     /// Mirrors `glamx::Pose2::prepend_translation`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a component of the result does not fit the scalar range.
     /// #### Deviations
-    /// * The rotation products and translation are summed exactly and floored once: 5,280 gas
-    ///   (`gas/pose2.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn prepend_translation(self: Pose2, translation: Vec2) -> Pose2;
 
     /// Appends a translation in the world frame.
@@ -131,7 +141,8 @@ pub trait Pose2Trait {
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_add Underflow'` if a component leaves the scalar range.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics with the native message where floating-point arithmetic returns infinity
+    ///   or a larger finite value: docs/DESIGN.md section 3, "overflow".
     fn append_translation(self: Pose2, translation: Vec2) -> Pose2;
 
     /// Returns the inverse pose: `(conjugate(rotation), conjugate(rotation) * -translation)`.
@@ -139,14 +150,18 @@ pub trait Pose2Trait {
     /// #### Preconditions
     /// * The rotation must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * The translation is negated inside the fused rotation sum, avoiding an intermediate
+    ///   `Vec2` negation and one constructed conjugate: 5,180 gas against 5,780 for the literal
+    ///   composed form (`gas/pose2.snap`).
+    ///
     /// Mirrors `glamx::Pose2::inverse`.
     /// #### Panics
     /// * `'i64_neg Underflow'` if `rotation.im` is `Fixed::MIN`.
     /// * `'Fixed: overflow'` if a translation component does not fit the scalar range.
     /// #### Deviations
-    /// * The translation is negated inside the fused rotation sum, avoiding an intermediate
-    ///   `Vec2` negation and one constructed conjugate: 5,180 gas against 5,780 for the literal
-    ///   composed form (`gas/pose2.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse(self: Pose2) -> Pose2;
 
     /// Computes `self.inverse() * rhs`, the relative pose of `rhs` in `self`'s frame.
@@ -154,15 +169,19 @@ pub trait Pose2Trait {
     /// #### Preconditions
     /// * `self.rotation` must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * Fused as `(conj(ra) * rb, conj(ra) * (tb - ta))`; 9,920 gas against 10,220 for the
+    ///   one-rotation composed form and 14,780 for upstream's `self.inverse() * rhs`, which
+    ///   rotates a translation twice (`gas/pose2.snap`).
+    ///
     /// Mirrors `glamx::Pose2::inv_mul`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if the translation difference leaves the
     ///   scalar range.
     /// * `'Fixed: overflow'` if a result component does not fit the scalar range.
     /// #### Deviations
-    /// * Fused as `(conj(ra) * rb, conj(ra) * (tb - ta))`; 9,920 gas against 10,220 for the
-    ///   one-rotation composed form and 14,780 for upstream's `self.inverse() * rhs`, which
-    ///   rotates a translation twice (`gas/pose2.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inv_mul(self: Pose2, rhs: Pose2) -> Pose2;
 
     /// Transforms a point by this pose: `rotation * p + translation`.
@@ -170,21 +189,29 @@ pub trait Pose2Trait {
     /// #### Preconditions
     /// * The rotation must be normalized for a rigid motion; it is not checked.
     ///
+    /// Implementation notes:
+    /// * The two rotation products and translation are summed exactly and floored once: 5,080
+    ///   gas against 6,360 for the composed form (`gas/pose2.snap`).
+    ///
     /// Mirrors `glamx::Pose2::transform_point`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a result component does not fit the scalar range.
     /// #### Deviations
-    /// * The two rotation products and translation are summed exactly and floored once: 5,080
-    ///   gas against 6,360 for the composed form (`gas/pose2.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn transform_point(self: Pose2, p: Vec2) -> Vec2;
 
     /// Transforms a vector by the rotation only.
+    ///
+    /// Implementation notes:
+    /// * As [`Rot2Trait::transform_vector`].
     ///
     /// Mirrors `glamx::Pose2::transform_vector`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a result component does not fit the scalar range.
     /// #### Deviations
-    /// * As [`Rot2Trait::transform_vector`].
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn transform_vector(self: Pose2, v: Vec2) -> Vec2;
 
     /// Transforms a point by the inverse pose.
@@ -192,14 +219,18 @@ pub trait Pose2Trait {
     /// #### Preconditions
     /// * The rotation must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * The conjugate signs are carried directly in the fused sums: 6,160 gas against 6,460 for
+    ///   the composed form (`gas/pose2.snap`).
+    ///
     /// Mirrors `glamx::Pose2::inverse_transform_point`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if `p - translation` leaves the scalar
     ///   range.
     /// * `'Fixed: overflow'` if a result component does not fit the scalar range.
     /// #### Deviations
-    /// * The conjugate signs are carried directly in the fused sums: 6,160 gas against 6,460 for
-    ///   the composed form (`gas/pose2.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse_transform_point(self: Pose2, p: Vec2) -> Vec2;
 
     /// Transforms a vector by the inverse rotation.
@@ -207,12 +238,16 @@ pub trait Pose2Trait {
     /// #### Preconditions
     /// * The rotation must be normalized; it is not checked.
     ///
+    /// Implementation notes:
+    /// * The conjugate is not constructed; its signs are carried in the fused sums: 4,680 gas
+    ///   against 4,980 for the composed form (`gas/pose2.snap`).
+    ///
     /// Mirrors `glamx::Pose2::inverse_transform_vector`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a result component does not fit the scalar range.
     /// #### Deviations
-    /// * The conjugate is not constructed; its signs are carried in the fused sums: 4,680 gas
-    ///   against 4,980 for the composed form (`gas/pose2.snap`).
+    /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+    ///   value: docs/DESIGN.md section 3, "overflow".
     fn inverse_transform_vector(self: Pose2, v: Vec2) -> Vec2;
 
     /// Interpolates rotations spherically and translations linearly.
@@ -236,7 +271,8 @@ pub trait Pose2Trait {
     /// #### Panics
     /// * `'i64_neg Underflow'` if `rotation.im` is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics with the native message where floating-point negation returns the finite
+    ///   value `2^31`: docs/DESIGN.md section 3, "overflow".
     fn to_mat3(self: Pose2) -> Mat3;
 
     /// Creates a pose from a homogeneous rigid 3x3 matrix.
@@ -446,12 +482,16 @@ pub impl Rot2Pose2Impl of Rot2Pose2Trait {
 /// #### Preconditions
 /// * Both rotations should be normalized; they are not checked or renormalized.
 ///
+/// Implementation notes:
+/// * The translation uses one fused rescale per component rather than a rotated `Vec2` followed
+///   by a separate addition: 8,840 gas against 10,120 (`gas/pose2.snap`).
+///
 /// Mirrors `impl Mul for glamx::Pose2`.
 /// #### Panics
 /// * `'Fixed: overflow'` if a result component does not fit the scalar range.
 /// #### Deviations
-/// * The translation uses one fused rescale per component rather than a rotated `Vec2` followed
-///   by a separate addition: 8,840 gas against 10,120 (`gas/pose2.snap`).
+/// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
+///   value: docs/DESIGN.md section 3, "overflow".
 pub impl Pose2Mul of Mul<Pose2> {
     #[inline(always)]
     fn mul(lhs: Pose2, rhs: Pose2) -> Pose2 {

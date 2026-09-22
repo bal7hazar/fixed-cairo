@@ -117,7 +117,8 @@ pub trait FixedTrait {
     /// * `'Fixed: division by zero'` if `den` is zero.
     /// * `'Fixed: overflow'` if the quotient does not fit the scalar range.
     /// #### Deviations
-    /// * None.
+    /// * Division by zero or overflow panics where floating-point division returns infinity or a
+    ///   larger finite value: docs/DESIGN.md section 3, "division by zero" and "overflow".
     fn from_ratio(num: i64, den: i64) -> Fixed;
     /// Converts to an integer, rounding toward negative infinity. Never fails: the integer part of
     /// every `Fixed` fits an `i32`.
@@ -150,7 +151,8 @@ pub trait FixedTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if `self` is `MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns the finite value `2^31`: docs/DESIGN.md section 3,
+    ///   "overflow".
     fn abs(self: Fixed) -> Fixed;
     /// Returns `-1` if `self` is negative, `+1` otherwise.
     ///
@@ -166,7 +168,8 @@ pub trait FixedTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if `self` is `MIN` and `sign` is not negative.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns the finite value `2^31`: docs/DESIGN.md section 3,
+    ///   "overflow".
     fn copysign(self: Fixed, sign: Fixed) -> Fixed;
     /// Returns `true` if `self < 0`.
     ///
@@ -222,8 +225,10 @@ pub trait FixedTrait {
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Rust panics when `min > max`; the precondition is not checked here (the result is then
-    ///   `min` if `self < min`, else `max` if `self > max`, else `self`).
+    /// * Rust panics when `min > max`; the precondition is not checked here. For a reversed range,
+    ///   this branch order returns `min` when `self < min`, `max` when `self > max`, and `self`
+    ///   otherwise. In particular, values below both bounds select `min`, whereas
+    ///   `self.max(min).min(max)` selects `max`.
     fn clamp(self: Fixed, min: Fixed, max: Fixed) -> Fixed;
     /// Returns the largest integer less than or equal to `self`.
     ///
@@ -239,7 +244,8 @@ pub trait FixedTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if `self > 2^31 - 1`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns the finite value `2^31`: docs/DESIGN.md section 3,
+    ///   "overflow".
     fn ceil(self: Fixed) -> Fixed;
     /// Returns the nearest integer, ties away from zero.
     ///
@@ -247,7 +253,8 @@ pub trait FixedTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if `self >= 2^31 - 1/2`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns the finite value `2^31`: docs/DESIGN.md section 3,
+    ///   "overflow".
     fn round(self: Fixed) -> Fixed;
     /// Returns the integer part, rounding toward zero.
     ///
@@ -302,11 +309,15 @@ pub trait FixedTrait {
     fn div_euclid(self: Fixed, rhs: Fixed) -> Fixed;
     /// Returns the least non-negative remainder of `self` modulo `|rhs|`, in `[0, |rhs|)`.
     ///
+    /// Implementation notes:
+    /// * Exact: always strictly below `|rhs|` (the f32 version can round up to `|rhs|`).
+    ///
     /// Mirrors `f32::rem_euclid` (`glam::f32::math::rem_euclid`).
     /// #### Panics
     /// * `'Fixed: division by zero'` if `rhs` is zero.
     /// #### Deviations
-    /// * Exact: always strictly below `|rhs|` (the f32 version can round up to `|rhs|`).
+    /// * Division by zero panics where `f32` returns NaN: docs/DESIGN.md section 3, "division by
+    ///   zero".
     fn rem_euclid(self: Fixed, rhs: Fixed) -> Fixed;
     /// Computes `self * a + b` with a single rescale (floor of the exact value).
     ///
@@ -314,7 +325,8 @@ pub trait FixedTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn mul_add(self: Fixed, a: Fixed, b: Fixed) -> Fixed;
     /// Computes `self` to an integer power. `|n| <= 4` is unrolled (`n = 2, 3`: floor of the
     /// exact power, `n = 4`: `floor(floor(x^2)^2)`); larger exponents use binary exponentiation
@@ -355,7 +367,9 @@ pub trait FixedTrait {
     /// #### Panics
     /// * As `inverse_lerp` and `lerp`.
     /// #### Deviations
-    /// * None.
+    /// * Division by zero or overflow panics where floating-point arithmetic returns NaN,
+    ///   infinity or a larger finite value: docs/DESIGN.md section 3, "division by zero" and
+    ///   "overflow".
     fn remap(
         self: Fixed, in_start: Fixed, in_end: Fixed, out_start: Fixed, out_end: Fixed,
     ) -> Fixed;
@@ -394,7 +408,8 @@ pub trait FixedTrait {
     ///   range, `'i64_add Overflow'` / `'i64_sub Underflow'` if `self +- d` does not.
     /// * `'i64_neg Underflow'` if `d` is `MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where `f32` returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn move_towards(self: Fixed, rhs: Fixed, d: Fixed) -> Fixed;
     /// Returns `true` if `|self - other| <= max_abs_diff`. The difference is computed exactly: it
     /// never overflows.

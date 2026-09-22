@@ -195,16 +195,19 @@ pub trait Vec3Trait {
     /// Creates a 3D vector from `v` divided by its `w` component: the perspective divide
     /// of a homogeneous coordinate.
     ///
+    /// One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one
+    /// fused product per component, instead of three truncated `Fixed / Fixed`: it pays
+    /// off from two divisions on (`alt_from_homogeneous_div` in `gas/vec3.snap`). A result
+    /// may differ by 1 ULP from the truncated division.
+    ///
     /// Mirrors `glam::Vec3::from_homogeneous`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `w` is zero (`glam_assert!` in glam-rs, which
     ///   otherwise returns infinity or NaN).
     /// * `'Fixed: overflow'` if a quotient does not fit the scalar range.
     /// #### Deviations
-    /// * One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one
-    ///   fused product per component, instead of three truncated `Fixed / Fixed`: it pays
-    ///   off from two divisions on (`alt_from_homogeneous_div` in `gas/vec3.snap`). A
-    ///   result may differ by 1 ULP from the truncated division.
+    /// * Division by zero or overflow panics where f32 returns NaN, infinity or a larger
+    ///   finite value: docs/DESIGN.md section 3, "division by zero" and "overflow".
     fn from_homogeneous(v: Vec4) -> Vec3;
     /// Creates a homogeneous coordinate from `self`, equivalent to `self.extend(1.0)`.
     ///
@@ -226,11 +229,14 @@ pub trait Vec3Trait {
     fn dot(self: Vec3, rhs: Vec3) -> Fixed;
     /// Returns a vector where every component is the dot product of `self` and `rhs`.
     ///
+    /// As `dot`.
+    ///
     /// Mirrors `glam::Vec3::dot_into_vec`.
     /// #### Panics
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
-    /// * As `dot`.
+    /// * Overflow panics where f32 returns NaN, infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn dot_into_vec(self: Vec3, rhs: Vec3) -> Vec3;
     /// Computes the cross product of `self` and `rhs`.
     ///
@@ -266,6 +272,7 @@ pub trait Vec3Trait {
     /// Component-wise clamping of values, similar to `Fixed::clamp`.
     ///
     /// Each element in `min` must be less-or-equal to the corresponding element in `max`.
+    /// The direct if-chain is measurably cheaper than composing `max` and `min`.
     ///
     /// Mirrors `glam::Vec3::clamp`.
     /// #### Panics
@@ -273,7 +280,7 @@ pub trait Vec3Trait {
     /// #### Deviations
     /// * The `glam_assert!(min <= max)` precondition is not checked. When it is violated
     ///   the result differs from the `self.max(min).min(max)` of glam-rs: an element below
-    ///   `min` clamps to `min` (glam-rs: to `max`). The if-chain is measurably cheaper.
+    ///   `min` clamps to `min` (glam-rs: to `max`).
     fn clamp(self: Vec3, min: Vec3, max: Vec3) -> Vec3;
     /// Returns the horizontal minimum of `self`.
     ///
@@ -315,12 +322,15 @@ pub trait Vec3Trait {
     ///
     /// In other words, this computes `self.x + self.y + ..`.
     ///
+    /// Exact: `Fixed` addition is an integer addition.
+    ///
     /// Mirrors `glam::Vec3::element_sum`.
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_add Underflow'` if a partial sum leaves the scalar
     ///   range.
     /// #### Deviations
-    /// * Exact: `Fixed` addition is an integer addition.
+    /// * Overflow panics where f32 returns NaN, infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn element_sum(self: Vec3) -> Fixed;
     /// Returns the product of all elements of `self`.
     ///
@@ -412,7 +422,8 @@ pub trait Vec3Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if an element is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where f32 returns NaN, infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn abs(self: Vec3) -> Vec3;
     /// Returns a vector with elements representing the sign of `self`: `1` for a positive
     /// element or zero, `-1` for a negative one.
@@ -460,7 +471,8 @@ pub trait Vec3Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if an element is at least `2^31 - 1/2`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where f32 returns the finite value `2^31`: docs/DESIGN.md section
+    ///   3, "overflow".
     fn round(self: Vec3) -> Vec3;
     /// Returns a vector containing the largest integer less than or equal to a number for
     /// each element of `self`.
@@ -478,7 +490,8 @@ pub trait Vec3Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if an element is greater than `2^31 - 1`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where f32 returns the finite value `2^31`: docs/DESIGN.md section
+    ///   3, "overflow".
     fn ceil(self: Vec3) -> Vec3;
     /// Returns a vector containing the integer part of each element of `self`. This means
     /// numbers are always truncated towards zero.
@@ -490,22 +503,24 @@ pub trait Vec3Trait {
     /// * None.
     fn trunc(self: Vec3) -> Vec3;
     /// Returns a vector containing the fractional part of the vector as `self -
-    /// self.trunc()`.
+    /// self.trunc()`. This is exact integer arithmetic on the raw values, not an f32
+    /// approximation.
     ///
     /// Mirrors `glam::Vec3::fract`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact (integer arithmetic on the raw values), not an f32 approximation.
+    /// * None.
     fn fract(self: Vec3) -> Vec3;
     /// Returns a vector containing the fractional part of the vector as `self -
-    /// self.floor()`.
+    /// self.floor()`. This is exact integer arithmetic on the raw values, not an f32
+    /// approximation.
     ///
     /// Mirrors `glam::Vec3::fract_gl`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact (integer arithmetic on the raw values), not an f32 approximation.
+    /// * None.
     fn fract_gl(self: Vec3) -> Vec3;
     /// Returns a vector containing the reciprocal `1 / n` of each element of `self`.
     ///
@@ -519,6 +534,10 @@ pub trait Vec3Trait {
     fn recip(self: Vec3) -> Vec3;
     /// Returns a vector containing the sine for each element of `self` (in radians).
     ///
+    /// 3 independent scalar calls: no work is shared between the elements. The wrapper
+    /// adds no gas to the scalar calls and is not force-inlined (`alt_sin_inline` in
+    /// `gas/vec3.snap`).
+    ///
     /// Mirrors `glam::Vec3::sin`.
     /// #### Panics
     /// * Never.
@@ -526,9 +545,6 @@ pub trait Vec3Trait {
     /// * Element-wise `TrigTrait::sin`: within 1.02 ULP of the exact sine over a turn
     ///   (2.03 at the extremes of the range), `sin(0) = 0` exactly and `sin(-x) =
     ///   -sin(x)`.
-    /// * 3 independent scalar calls: no work is shared between the elements. The wrapper
-    ///   adds no gas to the scalar calls and is not force-inlined (`alt_sin_inline` in
-    ///   `gas/vec3.snap`).
     fn sin(self: Vec3) -> Vec3;
     /// Returns a vector containing the cosine for each element of `self` (in radians).
     ///
@@ -608,6 +624,10 @@ pub trait Vec3Trait {
     fn log2(self: Vec3) -> Vec3;
     /// Returns a vector containing each element of `self` raised to the power of `n`.
     ///
+    /// 3 independent scalar calls: no work is shared between the elements. The wrapper
+    /// adds no gas to the scalar calls and is not force-inlined (`alt_powf_inline` in
+    /// `gas/vec3.snap`).
+    ///
     /// Mirrors `glam::Vec3::powf`.
     /// #### Panics
     /// * `'Fixed: overflow'` if a result does not fit the scalar range.
@@ -621,11 +641,12 @@ pub trait Vec3Trait {
     ///   fractional bits): panics where glam-rs returns infinity or NaN; within 2.05 ULP
     ///   below 1 and `0.44 * 2^-30` relative above (`x` in `[2^-8, 2^8]`, `n` in `[-4,
     ///   4]`); `powf(x, 1)` is not bit-identical to `x`.
-    /// * 3 independent scalar calls: no work is shared between the elements. The wrapper
-    ///   adds no gas to the scalar calls and is not force-inlined (`alt_powf_inline` in
-    ///   `gas/vec3.snap`).
     fn powf(self: Vec3, n: Fixed) -> Vec3;
     /// Returns a vector containing the square root for each element of `self`.
+    ///
+    /// Element-wise `FixedTrait::sqrt`: the floor of the exact root (integer square root
+    /// of `raw * 2^32`), bit-exact. Inlined: cheaper than the call (`alt_sqrt_noinline` in
+    /// `gas/vec3.snap`).
     ///
     /// Mirrors `glam::Vec3::sqrt`.
     /// #### Panics
@@ -634,19 +655,18 @@ pub trait Vec3Trait {
     ///   first offending element.
     /// #### Deviations
     /// * Panics where glam-rs returns NaN.
-    /// * Element-wise `FixedTrait::sqrt`: the floor of the exact root (integer square root
-    ///   of `raw * 2^32`), bit-exact. Inlined: cheaper than the call (`alt_sqrt_noinline`
-    ///   in `gas/vec3.snap`).
     fn sqrt(self: Vec3) -> Vec3;
     /// Returns a vector containing `0.0` if `rhs < self` and `1.0` otherwise, per element.
     ///
     /// Similar to glsl's step(edge, x), which translates into edge.step(x).
     ///
+    /// Exact: `Fixed::step` on each pair (`1` when the elements are equal).
+    ///
     /// Mirrors `glam::Vec3::step`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact: `Fixed::step` on each pair (`1` when the elements are equal).
+    /// * None.
     fn step(self: Vec3, rhs: Vec3) -> Vec3;
     /// Performs Hermite interpolation between `0.0` and `1.0` using `x` normalized to
     /// `[edge0, edge1]`.
@@ -654,6 +674,11 @@ pub trait Vec3Trait {
     /// This is equivalent to `t * t * (3.0 - 2.0 * t)`, where `t` is clamped to `[0.0,
     /// 1.0]`. Results are undefined if any element of `edge0` is greater than or equal to
     /// the corresponding element of `edge1`.
+    ///
+    /// Element-wise `Fixed::smoothstep`: `t = saturate(trunc((x - edge0) / (edge1 -
+    /// edge0)))`, then the polynomial is evaluated exactly and rescaled once (floored),
+    /// instead of the three rescaled vector operations of glam-rs (`alt_smoothstep_glam`
+    /// in `gas/vec3.snap`). Inlined: cheaper than the call (`alt_smoothstep_noinline`).
     ///
     /// Mirrors `glam::Vec3::smoothstep`.
     /// #### Panics
@@ -663,19 +688,17 @@ pub trait Vec3Trait {
     /// #### Deviations
     /// * The `edge0 < edge1` precondition (`glam_assert!`) is only checked for equality,
     ///   by the division; the result for `edge0 > edge1` is the one of the formula.
-    /// * Element-wise `Fixed::smoothstep`: `t = saturate(trunc((x - edge0) / (edge1 -
-    ///   edge0)))`, then the polynomial is evaluated exactly and rescaled once (floored),
-    ///   instead of the three rescaled vector operations of glam-rs (`alt_smoothstep_glam`
-    ///   in `gas/vec3.snap`). Inlined: cheaper than the call (`alt_smoothstep_noinline`).
     fn smoothstep(self: Vec3, edge0: Vec3, edge1: Vec3) -> Vec3;
     /// Returns a vector containing all elements of `self` clamped to the range of `[0,
     /// 1]`.
+    ///
+    /// Exact.
     ///
     /// Mirrors `glam::Vec3::saturate`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn saturate(self: Vec3) -> Vec3;
     /// Computes the length of `self`.
     ///
@@ -720,28 +743,37 @@ pub trait Vec3Trait {
     fn distance(self: Vec3, rhs: Vec3) -> Fixed;
     /// Computes the squared Euclidean distance between two points in space.
     ///
+    /// Exact differences and one floor rescale (see `distance`).
+    ///
     /// Mirrors `glam::Vec3::distance_squared`.
     /// #### Panics
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
-    /// * Exact differences and one floor rescale (see `distance`).
+    /// * Overflow panics where f32 returns NaN, infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn distance_squared(self: Vec3, rhs: Vec3) -> Fixed;
     /// Returns the element-wise quotient of Euclidean division of `self` by `rhs`.
+    ///
+    /// Exact: computed on the raw integers, with no intermediate rounding.
     ///
     /// Mirrors `glam::Vec3::div_euclid`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if an element of `rhs` is zero.
     /// * `'Fixed: overflow'` if a quotient does not fit the scalar range.
     /// #### Deviations
-    /// * Exact: computed on the raw integers, with no intermediate rounding.
+    /// * Division by zero or overflow panics where f32 returns NaN, infinity or a larger
+    ///   finite value: docs/DESIGN.md section 3, "division by zero" and "overflow".
     fn div_euclid(self: Vec3, rhs: Vec3) -> Vec3;
     /// Returns the element-wise remainder of Euclidean division of `self` by `rhs`.
+    ///
+    /// Exact: always strictly below `|rhs|` (the f32 version can round up to `|rhs|`).
     ///
     /// Mirrors `glam::Vec3::rem_euclid`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if an element of `rhs` is zero.
     /// #### Deviations
-    /// * Exact: always strictly below `|rhs|` (the f32 version can round up to `|rhs|`).
+    /// * Division by zero panics where f32 returns NaN or infinity: docs/DESIGN.md section
+    ///   3, "division by zero".
     fn rem_euclid(self: Vec3, rhs: Vec3) -> Vec3;
     /// Returns `self` normalized to length 1.
     ///
@@ -833,15 +865,18 @@ pub trait Vec3Trait {
     ///
     /// `rhs` must be of non-zero length.
     ///
+    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (truncated toward zero), then
+    /// one floor rescale per component. A shared `Recip` is measurably more expensive for
+    /// one division: it is kept in `benches::alt`.
+    ///
     /// Mirrors `glam::Vec3::project_onto`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `rhs.dot(rhs)` is zero, i.e. if `rhs` is zero or
     ///   shorter than `2^-16` (its squared length then rounds to zero).
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
-    /// * A single division `dot(self, rhs) / dot(rhs, rhs)` (truncated toward zero), then
-    ///   one floor rescale per component. A shared `Recip` is measurably more expensive
-    ///   for one division: it is kept in `benches::alt`.
+    /// * Division by zero or overflow panics where f32 returns NaN, infinity or a larger
+    ///   finite value: docs/DESIGN.md section 3, "division by zero" and "overflow".
     fn project_onto(self: Vec3, rhs: Vec3) -> Vec3;
     /// Returns the vector rejection of `self` from `rhs`.
     ///
@@ -919,16 +954,17 @@ pub trait Vec3Trait {
     ///
     /// The inputs do not need to be unit vectors however they must be non-zero.
     ///
+    /// `atan2(|self x rhs|, dot)` instead of the `acos_approx(dot / sqrt(|self|^2 *
+    /// |rhs|^2))` of glam-rs. It is not a change of formula but of conditioning: the
+    /// `acos` form loses the angle near `0` and `PI` (the slope of `acos` is infinite
+    /// there: one ULP of the cosine near 1 is up to `2e-5` rad), the `atan2` form does
+    /// not. The `acos_clamped` form is kept in `benches::alt`.
+    ///
     /// Mirrors `glam::Vec3::angle_between`.
     /// #### Panics
     /// * `'Fixed: overflow'` if `|self x rhs|` or `dot` does not fit the scalar range,
     ///   i.e. for `|self| * |rhs| >= 2^31`.
     /// #### Deviations
-    /// * `atan2(|self x rhs|, dot)` instead of the `acos_approx(dot / sqrt(|self|^2 *
-    ///   |rhs|^2))` of glam-rs. It is not a change of formula but of conditioning: the
-    ///   `acos` form loses the angle near `0` and `PI` (the slope of `acos` is infinite
-    ///   there: one ULP of the cosine near 1 is up to `2e-5` rad), the `atan2` form does
-    ///   not. The `acos_clamped` form is kept in `benches::alt`.
     /// * The three cross components are `mul_sub` kernels (one floor each), their norm is
     ///   the integer square root of the raw sum of squares, `dot` is floored once: the
     ///   total error is below `3.22 + 2.9 / (|self| * |rhs|)` ULP, about 6 ULP for vectors
@@ -995,6 +1031,9 @@ pub trait Vec3Trait {
     ///
     /// The axis must be a unit vector.
     ///
+    /// Building the same rotation as a `Mat3::from_axis_angle` and multiplying costs 15 %
+    /// more (58 730 against 51 120 gas, `alt_rotate_axis_mat3`).
+    ///
     /// Mirrors `glam::Vec3::rotate_axis`.
     /// #### Panics
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
@@ -1004,8 +1043,6 @@ pub trait Vec3Trait {
     ///   (about 1 ULP over a turn), then the 15-multiplication rotation kernel of
     ///   `Quat::mul_vec3`, which rescales once per component. The total error is below `4
     ///   |self|` ULP for a unit `axis`.
-    /// * Building the same rotation as a `Mat3::from_axis_angle` and multiplying costs 15
-    ///   % more (58 730 against 51 120 gas, `alt_rotate_axis_mat3`).
     fn rotate_axis(self: Vec3, axis: Vec3, angle: Fixed) -> Vec3;
     /// Rotates towards `rhs` up to `max_angle` (in radians).
     ///
@@ -1038,12 +1075,12 @@ pub trait Vec3Trait {
     /// The output vector is not necessarily unit length. For that use
     /// `any_orthonormal_vector` instead.
     ///
+    /// Exact: `self x Y` or `self x X`, whichever of the two is the longer, as in glam-rs.
+    ///
     /// Mirrors `glam::Vec3::any_orthogonal_vector`.
     /// #### Panics
     /// * `'i64_neg Underflow'` if a component is `MIN`.
     /// #### Deviations
-    /// * Exact: `self x Y` or `self x X`, whichever of the two is the longer, as in glam-
-    ///   rs.
     /// * The `|x| > |y|` test is the one of glam-rs; it is a comparison of absolute
     ///   values, not of the components.
     fn any_orthogonal_vector(self: Vec3) -> Vec3;
@@ -1254,6 +1291,10 @@ pub trait Vec3Trait {
     fn mul_scalar(self: Vec3, rhs: Fixed) -> Vec3;
     /// Returns `[self.x / rhs, self.y / rhs, ..]`.
     ///
+    /// One division shared by the components (`Recip`) and one fused multiplication each,
+    /// rounded to nearest: cheaper than, and up to 1 ULP away from, the component-wise
+    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    ///
     /// Mirrors `impl Div<f32> for glam::Vec3`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `rhs` is zero.
@@ -1261,11 +1302,10 @@ pub trait Vec3Trait {
     /// #### Deviations
     /// * glam-rs spells this with an operator (`impl Div<f32> for Vec3`); the core
     ///   operator traits of Cairo are homogeneous (docs/DESIGN.md section 3).
-    /// * One division shared by the components (`Recip`) and one fused multiplication
-    ///   each, rounded to nearest: cheaper than, and up to 1 ULP away from, the component-
-    ///   wise truncated `Fixed / Fixed` kept in `benches::alt`.
     fn div_scalar(self: Vec3, rhs: Fixed) -> Vec3;
     /// Returns `[self.x % rhs, self.y % rhs, ..]` (the remainder has the sign of `self`).
+    ///
+    /// Exact.
     ///
     /// Mirrors `impl Rem<f32> for glam::Vec3`.
     /// #### Panics
@@ -1273,7 +1313,6 @@ pub trait Vec3Trait {
     /// #### Deviations
     /// * glam-rs spells this with an operator (`impl Rem<f32> for Vec3`); the core
     ///   operator traits of Cairo are homogeneous (docs/DESIGN.md section 3).
-    /// * Exact.
     fn rem_scalar(self: Vec3, rhs: Fixed) -> Vec3;
     /// Casts all elements of `self` to `i32`, truncating toward zero.
     ///

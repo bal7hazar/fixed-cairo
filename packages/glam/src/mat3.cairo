@@ -181,11 +181,13 @@ pub trait Mat3Trait {
     fn row(self: Mat3, index: usize) -> Vec3;
     /// Returns the transpose of `self`.
     ///
+    /// Exact: a permutation of the elements.
+    ///
     /// Mirrors `glam::Mat3::transpose`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact: a permutation of the elements.
+    /// * None.
     fn transpose(self: Mat3) -> Mat3;
     /// Returns the determinant of `self`.
     ///
@@ -231,21 +233,27 @@ pub trait Mat3Trait {
     fn mul_mat3(self: Mat3, rhs: Mat3) -> Mat3;
     /// Adds two 3x3 matrices.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat3::add_mat3`.
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_add Underflow'` if an element sum leaves the scalar
     ///   range.
     /// #### Deviations
-    /// * Exact.
+    /// * Overflow panics where f32 returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn add_mat3(self: Mat3, rhs: Mat3) -> Mat3;
     /// Subtracts two 3x3 matrices.
+    ///
+    /// Exact.
     ///
     /// Mirrors `glam::Mat3::sub_mat3`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if an element difference leaves the
     ///   scalar range.
     /// #### Deviations
-    /// * Exact.
+    /// * Overflow panics where f32 returns infinity or a larger finite value:
+    ///   docs/DESIGN.md section 3, "overflow".
     fn sub_mat3(self: Mat3, rhs: Mat3) -> Mat3;
     /// Multiplies a 3x3 matrix by a scalar.
     ///
@@ -260,6 +268,10 @@ pub trait Mat3Trait {
     fn mul_scalar(self: Mat3, rhs: Fixed) -> Mat3;
     /// Divides a 3x3 matrix by a scalar.
     ///
+    /// One division shared by the 9 elements (`Recip`) and one fused multiplication each,
+    /// rounded to nearest: cheaper than, and up to 1 ULP away from, the element-wise
+    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    ///
     /// Mirrors `glam::Mat3::div_scalar`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `rhs` is zero.
@@ -267,9 +279,6 @@ pub trait Mat3Trait {
     /// #### Deviations
     /// * glam-rs spells this with an operator (`impl Div<f32> for Mat3`); the core
     ///   operator traits of Cairo are homogeneous (docs/DESIGN.md section 3).
-    /// * One division shared by the 9 elements (`Recip`) and one fused multiplication
-    ///   each, rounded to nearest: cheaper than, and up to 1 ULP away from, the element-
-    ///   wise truncated `Fixed / Fixed` kept in `benches::alt`.
     fn div_scalar(self: Mat3, rhs: Fixed) -> Mat3;
     /// Multiplies `self` by a scaling vector `scale`. This is faster than creating a whole
     /// diagonal scaling matrix and then multiplying that. This operation is commutative.
@@ -332,7 +341,8 @@ pub trait Mat3Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if an element is `Fixed::MIN`.
     /// #### Deviations
-    /// * None.
+    /// * Overflow panics where f32 returns the finite value `2^31`: docs/DESIGN.md section
+    ///   3, "overflow".
     fn abs(self: Mat3) -> Mat3;
     /// Returns a matrix containing the reciprocal `1 / n` of each element of `self`.
     ///
@@ -361,31 +371,44 @@ pub trait Mat3Trait {
     /// The resulting matrix can be used to transform 2D points and vectors. See
     /// `transform_point2` and `transform_vector2`.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat3::from_mat2`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat2(m: Mat2) -> Mat3;
     /// Creates a 3x3 matrix from a 4x4 matrix, discarding the 4th row and column.
+    ///
+    /// Exact.
     ///
     /// Mirrors `glam::Mat3::from_mat4`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_mat4(m: Mat4) -> Mat3;
     /// Creates a 3x3 matrix from the minor of the given 4x4 matrix, discarding the `i`th
     /// column and `j`th row.
+    ///
+    /// Exact. glam-rs panics with `'index out of bounds'`; the message is the one of this
+    /// module.
     ///
     /// Mirrors `glam::Mat3::from_mat4_minor`.
     /// #### Panics
     /// * `'Mat3: index out of bounds'` if `i` or `j` is greater than 3.
     /// #### Deviations
-    /// * Exact. glam-rs panics with `'index out of bounds'`; the message is the one of
-    ///   this module.
+    /// * None.
     fn from_mat4_minor(m: Mat4, i: usize, j: usize) -> Mat3;
     /// Creates a 3D rotation matrix from the given quaternion.
+    ///
+    /// Every element is one exact two-term sum of raw products rescaled once (floored): `1
+    /// - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling folded
+    /// into the second factor. Nine rescales for the nine elements, at most 1 ULP below
+    /// the exact value each. The literal glam-rs expression rescales the twelve products
+    /// one by one and costs 2.1x as much (43 460 against 20 660 gas for `Mat3`): it is
+    /// kept in `benches::alt`.
     ///
     /// Mirrors `glam::Mat3::from_quat`.
     /// #### Panics
@@ -397,12 +420,6 @@ pub trait Mat3Trait {
     ///   `rotation` must be normalized: as in glam-rs the elements are the ones of the
     ///   rotation matrix of a unit quaternion, and a quaternion of length `l` scales the
     ///   matrix by `l^2`.
-    /// * Every element is one exact two-term sum of raw products rescaled once (floored):
-    ///   `1 - 2 (b^2 + c^2)` on the diagonal, `2 (ab +- cd)` off it, with the doubling
-    ///   folded into the second factor. Nine rescales for the nine elements, at most 1 ULP
-    ///   below the exact value each. The literal glam-rs expression rescales the twelve
-    ///   products one by one and costs 2.1x as much (43 460 against 20 660 gas for
-    ///   `Mat3`): it is kept in `benches::alt`.
     fn from_quat(rotation: Quat) -> Mat3;
     /// Creates a 3D rotation matrix from a normalized rotation `axis` and `angle` (in
     /// radians).
@@ -463,16 +480,20 @@ pub trait Mat3Trait {
     /// The resulting matrix can be used to transform 2D points and vectors. See
     /// `transform_point2` and `transform_vector2`.
     ///
+    /// Exact.
+    ///
     /// Mirrors `glam::Mat3::from_translation`.
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Exact.
+    /// * None.
     fn from_translation(translation: Vec2) -> Mat3;
     /// Creates an affine transformation matrix from the given non-uniform 2D `scale`.
     ///
     /// The resulting matrix can be used to transform 2D points and vectors. See
     /// `transform_point2` and `transform_vector2`.
+    ///
+    /// Exact.
     ///
     /// Mirrors `glam::Mat3::from_scale`.
     /// #### Panics
@@ -480,7 +501,6 @@ pub trait Mat3Trait {
     /// #### Deviations
     /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3). glam-
     ///   rs asserts that `scale` is not entirely zero.
-    /// * Exact.
     fn from_scale(scale: Vec2) -> Mat3;
     /// Creates an affine transformation matrix from the given 2D `scale`, rotation `angle`
     /// (in radians) and `translation`.
