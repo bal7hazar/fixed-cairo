@@ -353,7 +353,7 @@ pub trait TrigTrait {
     ///
     /// Mirrors `f32::to_radians`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never: `|self * PI / 180| < |self|` (R1 panic-coverage audit, escalation 1).
     /// #### Deviations
     /// * Multiplies by a 57-bit `pi / 180` and rescales once, instead of the 32-bit
     ///   [`DEG_TO_RAD`](crate::fixed::DEG_TO_RAD): the result is the floor of the exact product

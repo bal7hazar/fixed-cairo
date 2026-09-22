@@ -1011,15 +1011,20 @@ def methods(t):
         ["Exact: always strictly below `|rhs|` (the f32 version can round up to `|rhs|`)."])
 
     # ------------------------------------------------------------------------------ normalize
+    # `norm{2,3}_wide` cannot overflow and `|x| * recip(len) <= 2^96`: every component of a
+    # `Vec2` / `Vec3` result is in `[-1, 1]`. Only `Vec4` reaches `'Fixed: overflow'`, with four
+    # `MIN` components (R1 panic-coverage audit, escalation 1).
     norm_dev = ("One square root and one division shared by the components, then one fused "
                 "multiplication each (rounded to nearest, ties toward +infinity): every "
                 "component is within `1 / |self|` ULP of the exact value, and an axis-aligned "
                 "vector normalizes to exactly `+-1`.")
+    norm_ovf = [OVF] if t.n == 4 else []
     add("normalize", f"(self: {T}) -> {T}",
         "Returns `self` normalized to length 1.\n\nFor valid results, `self` must not be of "
         "length zero.", fz("normalize"),
-        [f"`{zero_norm_msg(t)}` if the length of `self` is zero (raw sum of squares below 1).",
-         OVF], [norm_dev, "Panics instead of returning a NaN vector (docs/DESIGN.md section 3)."])
+        [f"`{zero_norm_msg(t)}` if the length of `self` is zero (raw sum of squares below 1)."]
+        + norm_ovf, [norm_dev, "Panics instead of returning a NaN vector (docs/DESIGN.md "
+                                "section 3)."])
     add("try_normalize", f"(self: {T}) -> Option<{T}>",
         "Returns `self` normalized to length 1 if possible, else returns `None`.\n\nIn "
         "particular, if the input is zero the result of this operation will be `None`.",
@@ -1027,7 +1032,8 @@ def methods(t):
         "match n.try_recip() {\n"
         f"    Some(r) => Some({normalized_fields(t)}),\n"
         "    None => None,\n"
-        "}", [OVF], [norm_dev, "`None` only for the zero vector: there is no non-finite input."])
+        "}", norm_ovf, [norm_dev, "`None` only for the zero vector: there is no non-finite "
+                                  "input."])
     add("normalize_or", f"(self: {T}, fallback: {T}) -> {T}",
         "Returns `self` normalized to length 1 if possible, else returns a fallback value.\n\nIn "
         "particular, if the input is zero the result of this operation will be the fallback "
@@ -1036,11 +1042,11 @@ def methods(t):
         "match n.try_recip() {\n"
         f"    Some(r) => {normalized_fields(t)},\n"
         "    None => fallback,\n"
-        "}", [OVF], [norm_dev, "The fallback is returned only for the zero vector."],
+        "}", norm_ovf, [norm_dev, "The fallback is returned only for the zero vector."],
         attrs=["allow(manual_unwrap_or)"])
     add("normalize_or_zero", f"(self: {T}) -> {T}",
         "Returns `self` normalized to length 1 if possible, else returns zero.",
-        "Self::normalize_or(self, Self::ZERO)", [OVF],
+        "Self::normalize_or(self, Self::ZERO)", norm_ovf,
         [norm_dev, "Zero is returned only for the zero vector."])
     add("normalize_and_length", f"(self: {T}) -> ({T}, Fixed)",
         "Returns `self` normalized to length 1 and the length of `self`.\n\nIf `self` is zero "
@@ -1238,8 +1244,11 @@ def methods(t):
             "negative, rotates towards the exact opposite of `rhs`. Will not go past the "
             "target.", body_rotate_towards3(t),
             ["`'Fixed: overflow'` if `|self x rhs|` or `self.dot(rhs)` does not fit the scalar "
-             "range, i.e. for `|self| * |rhs| >= 2^31`.", SUB_P],
-            ["One `atan2` (`angle_between`, error bound as there) and the `from_axis_angle` / "
+             "range, i.e. for `|self| * |rhs| >= 2^31`."],
+            ["Never for a component difference: the only `i64` subtraction is "
+             "`angle_between - PI`, with `angle_between` in `[0, PI]` (R1 panic-coverage audit, "
+             "escalation 1).",
+             "One `atan2` (`angle_between`, error bound as there) and the `from_axis_angle` / "
              "`mul_vec3` pair of `rotate_axis`: the total error is below `10 |self|` ULP.",
              "The rotation axis is the normalized `self.cross(rhs)`, falling back to the "
              "normalized `any_orthogonal_vector` when the two vectors are parallel, as in "
@@ -1347,9 +1356,10 @@ def methods(t):
     add("midpoint", f"(self: {T}, rhs: {T}) -> {T}",
         "Calculates the midpoint between `self` and `rhs`.\n\nThe midpoint is the average of, or "
         "halfway point between, two vectors. `a.midpoint(b)` should yield the same result as "
-        "`a.lerp(b, 0.5)` while being slightly cheaper to compute.", fz("midpoint"), [OVF],
+        "`a.lerp(b, 0.5)` while being slightly cheaper to compute.", fz("midpoint"), [],
         ["`self + (rhs - self) / 2` instead of `(self + rhs) * 0.5`: the sum of the two vectors "
-         "cannot overflow this way, and the result is the floor of the exact midpoint."])
+         "cannot overflow this way, and each component is the floor of the exact midpoint, "
+         "which lies between `self` and `rhs` (R1 panic-coverage audit, escalation 1)."])
     add("mul_add", f"(self: {T}, a: {T}, b: {T}) -> {T}",
         "Fused multiply-add. Computes `(self * a) + b` element-wise with only one rounding "
         "error.", fz("mul_add"), [OVF],

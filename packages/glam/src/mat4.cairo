@@ -529,11 +529,12 @@ pub trait Mat4Trait {
     /// * `'Fixed: division by zero'` if a column of the linear part is zero.
     /// * `'Fixed: overflow'` if a column length or an element of the determinant does not
     ///   fit the scalar range.
-    /// * `'i64_neg Underflow'` if an element is `MIN`.
     /// #### Deviations
     /// * The `glam_assert!` precondition is not checked (docs/DESIGN.md section 3). The
     ///   4th row of `self` must be `(0, 0, 0, 1)` and the determinant must not be zero;
     ///   the latter panics here instead (`'Fixed: division by zero'`).
+    /// * Never for a negation: the only one is `-length(x_axis)`, never `MIN` (R1 panic-
+    ///   coverage audit, escalation 1).
     /// * The sign of the determinant is applied to `scale.x` by negating the length
     ///   (exact) instead of multiplying it by `signum(det)`; `signum(0)` is `+1` as
     ///   everywhere else (docs/DESIGN.md section 3), but a zero determinant means a zero

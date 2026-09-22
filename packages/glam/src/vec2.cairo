@@ -752,7 +752,6 @@ pub trait Vec2Trait {
     /// #### Panics
     /// * `'Vec2: normalize zero'` if the length of `self` is zero (raw sum of squares
     ///   below 1).
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -766,7 +765,7 @@ pub trait Vec2Trait {
     ///
     /// Mirrors `glam::Vec2::try_normalize`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -781,7 +780,7 @@ pub trait Vec2Trait {
     ///
     /// Mirrors `glam::Vec2::normalize_or`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -793,7 +792,7 @@ pub trait Vec2Trait {
     ///
     /// Mirrors `glam::Vec2::normalize_or_zero`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -1037,11 +1036,12 @@ pub trait Vec2Trait {
     ///
     /// Mirrors `glam::Vec2::midpoint`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * `self + (rhs - self) / 2` instead of `(self + rhs) * 0.5`: the sum of the two
-    ///   vectors cannot overflow this way, and the result is the floor of the exact
-    ///   midpoint.
+    ///   vectors cannot overflow this way, and each component is the floor of the exact
+    ///   midpoint, which lies between `self` and `rhs` (R1 panic-coverage audit,
+    ///   escalation 1).
     fn midpoint(self: Vec2, rhs: Vec2) -> Vec2;
     /// Fused multiply-add. Computes `(self * a) + b` element-wise with only one rounding
     /// error.

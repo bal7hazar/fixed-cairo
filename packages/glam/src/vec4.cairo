@@ -979,11 +979,12 @@ pub trait Vec4Trait {
     ///
     /// Mirrors `glam::Vec4::midpoint`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * `self + (rhs - self) / 2` instead of `(self + rhs) * 0.5`: the sum of the two
-    ///   vectors cannot overflow this way, and the result is the floor of the exact
-    ///   midpoint.
+    ///   vectors cannot overflow this way, and each component is the floor of the exact
+    ///   midpoint, which lies between `self` and `rhs` (R1 panic-coverage audit,
+    ///   escalation 1).
     fn midpoint(self: Vec4, rhs: Vec4) -> Vec4;
     /// Fused multiply-add. Computes `(self * a) + b` element-wise with only one rounding
     /// error.

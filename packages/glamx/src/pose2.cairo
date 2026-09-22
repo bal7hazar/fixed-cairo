@@ -310,8 +310,8 @@ pub trait Pose2Trait {
     ///
     /// Mirrors `approx::AbsDiffEq for glamx::Pose2`.
     /// #### Panics
-    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if a component difference leaves the
-    ///   scalar range.
+    /// * Never: built on `Fixed::abs_diff_eq`, an `i128` difference that never panics (R1
+    ///   panic-coverage audit, escalation 1).
     /// #### Deviations
     /// * An inherent method with an explicit tolerance; there is no `approx` crate or default
     ///   epsilon.

@@ -223,9 +223,11 @@ pub trait QuatTrait {
     /// Mirrors `glam::Quat::from_rotation_axes`.
     /// #### Panics
     /// * `'i64_add Overflow'` / `'i64_sub Overflow'` (and their `Underflow` forms) if an element
-    ///   is far outside `[-1, 1]`, and `'Fixed: overflow'` if a component of the result is.
-    ///   The division and the square root cannot fail: whichever branch is taken, the value
-    ///   under the root is `1 - m22 -+ (m11 -+ m00) >= 1` by the very tests that select it.
+    ///   is far outside `[-1, 1]`. The division and the square root cannot fail, and the result
+    ///   cannot overflow either: whichever branch is taken, the value under the root is
+    ///   `1 - m22 -+ (m11 -+ m00) >= 1` by the very tests that select it, so the shared
+    ///   reciprocal is at most `1/2` and each output component -- at most half of an already
+    ///   valid scalar -- stays in range.
     /// #### Deviations
     /// * The four-branch algorithm of glam-rs (`XMQuaternionRotationMatrix`), branching on
     ///   `m22 <= 0` then on `m11 -+ m00 <= 0`, so that the component the division is carried by

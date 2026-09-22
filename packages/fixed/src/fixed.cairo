@@ -405,7 +405,11 @@ pub trait FixedTrait {
     /// Mirrors `glam::FloatExt::move_towards`.
     /// #### Panics
     /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if `rhs - self` does not fit the scalar
-    ///   range, `'i64_add Overflow'` / `'i64_sub Underflow'` if `self +- d` does not.
+    ///   range.
+    /// * `'i64_add Underflow'` / `'i64_sub Overflow'` if `self +- d` does not fit the scalar
+    ///   range, only reachable on the away branches (a negative `d`): the towards branches
+    ///   cannot leave the range, since `self + d < rhs` / `self - d > rhs` there (R1
+    ///   panic-coverage audit, escalation 2).
     /// * `'i64_neg Underflow'` if `d` is `MIN`.
     /// #### Deviations
     /// * Overflow panics where `f32` returns infinity or a larger finite value:

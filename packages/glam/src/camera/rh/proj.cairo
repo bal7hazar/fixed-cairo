@@ -72,10 +72,13 @@ pub mod opengl {
     /// Mirrors `glam::camera::rh::proj::opengl::orthographic`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
-    /// * `'Fixed: overflow'` if a difference or a sum of the box (`right - left`, `top - bottom`,
-    ///   `far - near`, `left + right`, `bottom + top`, `far + near`) or an element does not fit the
-    ///   scalar range.
+    /// * `'Fixed: overflow'` if an element (a rounded quotient) does not fit the scalar range.
     /// #### Deviations
+    /// * A difference or a sum of the box (`right - left`, `top - bottom`, `far - near`,
+    ///   `left + right`, `bottom + top`, `far + near`) that leaves the scalar range panics with
+    ///   a plain `i64` message (`'i64_sub Overflow'` / `'i64_sub Underflow'` / `'i64_add
+    ///   Overflow'` / `'i64_add Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit,
+    ///   escalation 2).
     /// * Every quotient is rounded to nearest (one shared `Recip` per axis, and one for the depth)
     ///   where glam-rs multiplies by a rounded reciprocal: each element is within 1 ULP of the
     ///   exact value.
@@ -105,11 +108,14 @@ pub mod opengl {
     ///   here).
     /// * `'camera: far not positive'` if `far <= 0` (the `glam_assert!` of glam-rs, checked here).
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
-    /// * `'Fixed: overflow'` if `2 * near`, a difference or a sum of the box (`right - left`,
-    ///   `right + left`, `top - bottom`, `top + bottom`), a quotient or a depth term does not fit
-    ///   the scalar range. The depth terms fit while `far / (far - near)` and `near * far / (far -
-    ///   near)` are below `2^30`, as in `perspective`.
+    /// * `'Fixed: overflow'` if a quotient or a depth term does not fit the scalar range. The
+    ///   depth terms fit while `far / (far - near)` and `near * far / (far - near)` are below
+    ///   `2^30`, as in `perspective`.
     /// #### Deviations
+    /// * `2 * near`, or a difference or a sum of the box (`right - left`, `right + left`,
+    ///   `top - bottom`, `top + bottom`), that leaves the scalar range panics with a plain
+    ///   `i64` message (`'i64_add Overflow'` / `'i64_add Underflow'` / `'i64_sub Overflow'` /
+    ///   `'i64_sub Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit, escalation 2).
     /// * `xx`, `yy`, `zx` and `zy` are quotients rounded to nearest (one shared `Recip` per axis):
     ///   each is within 1 ULP of the exact value.
     /// * The depth terms are those of `perspective`: one truncated division and one fused product.
@@ -266,10 +272,13 @@ pub mod vulkan {
     /// Mirrors `glam::camera::rh::proj::vulkan::orthographic`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
-    /// * `'Fixed: overflow'` if a difference or a sum of the box (`right - left`, `top - bottom`,
-    ///   `far - near`, `left + right`, `bottom + top`, `near`) or an element does not fit the
-    ///   scalar range.
+    /// * `'Fixed: overflow'` if an element (a rounded quotient) does not fit the scalar range.
     /// #### Deviations
+    /// * A difference or a sum of the box (`right - left`, `top - bottom`, `far - near`,
+    ///   `left + right`, `bottom + top`, `near`) that leaves the scalar range panics with a
+    ///   plain `i64` message (`'i64_sub Overflow'` / `'i64_sub Underflow'` / `'i64_add
+    ///   Overflow'` / `'i64_add Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit,
+    ///   escalation 2).
     /// * Every quotient is rounded to nearest (one shared `Recip` per axis, and one for the depth)
     ///   where glam-rs multiplies by a rounded reciprocal: each element is within 1 ULP of the
     ///   exact value.
@@ -297,11 +306,14 @@ pub mod vulkan {
     ///   here).
     /// * `'camera: far not positive'` if `far <= 0` (the `glam_assert!` of glam-rs, checked here).
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
-    /// * `'Fixed: overflow'` if `2 * near`, a difference or a sum of the box (`right - left`,
-    ///   `right + left`, `top - bottom`, `top + bottom`), a quotient or a depth term does not fit
-    ///   the scalar range. The depth terms fit while `far / (far - near)` and `near * far / (far -
-    ///   near)` are below `2^31`, as in `perspective`.
+    /// * `'Fixed: overflow'` if a quotient or a depth term does not fit the scalar range. The
+    ///   depth terms fit while `far / (far - near)` and `near * far / (far - near)` are below
+    ///   `2^31`, as in `perspective`.
     /// #### Deviations
+    /// * `2 * near`, or a difference or a sum of the box (`right - left`, `right + left`,
+    ///   `top - bottom`, `top + bottom`), that leaves the scalar range panics with a plain
+    ///   `i64` message (`'i64_add Overflow'` / `'i64_add Underflow'` / `'i64_sub Overflow'` /
+    ///   `'i64_sub Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit, escalation 2).
     /// * `xx`, `yy`, `zx` and `zy` are quotients rounded to nearest (one shared `Recip` per axis):
     ///   each is within 1 ULP of the exact value.
     /// * The depth terms are those of `perspective`: one truncated division and one fused product.
@@ -457,10 +469,13 @@ pub mod directx {
     /// Mirrors `glam::camera::rh::proj::directx::orthographic`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
-    /// * `'Fixed: overflow'` if a difference or a sum of the box (`right - left`, `top - bottom`,
-    ///   `far - near`, `left + right`, `bottom + top`, `near`) or an element does not fit the
-    ///   scalar range.
+    /// * `'Fixed: overflow'` if an element (a rounded quotient) does not fit the scalar range.
     /// #### Deviations
+    /// * A difference or a sum of the box (`right - left`, `top - bottom`, `far - near`,
+    ///   `left + right`, `bottom + top`, `near`) that leaves the scalar range panics with a
+    ///   plain `i64` message (`'i64_sub Overflow'` / `'i64_sub Underflow'` / `'i64_add
+    ///   Overflow'` / `'i64_add Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit,
+    ///   escalation 2).
     /// * Every quotient is rounded to nearest (one shared `Recip` per axis, and one for the depth)
     ///   where glam-rs multiplies by a rounded reciprocal: each element is within 1 ULP of the
     ///   exact value.
@@ -488,11 +503,14 @@ pub mod directx {
     ///   here).
     /// * `'camera: far not positive'` if `far <= 0` (the `glam_assert!` of glam-rs, checked here).
     /// * `'Fixed: division by zero'` if `left == right`, `bottom == top` or `near == far`.
-    /// * `'Fixed: overflow'` if `2 * near`, a difference or a sum of the box (`right - left`,
-    ///   `right + left`, `top - bottom`, `top + bottom`), a quotient or a depth term does not fit
-    ///   the scalar range. The depth terms fit while `far / (far - near)` and `near * far / (far -
-    ///   near)` are below `2^31`, as in `perspective`.
+    /// * `'Fixed: overflow'` if a quotient or a depth term does not fit the scalar range. The
+    ///   depth terms fit while `far / (far - near)` and `near * far / (far - near)` are below
+    ///   `2^31`, as in `perspective`.
     /// #### Deviations
+    /// * `2 * near`, or a difference or a sum of the box (`right - left`, `right + left`,
+    ///   `top - bottom`, `top + bottom`), that leaves the scalar range panics with a plain
+    ///   `i64` message (`'i64_add Overflow'` / `'i64_add Underflow'` / `'i64_sub Overflow'` /
+    ///   `'i64_sub Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit, escalation 2).
     /// * `xx`, `yy`, `zx` and `zy` are quotients rounded to nearest (one shared `Recip` per axis):
     ///   each is within 1 ULP of the exact value.
     /// * The depth terms are those of `perspective`: one truncated division and one fused product.

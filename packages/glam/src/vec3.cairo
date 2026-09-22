@@ -783,7 +783,6 @@ pub trait Vec3Trait {
     /// #### Panics
     /// * `'Vec3: normalize zero'` if the length of `self` is zero (raw sum of squares
     ///   below 1).
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -797,7 +796,7 @@ pub trait Vec3Trait {
     ///
     /// Mirrors `glam::Vec3::try_normalize`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -812,7 +811,7 @@ pub trait Vec3Trait {
     ///
     /// Mirrors `glam::Vec3::normalize_or`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -824,7 +823,7 @@ pub trait Vec3Trait {
     ///
     /// Mirrors `glam::Vec3::normalize_or_zero`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * One square root and one division shared by the components, then one fused
     ///   multiplication each (rounded to nearest, ties toward +infinity): every component
@@ -1055,9 +1054,9 @@ pub trait Vec3Trait {
     /// #### Panics
     /// * `'Fixed: overflow'` if `|self x rhs|` or `self.dot(rhs)` does not fit the scalar
     ///   range, i.e. for `|self| * |rhs| >= 2^31`.
-    /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if a component difference leaves the
-    ///   scalar range.
     /// #### Deviations
+    /// * Never for a component difference: the only `i64` subtraction is `angle_between -
+    ///   PI`, with `angle_between` in `[0, PI]` (R1 panic-coverage audit, escalation 1).
     /// * One `atan2` (`angle_between`, error bound as there) and the `from_axis_angle` /
     ///   `mul_vec3` pair of `rotate_axis`: the total error is below `10 |self|` ULP.
     /// * The rotation axis is the normalized `self.cross(rhs)`, falling back to the
@@ -1183,11 +1182,12 @@ pub trait Vec3Trait {
     ///
     /// Mirrors `glam::Vec3::midpoint`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    /// * Never.
     /// #### Deviations
     /// * `self + (rhs - self) / 2` instead of `(self + rhs) * 0.5`: the sum of the two
-    ///   vectors cannot overflow this way, and the result is the floor of the exact
-    ///   midpoint.
+    ///   vectors cannot overflow this way, and each component is the floor of the exact
+    ///   midpoint, which lies between `self` and `rhs` (R1 panic-coverage audit,
+    ///   escalation 1).
     fn midpoint(self: Vec3, rhs: Vec3) -> Vec3;
     /// Fused multiply-add. Computes `(self * a) + b` element-wise with only one rounding
     /// error.

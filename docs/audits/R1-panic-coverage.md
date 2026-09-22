@@ -196,3 +196,91 @@ panic tests into `test_<m>_panics.cairo` files (a `tests/lib.cairo` change, orch
 **Inventory.** The nine `IndexView` doc blocks add nine items to the `scripts/deviations.py`
 inventory; the appendix of `R1-deviations.md` was already stale on the base commit
 (`deviations.py --check` fails there too) and is left to the deviation-doc task.
+
+## Follow-up (#R1m)
+
+Branch `test/panic-followup`, follow-up of the panic coverage above: the 21 `deferred: quat PR in
+flight` entries (the quat pull request #36 is merged), the "unreachable documented panics"
+escalation, and the "wrong message in the doc" escalation. `deviations.py`'s doc-comment parser is
+unaffected: none of the edits below touch anything outside a `#### Panics` / `#### Deviations`
+bullet.
+
+**The 21 quat entries.** `is_normalized` and `is_near_identity` already document `Never` (fixed by
+#36, nothing to do). Of the other 20, each got a `#[should_panic(expected: ...)]` test in
+`test_quat.cairo` with a `// panics: Quat::<item>` marker: `from_axis_angle`, `from_rotation_axes`
+(`'i64_add Overflow'`), `from_mat3`, `from_mat4`, `from_affine3`, `look_to_lh`, `look_to_rh`,
+`look_at_lh`, `look_at_rh`, `from_rotation_arc`, `from_rotation_arc_colinear`,
+`from_rotation_arc_2d`, `to_scaled_axis`, `inverse`, `length_recip`, `rotate_towards`, `lerp`,
+`slerp`, `div_scalar`, `QuatMul`. The 21st, `from_rotation_axes` / `'Fixed: overflow'`, turned out
+unreachable on inspection: the doc already noted "whichever branch is taken, the value under the
+root is `1 - m22 -+ (m11 -+ m00) >= 1`" (an algebraic identity of the branch-selection
+inequalities alone, true of any input, not just a real rotation matrix), which bounds the shared
+reciprocal `r` to at most `1/2`; every component it scales is itself a plain `i64` sum or
+difference that already fits the scalar range (else the `'i64_add'` / `'i64_sub'` bullet would
+have fired first), so `r.mul(component)` is at most half of an already-valid scalar and cannot
+overflow. Verified two ways: algebraically (above) and by a 2 000 000-case randomized brute force
+of the raw Q32.32 arithmetic in Python, `check_rotaxes.py` (scratch, not committed), which found no
+overflow. The doc bullet and the allowlist entry were removed instead of adding an unreachable
+test.
+
+**Unreachable documented panics (escalation 1).** Verified by reading the code (the branch-
+selection or construction that makes the panic unreachable) and, for the vector items, confirmed
+against the existing golden/fuzz tests; no test was reachable to add, so the bullet was dropped (or
+the whole item set to `Never`) and the allowlist entry removed:
+
+- `Vec2` / `Vec3::normalize` / `try_normalize` / `normalize_or` / `normalize_or_zero`: the `OVF`
+  bullet is conditional on the vector's dimension in `tools/codegen/fvec.py` now (`t.n == 4`
+  only); `Vec4` keeps it (reachable, already tested).
+- `Vec2` / `Vec3` / `Vec4::midpoint`: `OVF` dropped unconditionally in `fvec.py` (unreachable at
+  every dimension).
+- `Vec3::rotate_towards`: the `SUB_P` bullet dropped in `fvec.py`; the `'Fixed: overflow'` bullet
+  (reachable, tested) stays.
+- `Mat4::to_scale_rotation_translation`: the `NEG_P` bullet dropped in `fmat.py`.
+- `camera::{lh,rh}::view::look_at_mat3`: the `'i64_neg Underflow'` bullet dropped by hand (not
+  generated); the `'Fixed: overflow'` and `'i64_sub ...'` bullets (reachable via `look_at_mat4`'s
+  `dot(eye, s)` and the element differences) stay.
+- `Fixed::to_radians`: the whole item is now `Never`.
+- `Pose2` / `Pose3::abs_diff_eq`: the whole item is now `Never`.
+
+**Wrong message in the doc (escalation 2).** The doc bullet now quotes the message the code
+actually raises; the mechanism note (what the doc used to say, and why it was wrong) moved to
+`#### Deviations` so it does not itself read as a second, untested requirement:
+
+- `Fixed::move_towards`: the `self +- d` bullet now reads `'i64_add Underflow'` / `'i64_sub
+  Overflow'` (the away branches; the towards branches are unreachable, noted inline), matching
+  the existing `golden_fixed_move_towards_panics_away_underflow` and
+  `test_move_towards_away_overflow_panics`.
+- `SdpMatrix2` / `SdpMatrix3::add_diagonal`, `SdpMatrix{2,3}Add`, `SdpMatrix{2,3}Sub`: the bullet
+  now reads `'i64_add Overflow'` / `'i64_add Underflow'` (`Add`, `add_diagonal`) or `'i64_sub
+  Overflow'` / `'i64_sub Underflow'` (`Sub`), matching the existing `test_add_overflow`,
+  `test_sub_underflow`, `test_add_diagonal_overflow`, `test_add_diagonal2_overflow`,
+  `test_add2_overflow`, `test_sub3_underflow` of `test_sdp.cairo`.
+- `orthographic` / `frustum` (all three graphics-API variants, both handedness files, 12 doc
+  blocks): not blocking (the `'Fixed: overflow'` requirement was already covered by the genuine
+  quotient/depth-term overflow, e.g. the `width_one_ulp` / `depth_overflow` tests), so fixed for
+  accuracy without touching the checker-tracked message: the `'Fixed: overflow'` bullet now names
+  only the rounded quotient / depth term, and a new `#### Deviations` bullet says the box
+  difference/sum (and, for `frustum`, `2 * near`) is a plain `i64` operation instead, naming the
+  real messages. No test file besides `test_quat.cairo` is in this task's allowlist, and none of
+  `orthographic` / `frustum`'s existing tests needed to change.
+
+**Before / after** (same script, same repository, before = the base commit of this branch):
+
+| | requirements | covered | allowlisted | missing | panic tests | by marker / by name |
+|---|---|---|---|---|---|---|
+| before | 815 | 748 | 67 | 0 | 960 | 225 / 732 |
+| after | 796 | 775 | 21 | **0** | 980 | 245 / 732 |
+
+19 fewer requirements (the unreachable bullets dropped: 4 + 4 normalize family, 3 midpoint, 1
+`rotate_towards`, 1 `to_scale_rotation_translation`, 2 `look_at_mat3`, 1 `to_radians`, 2
+`abs_diff_eq`, 1 `from_rotation_axes`), 20 more panic tests (the quat tests, all marker-attributed),
+46 fewer allowlist entries (21 quat + 19 now-absent unreachable requirements + 6 wrong-message
+entries whose corrected message the existing test already satisfies without an allowlist entry).
+
+**Line budget.** `test_quat.cairo` is 1138 lines after the 20 new tests: still under the 1200-line
+guideline, no overage.
+
+**Inventory (again).** No new item was added or removed from the `scripts/deviations.py`
+inventory by this follow-up (doc-comment wording only); `R1-deviations.md`'s appendix is unchanged
+from the base commit and is still left to the deviation-doc task (`deviations.py --check` is not
+part of `scripts/check.sh`).

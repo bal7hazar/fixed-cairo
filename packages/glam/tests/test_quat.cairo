@@ -12,7 +12,7 @@ use core::poseidon::PoseidonTrait;
 use fixed::fixed::{Fixed, FixedTrait};
 use glam::affine3::Affine3Trait;
 use glam::mat3::{Mat3Trait, mat3};
-use glam::mat4::Mat4Trait;
+use glam::mat4::{Mat4Trait, mat4};
 use glam::quat::{Quat, QuatTrait, quat};
 use glam::vec2::{Vec2, Vec2Trait, vec2};
 use glam::vec3::{Vec3, Vec3Trait, vec3};
@@ -805,6 +805,180 @@ fn test_conjugate_underflow() {
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_scalar_overflow() {
     let _ = MAXQ.mul_scalar(f(0x200000000));
+}
+
+// panics: Quat::from_axis_angle
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_axis_angle_overflow() {
+    // `axis.x * sin(angle / 2)` overflows: `sin(-PI / 2) = -1` exactly and `-MIN` does not fit.
+    let _ = QuatTrait::from_axis_angle(vec3(fixed::fixed::MIN, f(0), f(0)), -fixed::fixed::PI);
+}
+
+// panics: Quat::from_rotation_axes
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_rotation_axes_add_overflow() {
+    let _ = QuatTrait::from_rotation_axes(
+        vec3(f(0), fixed::fixed::MAX, f(0)),
+        vec3(fixed::fixed::MAX, f(0), f(0)),
+        vec3(f(0), f(0), f(0)),
+    );
+}
+
+// panics: Quat::from_mat3
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_mat3_add_overflow() {
+    let _ = QuatTrait::from_mat3(
+        mat3(
+            vec3(f(0), fixed::fixed::MAX, f(0)),
+            vec3(fixed::fixed::MAX, f(0), f(0)),
+            vec3(f(0), f(0), f(0)),
+        ),
+    );
+}
+
+// panics: Quat::from_mat4
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_mat4_add_overflow() {
+    let _ = QuatTrait::from_mat4(
+        mat4(
+            vec4(f(0), fixed::fixed::MAX, f(0), f(0)),
+            vec4(fixed::fixed::MAX, f(0), f(0), f(0)),
+            vec4(f(0), f(0), f(0), f(0)),
+            vec4(f(0), f(0), f(0), f(0x100000000)),
+        ),
+    );
+}
+
+// panics: Quat::from_affine3
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_affine3_add_overflow() {
+    let _ = QuatTrait::from_affine3(
+        Affine3Trait::from_cols(
+            vec3(f(0), fixed::fixed::MAX, f(0)),
+            vec3(fixed::fixed::MAX, f(0), f(0)),
+            vec3(f(0), f(0), f(0)),
+            vec3(f(0), f(0), f(0)),
+        ),
+    );
+}
+
+// panics: Quat::look_to_lh
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_to_lh_parallel() {
+    let _ = QuatTrait::look_to_lh(Vec3Trait::X, Vec3Trait::X);
+}
+
+// panics: Quat::look_to_rh
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_to_rh_parallel() {
+    let _ = QuatTrait::look_to_rh(Vec3Trait::X, Vec3Trait::X);
+}
+
+// panics: Quat::look_at_lh
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_at_lh_eye_is_center() {
+    let _ = QuatTrait::look_at_lh(Vec3Trait::ZERO, Vec3Trait::ZERO, Vec3Trait::Y);
+}
+
+// panics: Quat::look_at_rh
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_at_rh_eye_is_center() {
+    let _ = QuatTrait::look_at_rh(Vec3Trait::ZERO, Vec3Trait::ZERO, Vec3Trait::Y);
+}
+
+// panics: Quat::from_rotation_arc
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_rotation_arc_overflow() {
+    let long = vec3(fixed::fixed::MAX, fixed::fixed::MAX, fixed::fixed::MAX);
+    let _ = QuatTrait::from_rotation_arc(long, long);
+}
+
+// panics: Quat::from_rotation_arc_colinear
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_from_rotation_arc_colinear_neg_underflow() {
+    // `from.dot(to) < 0` negates `to`, whose `x` is `MIN`.
+    let _ = QuatTrait::from_rotation_arc_colinear(
+        Vec3Trait::X, vec3(fixed::fixed::MIN, f(0), f(0)),
+    );
+}
+
+// panics: Quat::from_rotation_arc_2d
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_rotation_arc_2d_overflow() {
+    let long = vec2(fixed::fixed::MAX, fixed::fixed::MAX);
+    let _ = QuatTrait::from_rotation_arc_2d(long, long);
+}
+
+// panics: Quat::to_scaled_axis
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_to_scaled_axis_overflow() {
+    let _ = MAXQ.to_scaled_axis();
+}
+
+// panics: Quat::inverse
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_inverse_neg_underflow() {
+    let _ = MINQ.inverse();
+}
+
+// panics: Quat::length_recip
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_length_recip_overflow() {
+    let _ = MAXQ.length_recip();
+}
+
+// panics: Quat::rotate_towards
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_rotate_towards_overflow() {
+    let _ = MAXQ.rotate_towards(MAXQ, f(0));
+}
+
+// panics: Quat::lerp
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_lerp_overflow() {
+    let a = Quat { x: f(0), y: f(0), z: f(0), w: f(0x100000000) };
+    let b = Quat { x: fixed::fixed::MIN, y: f(0), z: f(0), w: f(0x100000000) };
+    let _ = a.lerp(b, f(0x100000001));
+}
+
+// panics: Quat::slerp
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_slerp_overflow() {
+    let a = Quat { x: f(0), y: f(0), z: f(0), w: f(0x100000000) };
+    let b = Quat { x: fixed::fixed::MIN, y: f(0), z: f(0), w: f(0x100000000) };
+    let _ = a.slerp(b, f(0x100000001));
+}
+
+// panics: Quat::div_scalar
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_scalar_overflow() {
+    let _ = QuatTrait::IDENTITY.div_scalar(f(1));
+}
+
+// panics: Quat::QuatMul
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_quat_mul_operator_overflow() {
+    let _ = MAXQ * MAXQ;
 }
 
 // Seeded fuzz properties. The inputs are unit quaternions built by `from_axis_angle`, i.e. the

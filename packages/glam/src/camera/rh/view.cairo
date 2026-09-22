@@ -99,7 +99,8 @@ pub fn look_to_affine3(eye: Vec3, dir: Vec3, up: Vec3) -> Affine3 {
 /// #### Panics
 /// * `'Vec3: normalize zero'` if `center == eye`, or if the direction and `up` are parallel.
 /// * `'Fixed: overflow'` if an element does not fit the scalar range.
-/// * `'i64_neg Underflow'` if an element is `MIN`.
+/// * Never for a negation: the negations act on `normalize(center - eye)`, whose components
+///   are in `[-1, 1]` (R1 panic-coverage audit, escalation 1).
 /// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if an element difference leaves the scalar range.
 /// #### Deviations
 /// * The `glam_assert!` preconditions are not checked (docs/DESIGN.md section 3): `up` must be

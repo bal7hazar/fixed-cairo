@@ -41,73 +41,6 @@ INHERITED = "(inherited)"
 # (owner, item, message) -> reason. `message` is one message of the requirement (any of its
 # `/` alternatives) or INHERITED. Every entry must still match an uncovered requirement.
 ALLOWED_MISSING: dict[tuple[str, str, str], str] = {
-    ("Fixed", "move_towards", "i64_add Overflow"):
-        "escalated: unreachable, `self + d` runs only when `rhs - self > d`, so `self + d < rhs`; "
-        "`self - d` only when `self - d > rhs` (the away branches panic with 'i64_add Underflow' /"
-        " 'i64_sub Overflow')",
-    ("Fixed", "to_radians", "Fixed: overflow"):
-        "escalated: unreachable, `|self * PI / 180| < |self|`",
-    ("camera::lh::view", "look_at_mat3", "i64_neg Underflow"):
-        "escalated: unreachable, the negations act on `normalize(center - eye)`, components in "
-        "[-1, 1]",
-    ("camera::rh::view", "look_at_mat3", "i64_neg Underflow"):
-        "escalated: unreachable, the negations act on `normalize(center - eye)`, components in "
-        "[-1, 1]",
-    ("Mat4", "to_scale_rotation_translation", "i64_neg Underflow"):
-        "escalated: unreachable, the only negation is `-length(x_axis)`, never `MIN`",
-    ("Vec2", "normalize", "Fixed: overflow"):
-        "escalated: unreachable, `norm2_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec2", "try_normalize", "Fixed: overflow"):
-        "escalated: unreachable, `norm2_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec2", "normalize_or", "Fixed: overflow"):
-        "escalated: unreachable, `norm2_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec2", "normalize_or_zero", "Fixed: overflow"):
-        "escalated: unreachable, `norm2_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec3", "normalize", "Fixed: overflow"):
-        "escalated: unreachable, `norm3_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec3", "try_normalize", "Fixed: overflow"):
-        "escalated: unreachable, `norm3_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec3", "normalize_or", "Fixed: overflow"):
-        "escalated: unreachable, `norm3_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec3", "normalize_or_zero", "Fixed: overflow"):
-        "escalated: unreachable, `norm3_wide` cannot overflow and `|x| * recip(len) <= 2^96`: "
-        "every component is in [-1, 1]",
-    ("Vec2", "midpoint", "Fixed: overflow"):
-        "escalated: unreachable, the floored exact midpoint lies between the two inputs",
-    ("Vec3", "midpoint", "Fixed: overflow"):
-        "escalated: unreachable, the floored exact midpoint lies between the two inputs",
-    ("Vec4", "midpoint", "Fixed: overflow"):
-        "escalated: unreachable, the floored exact midpoint lies between the two inputs",
-    ("Vec3", "rotate_towards", "i64_sub Overflow"):
-        "escalated: unreachable, the only `i64` subtraction is `angle_between - PI`, with "
-        "`angle_between` in [0, PI]",
-    ("Pose2", "abs_diff_eq", "i64_sub Overflow"):
-        "escalated: unreachable, built on `Fixed::abs_diff_eq`, an `i128` difference that never "
-        "panics",
-    ("Pose3", "abs_diff_eq", "i64_sub Overflow"):
-        "escalated: unreachable, built on `Fixed::abs_diff_eq`, an `i128` difference that never "
-        "panics",
-    ("SdpMatrix2", "add_diagonal", "Fixed: overflow"):
-        "escalated: wrong message, a plain `Fixed` sum panics with 'i64_add Overflow' (tested)",
-    ("SdpMatrix3", "add_diagonal", "Fixed: overflow"):
-        "escalated: wrong message, a plain `Fixed` sum panics with 'i64_add Overflow' (tested)",
-    ("SdpMatrix", "SdpMatrix2Add", "Fixed: overflow"):
-        "escalated: wrong message, a plain `Fixed` sum panics with 'i64_add Overflow' (tested)",
-    ("SdpMatrix", "SdpMatrix3Add", "Fixed: overflow"):
-        "escalated: wrong message, a plain `Fixed` sum panics with 'i64_add Overflow' (tested)",
-    ("SdpMatrix", "SdpMatrix2Sub", "Fixed: overflow"):
-        "escalated: wrong message, a plain `Fixed` sum panics with 'i64_sub Overflow' / 'i64_sub "
-        "Underflow' (tested)",
-    ("SdpMatrix", "SdpMatrix3Sub", "Fixed: overflow"):
-        "escalated: wrong message, a plain `Fixed` sum panics with 'i64_sub Overflow' / 'i64_sub "
-        "Underflow' (tested)",
     ("Affine3", "from_quat", "(inherited)"):
         "inherited: panics as `Mat3Trait::from_quat`, exercised there",
     ("Affine3", "from_axis_angle", "(inherited)"):
@@ -132,48 +65,6 @@ ALLOWED_MISSING: dict[tuple[str, str, str], str] = {
         "inherited: panics as `look_at_mat3` and `QuatTrait::from_mat3`, exercised there",
     ("camera::rh::view", "look_to_quat", "(inherited)"):
         "inherited: panics as `look_to_mat3` and `QuatTrait::from_mat3`, exercised there",
-    ("Quat", "from_axis_angle", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_rotation_axes", "i64_add Overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_rotation_axes", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_mat3", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_mat4", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_affine3", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "look_to_lh", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "look_to_rh", "Vec3: normalize zero"):
-        "deferred: quat PR in flight",
-    ("Quat", "look_at_lh", "Vec3: normalize zero"):
-        "deferred: quat PR in flight",
-    ("Quat", "look_at_rh", "Vec3: normalize zero"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_rotation_arc", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_rotation_arc_colinear", "i64_neg Underflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "from_rotation_arc_2d", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "to_scaled_axis", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "inverse", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "length_recip", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "rotate_towards", "(inherited)"):
-        "deferred: quat PR in flight",
-    ("Quat", "lerp", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "slerp", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "div_scalar", "Fixed: overflow"):
-        "deferred: quat PR in flight",
-    ("Quat", "QuatMul", "Fixed: overflow"):
-        "deferred: quat PR in flight",
     ("Pose2", "lerp", "(inherited)"):
         "inherited: panics as `Rot2Trait::slerp` and `Vec2Trait::lerp`, exercised there",
     ("Pose2", "mul_vec2", "(inherited)"):
@@ -221,29 +112,7 @@ MARKERS: dict[tuple[str, str], str] = {
 
 # (test file, test function) -> reason: the test panics with a message that the doc of its item
 # does not list (a documentation gap, escalated in docs/audits/R1-panic-coverage.md).
-ALLOWED_UNDOCUMENTED: dict[tuple[str, str], str] = {
-    ("packages/glamx/tests/test_sdp.cairo", "test_add_overflow"):
-        "escalated: the doc of the item lists 'Fixed: overflow', the plain `Fixed` sum panics with"
-        " the i64 message",
-    ("packages/glamx/tests/test_sdp.cairo", "test_sub_underflow"):
-        "escalated: the doc of the item lists 'Fixed: overflow', the plain `Fixed` sum panics with"
-        " the i64 message",
-    ("packages/glamx/tests/test_sdp.cairo", "test_add_diagonal_overflow"):
-        "escalated: the doc of the item lists 'Fixed: overflow', the plain `Fixed` sum panics with"
-        " the i64 message",
-    ("packages/glamx/tests/test_sdp.cairo", "test_add_diagonal2_overflow"):
-        "escalated: the doc of the item lists 'Fixed: overflow', the plain `Fixed` sum panics with"
-        " the i64 message",
-    ("packages/glamx/tests/test_sdp.cairo", "test_add2_overflow"):
-        "escalated: the doc of the item lists 'Fixed: overflow', the plain `Fixed` sum panics with"
-        " the i64 message",
-    ("packages/glamx/tests/test_sdp.cairo", "test_sub3_underflow"):
-        "escalated: the doc of the item lists 'Fixed: overflow', the plain `Fixed` sum panics with"
-        " the i64 message",
-    ("packages/fixed/tests/golden_fixed.cairo", "golden_fixed_move_towards_panics_away_underflow"):
-        "escalated: the doc lists 'i64_add Overflow' / 'i64_sub Underflow' for `self +- d`, "
-        "the away-underflow branch panics with 'i64_add Underflow'",
-}
+ALLOWED_UNDOCUMENTED: dict[tuple[str, str], str] = {}
 
 # Test module stem -> source modules whose items it tests (default: the same stem).
 TEST_MODULES = {

@@ -117,8 +117,10 @@ pub trait SdpMatrix2Trait {
     ///
     /// Mirrors `parry::utils::SdpMatrix2::add_diagonal`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if a result does not fit the scalar range.
+    /// * `'i64_add Overflow'` / `'i64_add Underflow'` if a result does not fit the scalar range.
     /// #### Deviations
+    /// * A plain `Fixed` sum, not `'Fixed: overflow'` as previously documented (R1
+    ///   panic-coverage audit, escalation 2).
     /// * Takes `self` by value and does not mutate it (parry takes `&mut self` and returns a
     ///   copy without writing it back).
     fn add_diagonal(self: SdpMatrix2, elt: Fixed) -> SdpMatrix2;
@@ -276,8 +278,10 @@ pub impl SdpMatrix2Impl of SdpMatrix2Trait {
 ///
 /// Mirrors `Add for parry::utils::SdpMatrix2`.
 /// #### Panics
-/// * `'Fixed: overflow'` if a result does not fit the scalar range.
+/// * `'i64_add Overflow'` / `'i64_add Underflow'` if a result does not fit the scalar range.
 /// #### Deviations
+/// * A plain `Fixed` sum, not `'Fixed: overflow'` as previously documented (R1 panic-coverage
+///   audit, escalation 2).
 /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite value:
 ///   docs/DESIGN.md section 3, "overflow".
 pub impl SdpMatrix2Add of Add<SdpMatrix2> {
@@ -291,8 +295,10 @@ pub impl SdpMatrix2Add of Add<SdpMatrix2> {
 ///
 /// Mirrors nothing in parry (which only implements `Add`).
 /// #### Panics
-/// * `'Fixed: overflow'` if a result does not fit the scalar range.
+/// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if a result does not fit the scalar range.
 /// #### Deviations
+/// * A plain `Fixed` difference, not `'Fixed: overflow'` as previously documented (R1
+///   panic-coverage audit, escalation 2).
 /// * Not in parry; the component-wise difference.
 pub impl SdpMatrix2Sub of Sub<SdpMatrix2> {
     #[inline(always)]
@@ -346,8 +352,10 @@ pub trait SdpMatrix3Trait {
     ///
     /// Mirrors `parry::utils::SdpMatrix3::add_diagonal`.
     /// #### Panics
-    /// * `'Fixed: overflow'` if a result does not fit the scalar range.
+    /// * `'i64_add Overflow'` / `'i64_add Underflow'` if a result does not fit the scalar range.
     /// #### Deviations
+    /// * A plain `Fixed` sum, not `'Fixed: overflow'` as previously documented (R1
+    ///   panic-coverage audit, escalation 2).
     /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite
     ///   value: docs/DESIGN.md section 3, "overflow".
     fn add_diagonal(self: SdpMatrix3, elt: Fixed) -> SdpMatrix3;
@@ -669,8 +677,10 @@ pub impl SdpMatrix3Impl of SdpMatrix3Trait {
 ///
 /// Mirrors `Add for parry::utils::SdpMatrix3`.
 /// #### Panics
-/// * `'Fixed: overflow'` if a result does not fit the scalar range.
+/// * `'i64_add Overflow'` / `'i64_add Underflow'` if a result does not fit the scalar range.
 /// #### Deviations
+/// * A plain `Fixed` sum, not `'Fixed: overflow'` as previously documented (R1 panic-coverage
+///   audit, escalation 2).
 /// * Overflow panics where floating-point arithmetic returns infinity or a larger finite value:
 ///   docs/DESIGN.md section 3, "overflow".
 pub impl SdpMatrix3Add of Add<SdpMatrix3> {
@@ -691,8 +701,10 @@ pub impl SdpMatrix3Add of Add<SdpMatrix3> {
 ///
 /// Mirrors nothing in parry (which only implements `Add`).
 /// #### Panics
-/// * `'Fixed: overflow'` if a result does not fit the scalar range.
+/// * `'i64_sub Overflow'` / `'i64_sub Underflow'` if a result does not fit the scalar range.
 /// #### Deviations
+/// * A plain `Fixed` difference, not `'Fixed: overflow'` as previously documented (R1
+///   panic-coverage audit, escalation 2).
 /// * Not in parry; the component-wise difference.
 pub impl SdpMatrix3Sub of Sub<SdpMatrix3> {
     #[inline(always)]
