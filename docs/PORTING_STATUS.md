@@ -46,7 +46,8 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1g | faster bench job: one snforge test crate per bench file (CI bench job 928 s -> 198 s, local check ~2 090 s -> 230 s, snapshots identical); `all-checks` is now bounded by `Test glam` (~16 min) | done | #33 |
 | R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`); 8 rows added to DESIGN section 3 | done | #30 |
 | R1j | `glamx::rot2`: `lerp` aligned with upstream (not normalised, 15 330 -> 4 880 gas), `is_normalized` added (audit P0) | done | #35 |
-| R1k | panic coverage: item/branch -> `should_panic` test manifest and checker, doc template on the nine `IndexView` impls (audit P0) | todo | |
+| R1k | panic coverage: `scripts/panic_coverage.py` (item -> `should_panic` test, checked in CI), 324 tests added (372 missing pairs -> 0), doc template on the nine `IndexView` impls | done | #37 |
+| R1m | follow-up of #37: the 21 allowlisted `quat` panic tests, and the 25 escalated doc gaps (documented panics that cannot happen, wrong native messages on `move_towards` / sdp) ; after R1l | todo | |
 | R1l | doc-only deviation fixes, one PR per package: `Deviations: None.` on items that panic where upstream continues, stale camera module doc, non-semantic bullets moved out of `Deviations` (audit P1/P2); after the optimizer PRs | todo | |
 | R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining; `gas/bytecode.size` checked in CI | done | #31 |
 | R1z | `v0.1.0`: changelog, tag, GitHub release, scarbs.xyz (owner's confirmation required) | todo | |
