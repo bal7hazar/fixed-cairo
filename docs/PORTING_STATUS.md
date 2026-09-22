@@ -50,4 +50,4 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1m | follow-up of #37: the 21 allowlisted `quat` panic tests, and the 25 escalated doc gaps (documented panics that cannot happen, wrong native messages on `move_towards` / sdp); brief `docs/briefs/R1m-panic-followup.md` | done | #39 |
 | R1l | doc-only deviation fixes: stale camera module doc, `Deviations: None.` replaced on items that panic where upstream continues, non-semantic bullets moved out of `Deviations` | done | #38 |
 | R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining; `gas/bytecode.size` checked in CI | done | #31 |
-| R1z | `v0.1.0`: changelog frozen, tag + GitHub release by the orchestrator, `scarb publish` by the owner (registry token) | inprogress | |
+| R1z | `v0.1.0`: tag `v0.1.0` (2ac9a82) and GitHub release cut 2026-09-22; `scarb publish` of `fixed`, `glam`, `glamx` by the owner | done | [release](https://github.com/bal7hazar/glam.cairo/releases/tag/v0.1.0) |
