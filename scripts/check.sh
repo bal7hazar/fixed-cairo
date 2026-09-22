@@ -13,6 +13,8 @@ for dir in packages/*/; do
   [ "$pkg" = benches ] || snforge test -p "$pkg"
 done
 python3 scripts/bench.py check
+# Class size of the packages/consumer contract fixtures (gas/bytecode.size, release build).
+python3 scripts/bytecode_size.py check
 python3 scripts/api_parity.py --check
 python3 scripts/gas_tables.py --check
 # Golden vectors are up to date with tools/refgen (skipped when the Rust toolchain is absent; CI

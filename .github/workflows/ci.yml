@@ -58,6 +58,11 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/bench.py check | tee gas_report.md
+      # Fails on any class size change of packages/consumer not committed in gas/bytecode.size.
+      - name: Check bytecode size
+        run: |
+          set -o pipefail
+          python3 scripts/bytecode_size.py check | tee -a gas_report.md
       - name: Publish gas report
         if: always()
         run: cat gas_report.md >> "$GITHUB_STEP_SUMMARY"

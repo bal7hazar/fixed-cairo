@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "consumer"
+version = "0.1.0"
+dependencies = [
+ "fixed",
+ "glam",
+ "glamx",
+]
+
+[[package]]
 name = "fixed"
 version = "0.1.0"
 dependencies = [
