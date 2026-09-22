@@ -6,8 +6,8 @@
 //!   eigenspace are arbitrary): `check` verifies the ascending order, `A v = lambda v`, the
 //!   orthonormality, the handedness and the reconstruction `V diag(lambda) V^T = A`.
 //! * Tolerances, in raw ULPs, are the documented worst cases of the module (measured by
-//!   `scripts/gen_eigen3.py study` over 7 513 matrices, per unit of `|A| = max(1, max |a_ij|)`:
-//!   residual 10.4, reconstruction 8.2, orthonormality 3.5 absolute) rounded up to 16 / 16 / 4,
+//!   `scripts/gen_eigen3.py study` over 45 026 matrices, per unit of `|A| = max(1, max |a_ij|)`:
+//!   residual 8.3, reconstruction 10.1, orthonormality 3.4 absolute) rounded up to 16 / 16 / 4,
 //!   plus the rounding of the test's own arithmetic (stated at each assertion).
 //!
 //! The eigenvalues are also compared with glamx's f64 `DSymmetricEigen3` and with an f64 Jacobi
@@ -76,27 +76,51 @@ fn check(a: Mat3, e: SymmetricEigen3) {
     let back = SdpMatrix3Trait::from_rotated_diagonal_mat3(v, l).into_matrix();
     assert!(back.abs_diff_eq(a, f(16 * scale + 1)), "reconstruction");
 }
-/// `(a11, a12, a13, a22, a23, a33)`, the 3 eigenvalues, the 3 eigenvectors: the upstream unit
+/// `(a11, a12, a13, a22, a23, a33)`, the 3 eigenvalues and the 3 eigenvectors of `new`, the 3
+/// eigenvalues of `eigenvalues` (a separate path, see its `#### Deviations`): the upstream unit
 /// test, eigenvalues (1, 1, 4), 5 I, an unsorted diagonal, a rank-one matrix, a thin rod inertia,
 /// raw entries of a few ULPs, entries of 2^29 (scaled down), an indefinite and a generic matrix.
 #[cairofmt::skip]
-const MIRROR: [[i64; 18]; 10] = [
-    [8589934592, 30064771072, 34359738368, 25769803776, 12884901888, 0, -32663662990, 2480327262, 64543074095, 3067529746, -949329328, -2852328726, 1375737261, -3180081116, 2537947037, -2672892127, -2726279884, -1967178118],
-    [8589934592, 4294967296, 4294967296, 8589934592, 4294967296, 8589934592, 4294967296, 4294967296, 17179869184, 3037000500, -3037000500, 0, -1753413056, -1753413056, 3506826113, -2479700525, -2479700525, -2479700524],
-    [21474836480, 0, 0, 21474836480, 0, 21474836480, 21474836480, 21474836480, 21474836480, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 4294967296],
-    [8589934592, 0, 0, 21474836480, 0, 12884901888, 8589934592, 12884901888, 21474836480, 4294967296, 0, 0, 0, 0, 4294967296, 0, -4294967296, 0],
-    [4294967296, 8589934592, 12884901888, 17179869184, 25769803776, 38654705664, 0, 0, 60129542144, 3841535534, -1920767767, 0, 1540040337, 3080080673, -2566733894, 1147878294, 2295756587, 3443634882],
-    [35791394, -71582788, 0, 143165576, 0, 178956970, 0, 178956970, 178956970, 3841535534, 1920767767, 0, -1920767767, 3841535534, 0, 0, 0, 4294967296],
-    [3, -2, 1, 0, 5, -4, -8, 2, 4, -774243420, -2431168187, 3454954768, 3001652742, 2155097738, 2189150206, -2972771774, 2809220366, 1310592613],
-    [3458764513820540928, 576460752303423488, -1152921504606846976, 2305843009213693952, 288230376151711744, -1729382256910270464, -2011795556202354880, 2178111495894222464, 3868909326432096832, 922329289, -401882573, 4175469214, -1231240854, 4060965625, 662833486, -4009999840, -1339325453, 756870326],
-    [-12884901888, 2147483648, -1073741824, 4294967296, 3758096384, 8589934592, -13259352874, 2487542267, 10771810607, 4243642417, -585340199, 309224786, 661412555, 3664454568, -2140338812, 27866607, 2162381476, 3710805018],
-    [12345678901, -2345678901, 345678901, 22345678901, -45678901, 32345678901, 11817574471, 22867046980, 32352415251, 4191706232, 933621770, -68507913, -932821835, 4192093453, 54221645, 78653470, -38038830, 4294078569],
+const MIRROR: [[i64; 21]; 10] = [
+    [8589934592, 30064771072, 34359738368, 25769803776, 12884901888, 0, -32663662990, 2480327262, 64543074095, -3067529745, 949329328, 2852328727, 1375737263, -3180081115, 2537947037, 2672892128, 2726279885, 1967178117, -32663662990, 2480327262, 64543074095],
+    [8589934592, 4294967296, 4294967296, 8589934592, 4294967296, 8589934592, 4294967296, 4294967296, 17179869184, -1753413056, -1753413056, 3506826113, 3037000500, -3037000500, 0, 2479700525, 2479700525, 2479700525, 4294967296, 4294967296, 17179869184],
+    [21474836480, 0, 0, 21474836480, 0, 21474836480, 21474836480, 21474836480, 21474836480, 4294967296, 0, 0, 0, 4294967296, 0, 0, 0, 4294967296, 21474836480, 21474836480, 21474836480],
+    [8589934592, 0, 0, 21474836480, 0, 12884901888, 8589934592, 12884901888, 21474836480, 4294967296, 0, 0, 0, 0, 4294967296, 0, -4294967296, 0, 8589934592, 12884901888, 21474836480],
+    [4294967296, 8589934592, 12884901888, 17179869184, 25769803776, 38654705664, 0, 0, 60129542144, 3841535534, -1920767767, 0, 1540040336, 3080080674, -2566733895, 1147878293, 2295756587, 3443634881, 0, 0, 60129542144],
+    [35791394, -71582788, 0, 143165576, 0, 178956970, 0, 178956970, 178956970, 3841535534, 1920767767, 0, -1920767767, 3841535534, 0, 0, 0, 4294967296, 0, 178956970, 178956970],
+    [3, -2, 1, 0, 5, -4, -8, 2, 4, -774243420, -2431168188, 3454954767, 3001652742, 2155097739, 2189150208, -2972771775, 2809220364, 1310592613, -8, 2, 4],
+    [3458764513820540928, 576460752303423488, -1152921504606846976, 2305843009213693952, 288230376151711744, -1729382256910270464, -2011795556202354880, 2178111495894222464, 3868909326432096832, 922329289, -401882574, 4175469214, -1231240857, 4060965624, 662833487, -4009999840, -1339325456, 756870325, -2011795556202354880, 2178111495894222400, 3868909326432096832],
+    [-12884901888, 2147483648, -1073741824, 4294967296, 3758096384, 8589934592, -13259352874, 2487542267, 10771810607, 4243642417, -585340197, 309224786, 661412555, 3664454568, -2140338812, 27866606, 2162381476, 3710805018, -13259352874, 2487542267, 10771810607],
+    [12345678901, -2345678901, 345678901, 22345678901, -45678901, 32345678901, 11817574471, 22867046980, 32352415251, 4191706232, 933621770, -68507914, -932821835, 4192093453, 54221649, 78653471, -38038833, 4294078569, 11817574471, 22867046980, 32352415251],
 ];
 
 #[test]
 fn test_mirror_vectors() {
     for case in MIRROR.span() {
-        let [a11, a12, a13, a22, a23, a33, l0, l1, l2, x0, x1, x2, y0, y1, y2, z0, z1, z2] = *case;
+        let [
+            a11,
+            a12,
+            a13,
+            a22,
+            a23,
+            a33,
+            l0,
+            l1,
+            l2,
+            x0,
+            x1,
+            x2,
+            y0,
+            y1,
+            y2,
+            z0,
+            z1,
+            z2,
+            e0,
+            e1,
+            e2,
+        ] =
+            *case;
         let a = [a11, a12, a13, a22, a23, a33];
         let expected = SymmetricEigen3 {
             eigenvalues: v3(l0, l1, l2),
@@ -108,8 +132,8 @@ fn test_mirror_vectors() {
         assert_eq!(e, expected);
         assert_eq!(SymmetricEigen3Trait::from_sdp(sdp(a)), expected);
         assert_eq!(sym(a).symmetric_eigen(), expected);
-        assert_eq!(SymmetricEigen3Trait::eigenvalues(sym(a)), expected.eigenvalues);
-        assert_eq!(sym(a).symmetric_eigenvalues(), expected.eigenvalues);
+        assert_eq!(SymmetricEigen3Trait::eigenvalues(sym(a)), v3(e0, e1, e2));
+        assert_eq!(sym(a).symmetric_eigenvalues(), v3(e0, e1, e2));
         check(sym(a), e);
     }
 }
@@ -117,10 +141,11 @@ fn test_mirror_vectors() {
 #[test]
 fn test_upstream_unit_test() {
     // glamx `eigen_3x3`: eigenvalues -7.6051016780, 0.5774961930, 15.0276054850 (10 decimals,
-    // 0.22 ULP), quantized. Documented bound: 0.62 ULP * |A| = 5 ULP for |A| = 8.
+    // 0.22 ULP), quantized. Documented bound: 0.79 ULP * |A| = 7 ULP for |A| = 8.
     let a = sym([2 * ONE, 7 * ONE, 8 * ONE, 6 * ONE, 3 * ONE, 0]);
     let l = a.symmetric_eigenvalues();
-    assert!(l.abs_diff_eq(v3(-32663662990, 2480327262, 64543074095), f(5)));
+    assert!(l.abs_diff_eq(v3(-32663662990, 2480327262, 64543074095), f(7)));
+    assert!(SymmetricEigen3Trait::new(a).eigenvalues.abs_diff_eq(l, f(1)));
 }
 
 #[test]
@@ -228,10 +253,12 @@ fn fuzz_decomposition(a: i64, b: i64, c: i64) {
     let e = SymmetricEigen3Trait::new(sym(s));
     check(sym(s), e);
     assert_eq!(SymmetricEigen3Trait::from_sdp(sdp(s)), e);
-    // the trace is the sum of the eigenvalues: 3 * 0.62 ULP * |A| with |A| <= 8
+    // the trace is the sum of the eigenvalues: 3 * 0.79 ULP * |A| with |A| <= 8
     let l = e.eigenvalues;
     let [a11, _, _, a22, _, a33] = s;
-    assert!(abs(l.x.raw + l.y.raw + l.z.raw - a11 - a22 - a33) <= 15);
+    assert!(abs(l.x.raw + l.y.raw + l.z.raw - a11 - a22 - a33) <= 19);
+    // `eigenvalues` skips the polish of the eigenvectors: 1 ULP from `new` at most (measured)
+    assert!(SymmetricEigen3Trait::eigenvalues(sym(s)).abs_diff_eq(l, f(1)));
 }
 
 /// `16^k` for `k` in `0..12`.
@@ -279,6 +306,8 @@ fn fuzz_diagonal_is_exact(a: i64, b: i64, c: i64) {
     let v = e.eigenvectors;
     assert_eq!(v.transpose() * v, Mat3Trait::IDENTITY);
     assert_eq!(v.determinant().raw, ONE);
+    // no rotation: `eigenvalues` returns the same sorted diagonal
+    assert_eq!(SymmetricEigen3Trait::eigenvalues(sym([x, 0, 0, y, 0, z])), l);
 }
 
 #[test]
@@ -286,8 +315,8 @@ fn fuzz_diagonal_is_exact(a: i64, b: i64, c: i64) {
 fn fuzz_two_equal_eigenvalues(a: i64, b: i64, c: i64) {
     // A = l1 I + (l2 - l1) n n^T: eigenvalues (l1, l1, l2) up to the quantization of A. Each
     // entry is off by 1 ULP (floor) + 2 * 1 ULP * |l2 - l1| (the rounding of `n`, |n_i| <= 1,
-    // |l2 - l1| <= 16), i.e. 33 ULP; Weyl: eigenvalues move by at most 3 * 33 ULP, + 5 ULP for
-    // the documented 0.62 ULP * |A|.
+    // |l2 - l1| <= 16), i.e. 33 ULP; Weyl: eigenvalues move by at most 3 * 33 ULP, + 13 ULP for
+    // the documented 0.79 ULP * |A| (|A| <= 16).
     let n = Vec3 { x: f(cell(a, 0) + 1), y: f(cell(b, 1)), z: f(cell(c, 2)) }.normalize();
     let (l1, l2) = (f(cell(c, 3)), f(cell(a, 4)));
     let d = l2 - l1;
@@ -306,7 +335,7 @@ fn fuzz_two_equal_eigenvalues(a: i64, b: i64, c: i64) {
     } else {
         Vec3 { x: l2, y: l1, z: l1 }
     };
-    assert!(e.eigenvalues.abs_diff_eq(expected, f(104)));
+    assert!(e.eigenvalues.abs_diff_eq(expected, f(112)));
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -145,8 +145,9 @@ fn golden_eigen3_eigenvalues() {
         case += 1;
     }
 }
-// eigen3::symmetric_eigenvalues: 8 cases, tolerance 1 ULP - same code path as `eigenvalues`:
-// separated eigenvalues, one rounding on each side.
+// eigen3::symmetric_eigenvalues: 8 cases, tolerance 1 ULP - same code path as `eigenvalues` (no
+// polish of the eigenvectors, Rayleigh quotients as in `new`): separated eigenvalues, one
+// rounding on each side.
 #[cairofmt::skip]
 const SYMMETRIC_EIGENVALUES_CASES: [i64; 96] = [
     64636334510, 26289, 17179869184, -24413296638, -9941434419, 9090639415, -47051678875,
@@ -186,7 +187,7 @@ fn golden_eigen3_symmetric_eigenvalues() {
         case += 1;
     }
 }
-// eigen3::new_eigenvalues: 31 cases, tolerance 11 ULP - documented worst case of the module, 0.62
+// eigen3::new_eigenvalues: 31 cases, tolerance 13 ULP - documented worst case of the module, 0.79
 // ULP * |A| with |A| <= 16 (reached only by eigenvalues ~1 ULP * |A| apart), + 1/2 ULP of oracle
 // quantization. The degenerate edges are exact on the Cairo side.
 #[cairofmt::skip]
@@ -283,7 +284,7 @@ fn golden_eigen3_new_eigenvalues() {
     while !d.is_empty() {
         let a0 = next_mat3(ref d);
         let actual: Vec3 = E::new(a0).eigenvalues;
-        check_vec3(actual, ref d, 11, @name, case);
+        check_vec3(actual, ref d, 13, @name, case);
         case += 1;
     }
 }
@@ -302,7 +303,7 @@ fn golden_eigen3_new_eigenvalues_panics_eigenvalue_overflow() {
     let a0 = next_mat3(ref d);
     let _: Vec3 = E::new(a0).eigenvalues;
 }
-// eigen3::from_sdp_eigenvalues: 8 cases, tolerance 11 ULP - same code path as `new`: 0.62 ULP *
+// eigen3::from_sdp_eigenvalues: 8 cases, tolerance 13 ULP - same code path as `new`: 0.79 ULP *
 // |A| with |A| <= 16, + 1/2 ULP of oracle quantization.
 #[cairofmt::skip]
 const FROM_SDP_EIGENVALUES_CASES: [i64; 96] = [
@@ -340,11 +341,11 @@ fn golden_eigen3_from_sdp_eigenvalues() {
     while !d.is_empty() {
         let a0 = next_mat3(ref d);
         let actual: Vec3 = E::from_sdp(S3::from_sdp_matrix(a0)).eigenvalues;
-        check_vec3(actual, ref d, 11, @name, case);
+        check_vec3(actual, ref d, 13, @name, case);
         case += 1;
     }
 }
-// eigen3::symmetric_eigen_eigenvalues: 8 cases, tolerance 11 ULP - same code path as `new`: 0.62
+// eigen3::symmetric_eigen_eigenvalues: 8 cases, tolerance 13 ULP - same code path as `new`: 0.79
 // ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization.
 #[cairofmt::skip]
 const SYMMETRIC_EIGEN_EIGENVALUES_CASES: [i64; 96] = [
@@ -380,11 +381,11 @@ fn golden_eigen3_symmetric_eigen_eigenvalues() {
     while !d.is_empty() {
         let a0 = next_mat3(ref d);
         let actual: Vec3 = a0.symmetric_eigen().eigenvalues;
-        check_vec3(actual, ref d, 11, @name, case);
+        check_vec3(actual, ref d, 13, @name, case);
         case += 1;
     }
 }
-// eigen3::new_eigenvalues_small: 16 cases, tolerance 2 ULP - 0.62 ULP * |A| with |A| = max(1, max
+// eigen3::new_eigenvalues_small: 16 cases, tolerance 2 ULP - 0.79 ULP * |A| with |A| = max(1, max
 // |a_ij|) = 1, + 1/2 ULP of oracle quantization, rounded up: scaling up by 2^28 and more keeps
 // small matrices as accurate as unit ones.
 #[cairofmt::skip]
@@ -424,7 +425,7 @@ fn golden_eigen3_new_eigenvalues_small() {
         case += 1;
     }
 }
-// eigen3::new_eigenvalues_position: 16 cases, tolerance 621 ULP - 0.62 ULP * |A| with |A| <=
+// eigen3::new_eigenvalues_position: 16 cases, tolerance 791 ULP - 0.79 ULP * |A| with |A| <=
 // 1000, + 1/2 ULP of oracle quantization.
 #[cairofmt::skip]
 const NEW_EIGENVALUES_POSITION_CASES: [i64; 192] = [
@@ -486,7 +487,7 @@ fn golden_eigen3_new_eigenvalues_position() {
     while !d.is_empty() {
         let a0 = next_mat3(ref d);
         let actual: Vec3 = E::new(a0).eigenvalues;
-        check_vec3(actual, ref d, 621, @name, case);
+        check_vec3(actual, ref d, 791, @name, case);
         case += 1;
     }
 }

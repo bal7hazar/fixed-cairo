@@ -10,8 +10,8 @@
 # handedness and the reconstruction `V diag(lambda) V^T = A` in `tests/test_eigen3.cairo` (the
 # reconstruction call does not fit the 100-column golden line).
 #
-# Accuracy of the module (measured by `scripts/gen_eigen3.py study` on a bit-exact mirror, 7 513
-# matrices): eigenvalues within `0.62 ULP * |A|`, `|A| = max(1, max |a_ij|)`, the worst case being
+# Accuracy of the module (measured by `scripts/gen_eigen3.py study` on a bit-exact mirror, 45 026
+# matrices over two seeds): eigenvalues within `0.79 ULP * |A|`, `|A| = max(1, max |a_ij|)`, the worst case being
 # two eigenvalues about `1 ULP * |A|` apart. For
 # eigenvalues separated by at least 1 % of the spectrum width the error is the final rounding:
 # the Rayleigh quotient is off by `|dv|^2 * width` with `|dv| <= 2^-22` (eigenvector resolution
@@ -51,7 +51,7 @@ args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
 ret = "Vec3"
 cases = 8
 tolerance = 1
-justification = "same code path as `eigenvalues`: separated eigenvalues, one rounding on each side."
+justification = "same code path as `eigenvalues` (no polish of the eigenvectors, Rayleigh quotients as in `new`): separated eigenvalues, one rounding on each side."
 
 # ------------------------------------------------------------------------------------------------
 # Any gap, degenerate edges included: f64 Jacobi oracle (accurate to a few 2^-53 |A|).
@@ -63,8 +63,8 @@ call = "E::new({0}).eigenvalues"
 args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
 ret = "Vec3"
 cases = 24
-tolerance = 11
-justification = "documented worst case of the module, 0.62 ULP * |A| with |A| <= 16 (reached only by eigenvalues ~1 ULP * |A| apart), + 1/2 ULP of oracle quantization. The degenerate edges are exact on the Cairo side."
+tolerance = 13
+justification = "documented worst case of the module, 0.79 ULP * |A| with |A| <= 16 (reached only by eigenvalues ~1 ULP * |A| apart), + 1/2 ULP of oracle quantization. The degenerate edges are exact on the Cairo side."
 edges = [
     [[[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
     [[[5, 0, 0], [0, 5, 0], [0, 0, 5]]],
@@ -87,8 +87,8 @@ call = "E::from_sdp(S3::from_sdp_matrix({0})).eigenvalues"
 args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
 ret = "Vec3"
 cases = 8
-tolerance = 11
-justification = "same code path as `new`: 0.62 ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization."
+tolerance = 13
+justification = "same code path as `new`: 0.79 ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization."
 
 [[function]]
 name = "symmetric_eigen_eigenvalues"
@@ -97,8 +97,8 @@ call = "{0}.symmetric_eigen().eigenvalues"
 args = [{ type = "Mat3", min = -16.0, max = 16.0 }]
 ret = "Vec3"
 cases = 8
-tolerance = 11
-justification = "same code path as `new`: 0.62 ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization."
+tolerance = 13
+justification = "same code path as `new`: 0.79 ULP * |A| with |A| <= 16, + 1/2 ULP of oracle quantization."
 
 # Small matrices (the scale-up path: a thin rod or a light body has an inertia of 1e-3).
 [[function]]
@@ -109,7 +109,7 @@ args = [{ type = "Mat3", min = -0.001, max = 0.001 }]
 ret = "Vec3"
 cases = 16
 tolerance = 2
-justification = "0.62 ULP * |A| with |A| = max(1, max |a_ij|) = 1, + 1/2 ULP of oracle quantization, rounded up: scaling up by 2^28 and more keeps small matrices as accurate as unit ones."
+justification = "0.79 ULP * |A| with |A| = max(1, max |a_ij|) = 1, + 1/2 ULP of oracle quantization, rounded up: scaling up by 2^28 and more keeps small matrices as accurate as unit ones."
 
 # Larger matrices: the bound is proportional to |A|.
 [[function]]
@@ -119,5 +119,5 @@ call = "E::new({0}).eigenvalues"
 args = [{ type = "Mat3", min = -1000.0, max = 1000.0 }]
 ret = "Vec3"
 cases = 16
-tolerance = 621
-justification = "0.62 ULP * |A| with |A| <= 1000, + 1/2 ULP of oracle quantization."
+tolerance = 791
+justification = "0.79 ULP * |A| with |A| <= 1000, + 1/2 ULP of oracle quantization."

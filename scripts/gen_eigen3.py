@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
 """Bit-exact Python mirror, accuracy study and generator of `glamx::eigen3`.
 
-Two algorithms are mirrored in Python integer arithmetic, bit for bit:
+The algorithms are mirrored in Python integer arithmetic, bit for bit (`study --algos`):
 
-* `jacobi`  - the shipped one (`packages/glamx/src/eigen3.cairo`): power-of-two scaling, cyclic
-  Jacobi rotations computed without trigonometry, Gram-Schmidt polish of the eigenvectors,
-  Rayleigh-quotient refinement of the eigenvalues on the exact (scaled) input.
+* `jacobi`  - `SymmetricEigen3Trait::new` (`packages/glamx/src/eigen3.cairo`): power-of-two
+  scaling, cyclic Jacobi rotations computed without trigonometry (one rotation per loop iteration
+  on the relabelled plane `(1, 2)`, zero pivots skipped), Gram-Schmidt polish of the eigenvectors,
+  Rayleigh-quotient refinement of the eigenvalues on the exact (scaled) input; polish and
+  refinement are skipped when nothing was rotated.
+* `values`  - `SymmetricEigen3Trait::eigenvalues`: `jacobi` without the polish.
 * `closed`  - the loser (`packages/benches/src/alt/eigen3.cairo`): the closed form of glamx 0.3.1
   (trigonometric roots of the characteristic cubic, eigenvectors by cross products), with the
   scaling and the most-isolated-eigenvalue ordering of Eberly's paper.
+* `jacobi_normalize`, `values_normalize`, `values_diagonal_read` - the losers of the optimizer
+  pass (`alt::rotation_normalize`, `alt::symmetric_eigenvalues_diagonal_read`).
 
 Commands:
 
-    scripts/gen_eigen3.py study [--n 1000]   accuracy tables of both algorithms (needs mpmath)
-    scripts/gen_eigen3.py sweeps             convergence of the Jacobi sweeps (needs mpmath)
+    scripts/gen_eigen3.py study [--n 1000] [--seed 0xe16e3] [--algos jacobi,values,...]
+                                             accuracy tables (needs mpmath); the documented
+                                             bounds are the worst of the default run and of
+                                             `--n 5000 --seed 0xbeef`
+    scripts/gen_eigen3.py sweeps [--n 1000] [--seed ...]
+                                             convergence and rotation counts (needs mpmath)
     scripts/gen_eigen3.py vectors            bit-exact test vectors (the table of test_eigen3.cairo)
     scripts/gen_eigen3.py emit [--check]     (re)generates the scale search trees of both files
 
-The generated blocks are delimited by `// GENERATED-BEGIN eigen3` / `// GENERATED-END eigen3`.
+The generated blocks are delimited by `// GENERATED-BEGIN eigen3` / `// GENERATED-END eigen3`
+(and `eigen3-jacobi` for the Jacobi scale of the alt module).
 """
 
 import argparse
@@ -36,7 +46,7 @@ FRAC = 32
 ONE = 1 << FRAC
 I64_MIN, I64_MAX = -(1 << 63), (1 << 63) - 1
 
-# Number of cyclic sweeps of the shipped algorithm (3 rotations each).
+# At most 3 * SWEEPS rotations in the shipped algorithm (6 cyclic sweeps of the 3 planes).
 SWEEPS = 6
 # The scaled matrix has its largest magnitude in [2^54, 2^58) raw (value in [2^22, 2^26)).
 TOP = 58
@@ -169,10 +179,19 @@ def scale_down(y, q, h):
 
 # ----------------------------------------------------------------- the shipped algorithm
 
-def rotate(app, aqq, apq, arp, arq, vp, vq):
-    """One Jacobi rotation zeroing `apq`. Returns (app, aqq, arp, arq, vp, vq)."""
-    if apq == 0:
-        return app, aqq, arp, arq, vp, vq
+def normalize2(x, y):
+    """`fixed::wide::normalize2`."""
+    n = isqrt(x * x + y * y)
+    if n == 0:
+        raise Panic("Fixed: division by zero")
+    r = (1 << 96) // n
+    return recip_mul(r, x), recip_mul(r, y)
+
+
+def rotate(app, aqq, apq, arp, arq, vp, vq, vectors=True):
+    """One Jacobi rotation zeroing `apq` (not zero): `t = 2 apq / (d + sgn(d) r)`,
+    `c = 1 / sqrt(1 + t^2)`, `s = t c`, the diagonal moved by `t apq` (rounded).
+    Returns (app, aqq, arp, arq, vp, vq)."""
     d = i64(aqq - app)
     two = i64(apq + apq)
     r = i64(isqrt(d * d + two * two))
@@ -183,24 +202,68 @@ def rotate(app, aqq, apq, arp, arq, vp, vq):
     c = recip_mul(rec, ONE)
     s = recip_mul(rec, t)
     x = narrow32r(t * apq)
-    n_vp = [narrow32r(c * vp[i] - s * vq[i]) for i in range(3)]
-    n_vq = [narrow32r(s * vp[i] + c * vq[i]) for i in range(3)]
+    if vectors:
+        vp, vq = ([narrow32r(c * vp[i] - s * vq[i]) for i in range(3)],
+                  [narrow32r(s * vp[i] + c * vq[i]) for i in range(3)])
     return (
         i64(app - x), i64(aqq + x),
         narrow32r(c * arp - s * arq), narrow32r(s * arp + c * arq),
-        n_vp, n_vq,
+        vp, vq,
     )
 
 
-def sweep(st):
-    a11, a12, a13, a22, a23, a33, v1, v2, v3 = st
-    a11, a22, a13, a23, v1, v2 = rotate(a11, a22, a12, a13, a23, v1, v2)
-    a12 = 0
-    a11, a33, a12, a23, v1, v3 = rotate(a11, a33, a13, a12, a23, v1, v3)
-    a13 = 0
-    a22, a33, a12, a13, v2, v3 = rotate(a22, a33, a23, a12, a13, v2, v3)
-    a23 = 0
-    return a11, a12, a13, a22, a23, a33, v1, v2, v3
+def rotate_normalize(app, aqq, apq, arp, arq, vp, vq, vectors=True):
+    """`benches::alt::eigen3::rotation_normalize` (loser): no division by the denominator of
+    `t`, `t apq = sgn(d) (r - |d|) / 2` and `(c, s) = normalize2(|d| + r, sgn(d) 2 apq)`. 4 % cheaper,
+    but `normalize2` of small raw values (a converged pivot between two close eigenvalues) is
+    not unit: `c^2 + s^2` is off by up to `1 / (|d| + r)` relative."""
+    d = i64(aqq - app)
+    two = i64(apq + apq)
+    r = i64(isqrt(d * d + two * two))
+    ad = fabs(d)
+    c, s = normalize2(i64(ad + r), -two if d < 0 else two)
+    x = narrow32r(i64(r - ad) * (ONE >> 1))
+    if d < 0:
+        x = -x
+    if vectors:
+        vp, vq = ([narrow32r(c * vp[i] - s * vq[i]) for i in range(3)],
+                  [narrow32r(s * vp[i] + c * vq[i]) for i in range(3)])
+    return (
+        i64(app - x), i64(aqq + x),
+        narrow32r(c * arp - s * arq), narrow32r(s * arp + c * arq),
+        vp, vq,
+    )
+
+
+def relabel(a, v):
+    """`(1, 2, 3) -> (3, 1, 2)`: the next plane of the order `(1,2)`, `(2,3)`, `(3,1)` becomes
+    `(1, 2)`."""
+    a11, a12, a13, a22, a23, a33 = a
+    return [a22, a23, a12, a33, a13, a11], [v[1], v[2], v[0]]
+
+
+def iterate(a, sweeps=SWEEPS, rot=rotate, vectors=True, trace=None):
+    """At most `3 * sweeps` rotations of the cyclic order `(1,2)`, `(2,3)`, `(3,1)`, each one on
+    the plane `(1, 2)` of the relabelled state; a plane whose pivot is zero is skipped (relabelled
+    only) inside the iteration of the next rotation. `trace` gets the largest off-diagonal
+    magnitude after every 3 rotations. Returns (a, [v1, v2, v3], rotations) in the final labels."""
+    a = list(a)
+    v = [[ONE, 0, 0], [0, ONE, 0], [0, 0, ONE]]
+    n = 3 * sweeps
+    rotations = 0
+    while n != 0 and (a[1] != 0 or a[2] != 0 or a[4] != 0):
+        if a[1] == 0:
+            a, v = relabel(a, v)
+            if a[1] == 0:
+                a, v = relabel(a, v)
+        a11, a12, a13, a22, a23, a33 = a
+        a11, a22, a13, a23, v[0], v[1] = rot(a11, a22, a12, a13, a23, v[0], v[1], vectors)
+        a, v = relabel([a11, 0, a13, a22, a23, a33], v)
+        n -= 1
+        rotations += 1
+        if trace is not None and rotations % 3 == 0:
+            trace.append(max(abs(a[1]), abs(a[2]), abs(a[4])))
+    return a, v, rotations
 
 
 def rayleigh(a, v):
@@ -213,30 +276,34 @@ def rayleigh(a, v):
     return i64(r - narrow64(e * r))
 
 
-def jacobi(a11, a12, a13, a22, a23, a33, sweeps=SWEEPS, polish=True, refine=True, trace=None):
-    """Returns (eigenvalues ascending [3], eigenvectors as 3 columns)."""
+def scaled(a11, a12, a13, a22, a23, a33):
+    """(scaled entries, (P, Q, H)), or None for the zero matrix."""
     m = max(fabs(a11), fabs(a12), fabs(a13), fabs(a22), fabs(a23), fabs(a33))
     if m == 0:
-        return [0, 0, 0], [[ONE, 0, 0], [0, ONE, 0], [0, 0, ONE]]
+        return None
     p, q, h = scale_of(m)
-    a = [scale_up(x, p) for x in (a11, a12, a13, a22, a23, a33)]
-    st = (a[0], a[1], a[2], a[3], a[4], a[5], [ONE, 0, 0], [0, ONE, 0], [0, 0, ONE])
-    for _ in range(sweeps):
-        if st[1] == 0 and st[2] == 0 and st[4] == 0:
-            break
-        st = sweep(st)
-        if trace is not None:
-            trace.append(max(abs(st[1]), abs(st[2]), abs(st[4])))
-    v1, v2, v3 = st[6], st[7], st[8]
-    if polish:
-        v1 = normalize3(v1)
-        k = dot3(v1, v2)
-        v2 = normalize3([narrow32((v2[i] << FRAC) - k * v1[i]) for i in range(3)])
-        v3 = normalize3(cross(v1, v2))
-    if refine:
-        lam = [rayleigh(a, v) for v in (v1, v2, v3)]
-    else:
+    return [scale_up(x, p) for x in (a11, a12, a13, a22, a23, a33)], (p, q, h)
+
+
+def jacobi(a11, a12, a13, a22, a23, a33, sweeps=SWEEPS, polish=True, refine=True, trace=None,
+           rot=rotate):
+    """`SymmetricEigen3Trait::new`: (eigenvalues ascending [3], eigenvectors as 3 columns)."""
+    sc = scaled(a11, a12, a13, a22, a23, a33)
+    if sc is None:
+        return [0, 0, 0], [[ONE, 0, 0], [0, ONE, 0], [0, 0, ONE]]
+    a, (p, q, h) = sc
+    st, (v1, v2, v3), rotations = iterate(a, sweeps, rot, trace=trace)
+    if rotations == 0 or not refine:
+        # no rotation: the axes and the (scaled) diagonal, which the polish and the Rayleigh
+        # quotients would return unchanged
         lam = [st[0], st[3], st[5]]
+    else:
+        if polish:
+            v1 = normalize3(v1)
+            k = dot3(v1, v2)
+            v2 = normalize3([narrow32((v2[i] << FRAC) - k * v1[i]) for i in range(3)])
+            v3 = normalize3(cross(v1, v2))
+        lam = [rayleigh(a, v) for v in (v1, v2, v3)]
     lam = [scale_down(x, q, h) for x in lam]
     vs = [v1, v2, v3]
     odd = False
@@ -248,6 +315,24 @@ def jacobi(a11, a12, a13, a22, a23, a33, sweeps=SWEEPS, polish=True, refine=True
     if odd:
         vs[2] = [i64(-c) for c in vs[2]]
     return lam, vs
+
+
+def values(a11, a12, a13, a22, a23, a33):
+    """`SymmetricEigen3Trait::eigenvalues`: the Rayleigh quotients of the accumulated (not
+    polished) eigenvectors. Returns (eigenvalues, eigenvectors) like `jacobi`, the eigenvectors
+    being the unpolished ones (the study only reads the eigenvalues of this path)."""
+    return jacobi(a11, a12, a13, a22, a23, a33, polish=False)
+
+
+def values_diagonal_read(a11, a12, a13, a22, a23, a33):
+    """`benches::alt::eigen3::symmetric_eigenvalues_diagonal_read`: rotations of the matrix only
+    (no eigenvector), eigenvalues read on the final diagonal (loser on accuracy)."""
+    sc = scaled(a11, a12, a13, a22, a23, a33)
+    if sc is None:
+        return [0, 0, 0], None
+    a, (p, q, h) = sc
+    st, _, _ = iterate(a, vectors=False)
+    return sorted(scale_down(x, q, h) for x in (st[0], st[3], st[5])), None
 
 
 # ----------------------------------------------------------------- the closed form (alt)
@@ -425,7 +510,11 @@ def compose(rot, lam):
             for i in range(3)]
 
 
-def corpora(n, seed=0xE16E3):
+# Seed of the committed study; `--seed 0xbeef --n 5000` is the confirmation run.
+SEED = 0xE16E3
+
+
+def corpora(n, seed=SEED):
     rng = random.Random(seed)
     out = {}
 
@@ -541,55 +630,109 @@ def det_sign(vs):
     return dot3(c, vs[2])
 
 
-def study(n):
-    sets = corpora(n)
-    print(f"sweeps = {SWEEPS}; errors in raw ULPs (1 ULP = 2^-32); 'rel' = ULPs / max|a_ij| "
-          f"(value), i.e. the error of a matrix of unit scale")
-    for algo_name, algo in (("jacobi", jacobi), ("closed", closed)):
-        print(f"\n## {algo_name}")
-        print("| corpus | n | panics | eig max | eig rel max | resid rel max | orth max "
-              "| recon rel max | det<0 | unsorted |")
-        print("|---|---|---|---|---|---|---|---|---|---|")
-        for name, mats in sets.items():
-            worst = [0.0] * 5
-            panics = 0
-            neg = 0
-            unsorted = 0
-            for a in mats:
-                try:
-                    lam, vs = algo(*a)
-                except Panic:
-                    panics += 1
-                    continue
-                ref = reference(a)
-                err, res, orth, rec = metrics(a, lam, vs, ref)
-                norm = max(1.0, max(map(abs, a)) / ONE)
-                vals = (err, err / norm, res / norm, orth, rec / norm)
-                worst = [max(w, v) for w, v in zip(worst, vals)]
-                if det_sign(vs) < 0:
-                    neg += 1
-                if not lam[0] <= lam[1] <= lam[2]:
-                    unsorted += 1
-            print(f"| {name} | {len(mats)} | {panics} | {worst[0]:.1f} | {worst[1]:.2f} "
-                  f"| {worst[2]:.2f} | {worst[3]:.1f} | {worst[4]:.2f} | {neg} | {unsorted} |")
+def jacobi_normalize(*a):
+    """The shipped iteration with the loser rotation `rotate_normalize`."""
+    return jacobi(*a, rot=rotate_normalize)
 
 
-def sweeps_study(n):
-    sets = corpora(n)
-    print("largest off-diagonal magnitude (raw, scaled domain, max over the corpus) after k sweeps")
-    print("| corpus | " + " | ".join(str(k + 1) for k in range(8)) + " |")
-    print("|---|" + "---|" * 8)
+def values_normalize(*a):
+    """`values` with the loser rotation `rotate_normalize`."""
+    return jacobi(*a, rot=rotate_normalize, polish=False)
+
+
+# name -> (function, full decomposition?). Eigenvalue-only paths report the eigenvalue columns.
+ALGOS = {
+    "jacobi": (jacobi, True),
+    "values": (values, False),
+    "jacobi_normalize": (jacobi_normalize, True),
+    "values_normalize": (values_normalize, False),
+    "values_diagonal_read": (values_diagonal_read, False),
+    "closed": (closed, True),
+}
+
+
+def _measure(job):
+    algo, a, ref = job
+    fn, full = ALGOS[algo]
+    try:
+        lam, vs = fn(*a)
+    except Panic:
+        return None
+    ref = [float(x) for x in ref]
+    norm = max(1.0, max(map(abs, a)) / ONE)
+    err = max(abs(lam[i] - ref[i]) for i in range(3))
+    unsorted = not lam[0] <= lam[1] <= lam[2]
+    if not full:
+        dev = 0
+        if algo in ("values", "values_normalize"):
+            base = jacobi_normalize(*a) if algo == "values_normalize" else jacobi(*a)
+            dev = max(abs(x - y) for x, y in zip(lam, base[0]))
+        return (err, err / norm, dev, unsorted)
+    _, res, orth, rec = metrics(a, lam, vs, ref)
+    return (err, err / norm, res / norm, orth, rec / norm, det_sign(vs) < 0, unsorted)
+
+
+def _reference(a):
+    return [str(x) for x in reference(a)]
+
+
+def study(n, seed, algos):
+    from multiprocessing import Pool
+    sets = corpora(n, seed)
+    flat = [a for mats in sets.values() for a in mats]
+    with Pool() as pool:
+        refs = dict(zip(flat, pool.map(_reference, flat, chunksize=64)))
+        print(f"n = {n}, seed = {seed:#x}, sweeps = {SWEEPS}; errors in raw ULPs (1 ULP = 2^-32); "
+              f"'rel' = ULPs / max(1, max |a_ij|) (value), i.e. the error of a matrix of unit scale")
+        for algo in algos:
+            full = ALGOS[algo][1]
+            print(f"\n## {algo}")
+            if full:
+                print("| corpus | n | panics | eig max | eig rel max | resid rel max | orth max "
+                      "| recon rel max | det<0 | unsorted |")
+                print("|---|---|---|---|---|---|---|---|---|---|")
+            else:
+                print("| corpus | n | panics | eig max | eig rel max | max diff to `new` (ULP) "
+                      "| unsorted |")
+                print("|---|---|---|---|---|---|---|")
+            for name, mats in sets.items():
+                out = pool.map(_measure, [(algo, a, refs[a]) for a in mats], chunksize=64)
+                ok = [o for o in out if o is not None]
+                panics = len(out) - len(ok)
+                w = [max((o[i] for o in ok), default=0) for i in range(len(ok[0]) if ok else 0)]
+                if full:
+                    print(f"| {name} | {len(mats)} | {panics} | {w[0]:.1f} | {w[1]:.2f} "
+                          f"| {w[2]:.2f} | {w[3]:.1f} | {w[4]:.2f} | {sum(o[5] for o in ok)} "
+                          f"| {sum(o[6] for o in ok)} |")
+                else:
+                    print(f"| {name} | {len(mats)} | {panics} | {w[0]:.1f} | {w[1]:.2f} "
+                          f"| {w[2]} | {sum(o[3] for o in ok)} |")
+
+
+def sweeps_study(n, seed):
+    sets = corpora(n, seed)
+    print("largest off-diagonal magnitude (raw, scaled domain, max over the corpus) after k sweeps,")
+    print("and the number of rotations (zero pivots are skipped; mean / max over the corpus)")
+    print("| corpus | " + " | ".join(str(k + 1) for k in range(8)) + " | rotations |")
+    print("|---|" + "---|" * 9)
     for name, mats in sets.items():
         worst = [0] * 8
+        rots = []
         for a in mats:
             tr = []
             try:
-                jacobi(*a, sweeps=8, trace=tr)
+                sc = scaled(*a)
+                if sc is None:
+                    continue
+                _, _, k = iterate(sc[0], sweeps=8, trace=tr)
             except Panic:
                 continue
+            rots.append(k)
             tr += [0] * (8 - len(tr))
             worst = [max(w, t) for w, t in zip(worst, tr)]
-        print(f"| {name} | " + " | ".join(str(w) for w in worst) + " |")
+        mean = sum(rots) / len(rots) if rots else 0
+        print(f"| {name} | " + " | ".join(str(w) for w in worst)
+              + f" | {mean:.2f} / {max(rots, default=0)} |")
 
 
 # ----------------------------------------------------------------- test vectors
@@ -612,9 +755,11 @@ VECTORS = [
 
 
 def vectors():
+    """Rows of `MIRROR` in `test_eigen3.cairo`: the 6 entries, `new` (3 eigenvalues, 3
+    eigenvectors), then `eigenvalues` (3 values)."""
     for a in VECTORS:
         lam, vs = jacobi(*a)
-        flat = list(a) + lam + vs[0] + vs[1] + vs[2]
+        flat = list(a) + lam + vs[0] + vs[1] + vs[2] + values(*a)[0]
         print("    [" + ", ".join(str(x) for x in flat) + "],")
 
 
@@ -635,7 +780,7 @@ def tree(entries, indent):
             + f"{pad}}} else {{\n" + tree(entries[mid:], indent + 1) + f"{pad}}}\n")
 
 
-def block(drop):
+def block(drop, name="scale_of"):
     entries = []
     for bound, e in buckets(TOP):
         p, q, h = scale_of(bound - 1 if bound is not None else 1 << 62, drop)
@@ -650,15 +795,15 @@ def block(drop):
         f"on constant\n/// thresholds (4 comparisons, no loop, no bitwise operation). "
         f"`up = 2^(32 + e/2)`,\n/// `down = 2^(32 - e/2)`, `half = 2^(e - 1)` (`0` if "
         f"`e <= 0`), as raw values.\n"
-        f"#[allow(collapsible_if_else)]\nfn scale_of(m: i64) -> Scale {{\n"
+        f"#[allow(collapsible_if_else)]\nfn {name}(m: i64) -> Scale {{\n"
         + tree(entries, 1) + "}\n"
     )
     return body
 
 
-def splice(path, body, write):
+def splice(path, body, write, tag="eigen3"):
     text = path.read_text()
-    pat = re.compile(r"(// GENERATED-BEGIN eigen3\n).*?(// GENERATED-END eigen3\n)", re.S)
+    pat = re.compile(rf"(// GENERATED-BEGIN {tag}\n).*?(// GENERATED-END {tag}\n)", re.S)
     if not pat.search(text):
         sys.exit(f"{path}: generated block markers not found")
     new = pat.sub(lambda mo: mo.group(1) + body + mo.group(2), text)
@@ -675,6 +820,7 @@ def splice(path, body, write):
 def emit(check):
     ok = splice(LIB, block(0), not check)
     ok = splice(ALT, block(CLOSED_DROP), not check) and ok
+    ok = splice(ALT, block(0, "jacobi_scale_of"), not check, "eigen3-jacobi") and ok
     if not ok:
         sys.exit(1)
 
@@ -684,16 +830,20 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("study")
     s.add_argument("--n", type=int, default=1000)
+    s.add_argument("--seed", type=lambda x: int(x, 0), default=SEED)
+    s.add_argument("--algos", default=",".join(ALGOS), help="comma-separated, among "
+                   + ", ".join(ALGOS))
     s = sub.add_parser("sweeps")
     s.add_argument("--n", type=int, default=1000)
+    s.add_argument("--seed", type=lambda x: int(x, 0), default=SEED)
     sub.add_parser("vectors")
     s = sub.add_parser("emit")
     s.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.cmd == "study":
-        study(args.n)
+        study(args.n, args.seed, args.algos.split(","))
     elif args.cmd == "sweeps":
-        sweeps_study(args.n)
+        sweeps_study(args.n, args.seed)
     elif args.cmd == "vectors":
         vectors()
     else:

@@ -1,11 +1,12 @@
 //! Gas benchmarks of `glamx::eigen3` and of the closed form kept in `benches::alt::eigen3` (the
 //! `alt_*` benches).
 //!
-//! The Jacobi iteration stops as soon as the off-diagonal entries are zero, and a rotation whose
-//! pivot is already zero is skipped: the cost depends on the input, so the decomposition is
-//! measured on a generic matrix, a diagonal one (no rotation), a repeated eigenvalue and a small
-//! inertia tensor. Every input goes through `bb` (otherwise the computation is constant-folded
-//! away) and every result through `sink`.
+//! The Jacobi iteration stops as soon as the off-diagonal entries are zero, a plane whose pivot
+//! is already zero is skipped, and the polish and refinement only run after a rotation: the
+//! cost depends on the input, so the decomposition and the eigenvalues are measured on a generic
+//! matrix (10 rotations), a diagonal one (no rotation), a repeated eigenvalue (2 rotations) and a
+//! small inertia tensor (1 rotation). Every input goes through `bb` (otherwise the computation is
+//! constant-folded away) and every result through `sink`.
 
 use benches::alt::eigen3 as alt;
 use benches::harness::{bb, sink};
@@ -15,7 +16,15 @@ use glam::vec3::Vec3;
 use glamx::eigen3::{Mat3ExtTrait, SymmetricEigen3, SymmetricEigen3Trait};
 use glamx::sdp::SdpMatrix3;
 
-/// The matrix of the glamx unit test: eigenvalues -7.605, 0.577, 15.028 (4 sweeps).
+/// A rotation of the scaled domain (entries around `2^24`): pivot, diagonal, third row.
+const APP: Fixed = Fixed { raw: 0x123456789abcdef };
+const AQQ: Fixed = Fixed { raw: 0x3456789abcdef1 };
+const APQ: Fixed = Fixed { raw: -0x6789abcdef1234 };
+const V: Vec3 = Vec3 {
+    x: Fixed { raw: 0x80000000 }, y: Fixed { raw: 0x60000000 }, z: Fixed { raw: -0x70000000 },
+};
+
+/// The matrix of the glamx unit test: eigenvalues -7.605, 0.577, 15.028 (10 rotations).
 const GENERIC: Mat3 = Mat3 {
     x_axis: Vec3 {
         x: Fixed { raw: 0x200000000 }, y: Fixed { raw: 0x700000000 }, z: Fixed { raw: 0x800000000 },
@@ -288,4 +297,96 @@ fn alt_symmetric_eigenvalues_closed_form_eigenvalues_generic__op() {
     let a = bb(GENERIC);
     let _r = bb(EIGEN.eigenvalues);
     sink(alt::symmetric_eigenvalues_closed_form(a));
+}
+
+#[test]
+fn eigenvalues_diagonal__base() {
+    let _a = bb(DIAGONAL);
+    let r = bb(EIGEN.eigenvalues);
+    sink(r);
+}
+
+#[test]
+fn eigenvalues_diagonal__op() {
+    let a = bb(DIAGONAL);
+    let _r = bb(EIGEN.eigenvalues);
+    sink(SymmetricEigen3Trait::eigenvalues(a));
+}
+
+#[test]
+fn eigenvalues_two_equal__base() {
+    let _a = bb(TWO_EQUAL);
+    let r = bb(EIGEN.eigenvalues);
+    sink(r);
+}
+
+#[test]
+fn eigenvalues_two_equal__op() {
+    let a = bb(TWO_EQUAL);
+    let _r = bb(EIGEN.eigenvalues);
+    sink(SymmetricEigen3Trait::eigenvalues(a));
+}
+
+#[test]
+fn eigenvalues_rod__base() {
+    let _a = bb(ROD);
+    let r = bb(EIGEN.eigenvalues);
+    sink(r);
+}
+
+#[test]
+fn eigenvalues_rod__op() {
+    let a = bb(ROD);
+    let _r = bb(EIGEN.eigenvalues);
+    sink(SymmetricEigen3Trait::eigenvalues(a));
+}
+
+#[test]
+fn alt_rotation_division__base() {
+    let _p = bb(APP);
+    let _q = bb(AQQ);
+    let _pq = bb(APQ);
+    let _v = bb(V);
+    sink(bb(APP));
+}
+
+#[test]
+fn alt_rotation_division__op() {
+    let p = bb(APP);
+    let q = bb(AQQ);
+    let pq = bb(APQ);
+    let v = bb(V);
+    sink(alt::rotation_division(p, q, pq, q, pq, v, v));
+}
+
+#[test]
+fn alt_rotation_normalize__base() {
+    let _p = bb(APP);
+    let _q = bb(AQQ);
+    let _pq = bb(APQ);
+    let _v = bb(V);
+    sink(bb(APP));
+}
+
+#[test]
+fn alt_rotation_normalize__op() {
+    let p = bb(APP);
+    let q = bb(AQQ);
+    let pq = bb(APQ);
+    let v = bb(V);
+    sink(alt::rotation_normalize(p, q, pq, q, pq, v, v));
+}
+
+#[test]
+fn alt_symmetric_eigenvalues_diagonal_read_eigenvalues_generic__base() {
+    let _a = bb(GENERIC);
+    let r = bb(EIGEN.eigenvalues);
+    sink(r);
+}
+
+#[test]
+fn alt_symmetric_eigenvalues_diagonal_read_eigenvalues_generic__op() {
+    let a = bb(GENERIC);
+    let _r = bb(EIGEN.eigenvalues);
+    sink(alt::symmetric_eigenvalues_diagonal_read(a));
 }
