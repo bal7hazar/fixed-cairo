@@ -178,8 +178,12 @@ The glam-rs constructor functions (`vec3(x, y, z)`, `bvec3(..)`) share their mod
 in Cairo a root re-export of the function shadows the module (`glam::vec3::Vec3` stops resolving):
 import them from their module (`use glam::vec3::vec3;`).
 
-Gas accounting note: for branching code snforge's l2_gas depends on the branch taken, so benches
-of branching functions carry several inputs (`_first` / `_last` ...).
+Gas accounting note (measured on `eigen3`, #34): inside a function Sierra gas is charged for the
+most expensive branch whichever one runs (a skipped Jacobi rotation still cost its 38 040 gas),
+while steps count what ran; only the iterations of a loop are metered as they execute. So a
+cheap early-out saves steps, not gas, unless it is the exit condition of a `while`; and benches
+of branching functions carry several inputs (`_first` / `_last` ...) mainly for the steps and
+for the cases where the compiler does redeposit the gas of the cheaper branch.
 
 Doc template (every public item):
 

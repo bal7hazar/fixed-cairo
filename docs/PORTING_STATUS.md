@@ -39,7 +39,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | X3b | parity closure of `Quat`, `Mat3/4`, `Affine2/3`, camera views | done | #26 |
 | R1b | generated gas tables in the READMEs (`scripts/gas_tables.py`, checked in CI) | done | #28 |
 | R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (see `docs/HANDOFF.md`, briefs `docs/briefs/R1-common.md` + `R1c`..`R1i`) | inprogress | |
-| R1c | optimizer pass on `glamx::eigen3` (values-only path, polish, rotation cost) | inprogress | |
+| R1c | optimizer pass on `glamx::eigen3`: metered one-rotation iterations (zero pivots free), polish-free `eigenvalues`, diagonal short-circuit: `new` -8.6 %, `eigenvalues` -15.9 %, diagonal -45.5 %; rotation order changed (numeric change, all overall worst cases improve) | done | #34 |
 | R1d | optimizer pass on `quat` (shared `slerp` helper, `rotate_towards`, wide `is_normalized`); after R1e | todo | |
 | R1e | optimizer pass on `fixed::wide` + `Vec2/3/4`: `is_unit2/3/4` kernels (`is_normalized` total and ~2x cheaper), shared norm in `Vec3::rotate_towards`; single-division and `slerp` candidates measured and kept in `benches::alt` | done | #32 |
 | R1f | `camera` / `Mat4::look_to_*` duplication; after R1i (bytecode evidence) | todo | |
