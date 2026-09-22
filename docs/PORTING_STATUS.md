@@ -40,7 +40,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1b | generated gas tables in the READMEs (`scripts/gas_tables.py`, checked in CI) | done | #28 |
 | R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (see `docs/HANDOFF.md`, briefs `docs/briefs/R1-common.md` + `R1c`..`R1i`) | inprogress | |
 | R1c | optimizer pass on `glamx::eigen3`: metered one-rotation iterations (zero pivots free), polish-free `eigenvalues`, diagonal short-circuit: `new` -8.6 %, `eigenvalues` -15.9 %, diagonal -45.5 %; rotation order changed (numeric change, all overall worst cases improve) | done | #34 |
-| R1d | optimizer pass on `quat` (shared `slerp` helper, `rotate_towards`, wide `is_normalized`); after R1e | todo | |
+| R1d | optimizer pass on `quat`: `rotate_towards` 162 720 -> 129 100 gas, `slerp` back to 122 180, `is_normalized` / `is_near_identity` total and ~2x cheaper; flaky `fuzz_mul_quat_drift` fixed (test helper built quaternions 5 ULP off unit) | done | #36 |
 | R1e | optimizer pass on `fixed::wide` + `Vec2/3/4`: `is_unit2/3/4` kernels (`is_normalized` total and ~2x cheaper), shared norm in `Vec3::rotate_towards`; single-division and `slerp` candidates measured and kept in `benches::alt` | done | #32 |
 | R1f | `camera` / `Mat4::look_to_*` duplication | dropped | the bytecode audit (#31) shows no gain: inlined bodies are paid per call site whichever function holds them |
 | R1g | faster bench job: one snforge test crate per bench file (CI bench job 928 s -> 198 s, local check ~2 090 s -> 230 s, snapshots identical); `all-checks` is now bounded by `Test glam` (~16 min) | done | #33 |
