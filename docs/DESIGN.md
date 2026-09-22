@@ -159,7 +159,15 @@ Hard rules (each one is backed by a measurement in report 05 section 6 / report 
 2. Products go through the fused kernels of `fixed::wide`: one rescale per output scalar.
 3. `#[inline(always)]` on every scalar operator, constructor, accessor and kernel helper. Public
    kernels are the only call boundaries. Large bodies (`Mat4::inverse`, `slerp`) are not inlined.
-   Any inlining decision on a hot path is backed by a snapshot delta.
+   Any inlining decision on a hot path is backed by a snapshot delta. Bytecode is the price
+   (`docs/audits/R1-bytecode-size.md`, #31): an inlined item is paid at every call site (51 CASM
+   felts for `Fixed * Fixed`, ~900 for `Mat4::mul_mat4`, ~1 100 for a camera `perspective`), a
+   non-inlined one once per class (`powf` 9.3k); a kitchen-sink contract of 22 entry points sits
+   at 62 % of the 81 920-felt class limit. The library does not ship non-inlined twins: a
+   consumer short of bytecode wraps the call site in its own `#[inline(never)]` function
+   (+15 to +42 % gas on that call), which is possible in that direction only; the compiler's
+   `inlining-strategy` is left at its default (`avoid` costs +177 % gas). `gas/bytecode.size`
+   tracks the fixture sizes in CI.
 4. No bitwise operators. Masks and shifts are `DivRem` by a constant power of two
    (`NonZero` const). Never `pow(2, n)` at runtime.
 5. Tables are `const [T; N]` + `.span()` (1 270 gas, size independent); dispatch is `match` on a

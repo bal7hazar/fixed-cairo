@@ -42,11 +42,11 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1c | optimizer pass on `glamx::eigen3`: metered one-rotation iterations (zero pivots free), polish-free `eigenvalues`, diagonal short-circuit: `new` -8.6 %, `eigenvalues` -15.9 %, diagonal -45.5 %; rotation order changed (numeric change, all overall worst cases improve) | done | #34 |
 | R1d | optimizer pass on `quat` (shared `slerp` helper, `rotate_towards`, wide `is_normalized`); after R1e | todo | |
 | R1e | optimizer pass on `fixed::wide` + `Vec2/3/4`: `is_unit2/3/4` kernels (`is_normalized` total and ~2x cheaper), shared norm in `Vec3::rotate_towards`; single-division and `slerp` candidates measured and kept in `benches::alt` | done | #32 |
-| R1f | `camera` / `Mat4::look_to_*` duplication; after R1i (bytecode evidence) | todo | |
+| R1f | `camera` / `Mat4::look_to_*` duplication | dropped | the bytecode audit (#31) shows no gain: inlined bodies are paid per call site whichever function holds them |
 | R1g | faster bench job: one snforge test crate per bench file (CI bench job 928 s -> 198 s, local check ~2 090 s -> 230 s, snapshots identical); `all-checks` is now bounded by `Test glam` (~16 min) | done | #33 |
 | R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`); 8 rows added to DESIGN section 3 | done | #30 |
 | R1j | `glamx::rot2`: `lerp` aligned with upstream (not normalised), `is_normalized` added (audit P0); after R1e (wide kernel) | todo | |
 | R1k | panic coverage: item/branch -> `should_panic` test manifest and checker, doc template on the nine `IndexView` impls (audit P0) | todo | |
 | R1l | doc-only deviation fixes, one PR per package: `Deviations: None.` on items that panic where upstream continues, stale camera module doc, non-semantic bullets moved out of `Deviations` (audit P1/P2); after the optimizer PRs | todo | |
-| R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining | inreview | #31 |
+| R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining; `gas/bytecode.size` checked in CI | done | #31 |
 | R1z | `v0.1.0`: changelog, tag, GitHub release, scarbs.xyz (owner's confirmation required) | todo | |
