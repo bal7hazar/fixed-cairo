@@ -289,8 +289,13 @@ class Gen:
         a = "".join(f"#[{x}]\n" for x in attrs)
         self.out.append(f"#[test]\n{a}fn {name}() {{\n{body}\n}}\n")
 
-    def panic(self, name, msg, lines):
+    def panic(self, name, msg, lines, marker=None):
+        """`marker`: `<Owner>::<item>` of `scripts/panic_coverage.py`, when the name of the
+        test does not attribute it."""
+        start = len(self.out)
         self.test(name, lines, attrs=[f"should_panic(expected: {msg})"])
+        if marker:
+            self.out[start] = f"// panics: {marker}\n" + self.out[start]
 
     def fuzz(self, name, seed, args, lines):
         body = "\n".join("    " + l for l in lines)
@@ -783,7 +788,7 @@ def gen_tests(t):
             "assert!(Mat3Trait::from_mat4(m).determinant().abs_diff_eq(f(0x100000000), f(8)));"])
 
     # ------------------------------------------------------------------------------- panics
-    sp = lambda name, msg, expr: panic(name, msg, [f"let _ = {expr};"])
+    sp = lambda name, msg, expr, marker=None: panic(name, msg, [f"let _ = {expr};"], marker)
     big = M([[MAX_RAW] * n for _ in range(n)])
     low = M([[MIN_RAW] * n for _ in range(n)])
     sing = M([[0] * n for _ in range(n)])
@@ -799,9 +804,91 @@ def gen_tests(t):
     # the all-`MAX` matrix has a zero determinant; a `MAX` diagonal does overflow
     diag_max = M([[MAX_RAW if i == j else 0 for j in range(n)] for i in range(n)])
     sp("test_determinant_overflow", "'Fixed: overflow'", f"{diag_max}.determinant()")
-    sp("test_mul_vec_overflow", "'Fixed: overflow'", f"{big}.mul_vec{n}({Vt}::ONE)")
+    sp("test_mul_vec_overflow", "'Fixed: overflow'", f"{big}.mul_vec{n}({Vt}::ONE)",
+       f"{T}::mul_vec{n}")
     sp("test_mul_scalar_overflow", "'Fixed: overflow'",
        f"{big}.mul_scalar(f({MAX_RAW}))")
+    ovf = "'Fixed: overflow'"
+    big, low = f"full({MAX_RAW})", f"full({MIN_RAW})"
+    sp(f"test_mul_transpose_vec{n}_overflow", ovf, f"{big}.mul_transpose_vec{n}({Vt}::ONE)")
+    sp(f"test_mul_mat{n}_overflow", ovf, f"{big}.mul_mat{n}({big})")
+    sp(f"test_add_mat{n}_overflow", "'i64_add Overflow'", f"{big}.add_mat{n}({big})")
+    sp(f"test_sub_mat{n}_underflow", "'i64_sub Underflow'", f"{low}.sub_mat{n}({big})")
+    sp("test_div_scalar_overflow", ovf, f"{big}.div_scalar(f(0x80000000))")
+    sp("test_mul_diagonal_scale_overflow", ovf,
+       f"{big}.mul_diagonal_scale({Vt}::splat(f({MAX_RAW})))")
+    # the determinant is 1 raw: the inverse of the `1.0` elements is 2^32
+    tiny = M([[(1 if i == 0 else ONE) if i == j else 0 for j in range(n)] for i in range(n)])
+    sp("test_inverse_overflow", ovf, f"{tiny}.inverse()")
+    sp("test_try_inverse_overflow", ovf, f"{tiny}.try_inverse()")
+    sp("test_inverse_or_zero_overflow", ovf, f"{tiny}.inverse_or_zero()")
+    sp("test_recip_overflow", ovf, "full(1).recip()")
+    v3 = lambda x, y, z: f"Vec3Trait::new(f({x}), f({y}), f({z}))"
+    v2 = lambda x, y: f"Vec2Trait::new(f({x}), f({y}))"
+    # `sin_cos(FRAC_PI_2)` is exactly `(1, 0)`: `-sin * MIN` overflows
+    pi2 = "fixed::fixed::FRAC_PI_2"
+    qbig = "QuatTrait::from_xyzw(" + ", ".join([f"f({1 << 48})"] * 4) + ")"
+    qmax = f"QuatTrait::from_xyzw(f({MAX_RAW}), f(0), f(0), f(0))"
+    if n == 2:
+        sp("test_from_scale_angle_overflow", ovf,
+           f"Mat2Trait::from_scale_angle({v2(MIN_RAW, MIN_RAW)}, {pi2})")
+    if n == 3:
+        sp("test_from_quat_overflow", ovf, f"Mat3Trait::from_quat({qbig})")
+        sp("test_from_quat_add_overflow", "'i64_add Overflow'", f"Mat3Trait::from_quat({qmax})")
+        sp("test_from_axis_angle_overflow", ovf,
+           f"Mat3Trait::from_axis_angle(Vec3Trait::splat(f({MAX_RAW})), {pi2})")
+        sp("test_from_scale_angle_translation_overflow", ovf,
+           f"Mat3Trait::from_scale_angle_translation({v2(MIN_RAW, MIN_RAW)}, {pi2}, "
+           "Vec2Trait::ZERO)")
+        sp("test_transform_point2_overflow", ovf, f"{big}.transform_point2(Vec2Trait::ONE)")
+        sp("test_transform_vector2_overflow", ovf, f"{big}.transform_vector2(Vec2Trait::ONE)")
+    if n == 4:
+        sp("test_mul_affine3_overflow", ovf,
+           f"{big}.mul_affine3(glam::affine3::Affine3Trait::from_scale("
+           f"Vec3Trait::splat(f({2 * ONE}))))")
+        sp("test_from_quat_overflow", ovf, f"Mat4Trait::from_quat({qbig})")
+        sp("test_from_quat_add_overflow", "'i64_add Overflow'", f"Mat4Trait::from_quat({qmax})")
+        sp("test_from_rotation_translation_overflow", ovf,
+           f"Mat4Trait::from_rotation_translation({qbig}, Vec3Trait::ZERO)")
+        sp("test_from_rotation_translation_add_overflow", "'i64_add Overflow'",
+           f"Mat4Trait::from_rotation_translation({qmax}, Vec3Trait::ZERO)")
+        sp("test_from_scale_rotation_translation_overflow", ovf,
+           f"Mat4Trait::from_scale_rotation_translation(Vec3Trait::ONE, {qbig}, Vec3Trait::ZERO)")
+        sp("test_from_scale_rotation_translation_add_overflow", "'i64_add Overflow'",
+           f"Mat4Trait::from_scale_rotation_translation(Vec3Trait::ONE, {qmax}, "
+           "Vec3Trait::ZERO)")
+        sp("test_to_scale_rotation_translation_zero", "'Fixed: division by zero'",
+           "Mat4Trait::ZERO.to_scale_rotation_translation()")
+        sp("test_to_scale_rotation_translation_overflow", ovf,
+           f"{big}.to_scale_rotation_translation()")
+        sp("test_from_axis_angle_overflow", ovf,
+           f"Mat4Trait::from_axis_angle(Vec3Trait::splat(f({MAX_RAW})), {pi2})")
+        sp("test_transform_point3_overflow", ovf, f"{big}.transform_point3(Vec3Trait::ONE)")
+        sp("test_transform_vector3_overflow", ovf, f"{big}.transform_vector3(Vec3Trait::ONE)")
+        sp("test_project_point3_overflow", ovf, f"{big}.project_point3(Vec3Trait::ONE)")
+        # `dir = X`, `up = Y`: `s = Z`, `u = Y`, so the translation is `(-eye.z, -eye.y, eye.x)`
+        # (`-MIN` underflows); with `up = (0, 1, 1)`, `s = (0, -1, 1) / sqrt(2)` and
+        # `-dot(eye, s)` overflows for `eye = (0, MIN, MAX)`
+        up11 = v3(0, ONE, ONE)
+        e_min, e_ovf = v3(0, MIN_RAW, 0), v3(0, MIN_RAW, MAX_RAW)
+        c_min, c_ovf = v3(ONE, MIN_RAW, 0), v3(ONE, MIN_RAW, MAX_RAW)
+        for h in ("rh", "lh"):
+            if h == "lh":
+                sp("test_look_to_lh_parallel", "'Vec3: normalize zero'",
+                   "Mat4Trait::look_to_lh(Vec3Trait::ZERO, Vec3Trait::Y, Vec3Trait::Y)")
+            sp(f"test_look_to_{h}_overflow", ovf,
+               f"Mat4Trait::look_to_{h}({e_ovf}, Vec3Trait::X, {up11})")
+            sp(f"test_look_to_{h}_neg_underflow", "'i64_neg Underflow'",
+               f"Mat4Trait::look_to_{h}({e_min}, Vec3Trait::X, Vec3Trait::Y)")
+            sp(f"test_look_at_{h}_eye_is_center", "'Vec3: normalize zero'",
+               f"Mat4Trait::look_at_{h}(Vec3Trait::ONE, Vec3Trait::ONE, Vec3Trait::Y)")
+            sp(f"test_look_at_{h}_overflow", ovf,
+               f"Mat4Trait::look_at_{h}({e_ovf}, {c_ovf}, {up11})")
+            sp(f"test_look_at_{h}_neg_underflow", "'i64_neg Underflow'",
+               f"Mat4Trait::look_at_{h}({e_min}, {c_min}, Vec3Trait::Y)")
+            sp(f"test_look_at_{h}_sub_underflow", "'i64_sub Underflow'",
+               f"Mat4Trait::look_at_{h}({v3(MAX_RAW, 0, 0)}, {v3(MIN_RAW, 0, 0)}, "
+               "Vec3Trait::Y)")
     if n == 2:
         sp("test_from_mat3_minor_column", "'Mat2: index out of bounds'",
            "Mat2Trait::from_mat3_minor(Mat3Trait::IDENTITY, 3, 0)")
@@ -816,7 +903,8 @@ def gen_tests(t):
         sp("test_project_point3_by_zero", "'Fixed: division by zero'",
            "Mat4Trait::ZERO.project_point3(Vec3Trait::ONE)")
         sp("test_look_to_parallel", "'Vec3: normalize zero'",
-           "Mat4Trait::look_to_rh(Vec3Trait::ZERO, Vec3Trait::Y, Vec3Trait::Y)")
+           "Mat4Trait::look_to_rh(Vec3Trait::ZERO, Vec3Trait::Y, Vec3Trait::Y)",
+           "Mat4::look_to_rh")
 
     # --------------------------------------------------------------------------------- fuzz
     seed = 200 * n
@@ -978,6 +1066,12 @@ fn om(r: Span<i64>, o: u32) -> Option<{T}> {{
     }} else {{
         Some(mx(r, o + 1))
     }}
+}}
+"""
+    helpers["full"] = f"""
+fn full(raw: i64) -> {T} {{
+    let x = f(raw);
+    {Tt}::from_cols_array([{", ".join(["x"] * (n * n))}])
 }}
 """
     helpers["hash"] = f"""

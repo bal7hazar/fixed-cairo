@@ -340,12 +340,14 @@ fn test_mask_test_exhaustive() {
     }
 }
 
+// panics: BVec3::test
 #[test]
 #[should_panic(expected: 'BVec3: index out of bounds')]
 fn test_mask_test_out_of_bounds() {
     BVec3Trait::new(true, false, true).test(3);
 }
 
+// panics: BVec3::test
 #[test]
 #[should_panic(expected: 'BVec3: index out of bounds')]
 fn test_mask_test_out_of_bounds_max() {
@@ -388,6 +390,7 @@ fn test_mask_set_exhaustive() {
     }
 }
 
+// panics: BVec3::set
 #[test]
 #[should_panic(expected: 'BVec3: index out of bounds')]
 fn test_mask_set_out_of_bounds() {
@@ -395,6 +398,7 @@ fn test_mask_set_out_of_bounds() {
     a.set(3, true);
 }
 
+// panics: BVec3::set
 #[test]
 #[should_panic(expected: 'BVec3: index out of bounds')]
 fn test_mask_set_out_of_bounds_max() {

@@ -894,6 +894,12 @@ fn test_sub_overflow() {
 }
 
 #[test]
+#[should_panic(expected: 'i32_sub Underflow')]
+fn test_sub_scalar_underflow() {
+    let _ = IVec3Trait::MIN.sub_scalar(1);
+}
+
+#[test]
 #[should_panic(expected: 'i32_neg Underflow')]
 fn test_neg_overflow() {
     let _ = -IVec3Trait::MIN;
@@ -921,6 +927,12 @@ fn test_rem_overflow() {
 #[should_panic(expected: 'attempt to divide with overflow')]
 fn test_div_scalar_overflow() {
     let _ = IVec3Trait::MIN.div_scalar(-1);
+}
+
+#[test]
+#[should_panic(expected: 'attempt to divide with overflow')]
+fn test_rem_scalar_overflow() {
+    let _ = IVec3Trait::MIN.rem_scalar(-1);
 }
 
 #[test]

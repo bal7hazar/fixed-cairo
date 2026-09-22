@@ -300,18 +300,21 @@ fn test_recip_is_exact_on_representable_quotients() {
 
 // ------------------------------------------------------------------ panics
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_overflow_panics() {
     let _ = wide_from(MAX).add(wide_mul(f(0xffffffff), f(1))).add(wide_mul(f(1), f(1))).narrow();
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_underflow_panics() {
     let _ = wide_from(MIN).sub(wide_mul(f(1), f(1))).narrow();
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_w16_positive_extreme_panics() {
@@ -321,6 +324,7 @@ fn test_narrow_w16_positive_extreme_panics() {
     let _ = s8.add(s8).narrow(); // 2^130
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_w16_negative_extreme_panics() {
@@ -330,6 +334,7 @@ fn test_narrow_w16_negative_extreme_panics() {
     let _ = s8.neg().sub(s8).narrow(); // -2^130
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_triple_overflow_panics() {
@@ -338,6 +343,7 @@ fn test_narrow_triple_overflow_panics() {
     let _ = wide_from(MAX).lift().add(frac).add(one).narrow();
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_triple_underflow_panics() {
@@ -345,6 +351,7 @@ fn test_narrow_triple_underflow_panics() {
     let _ = wide_from(MIN).lift().sub(one).narrow();
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_t16_positive_extreme_panics() {
@@ -354,6 +361,7 @@ fn test_narrow_t16_positive_extreme_panics() {
     let _ = t8.add(t8).narrow(); // 2^193
 }
 
+// panics: WideNarrow::narrow
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_narrow_t16_negative_extreme_panics() {
@@ -363,24 +371,28 @@ fn test_narrow_t16_negative_extreme_panics() {
     let _ = t8.add(t8).narrow(); // -2^193
 }
 
+// panics: WideSqrt::sqrt
 #[test]
 #[should_panic(expected: 'Fixed: sqrt negative')]
 fn test_wide_sqrt_negative_panics() {
     let _ = wide_mul(ONE, NEG_ONE).sqrt();
 }
 
+// panics: WideSqrt::sqrt
 #[test]
 #[should_panic(expected: 'Fixed: sqrt negative')]
 fn test_wide_sqrt_negative_discriminant_panics() {
     let _ = wide_mul(int(2), int(2)).sub(wide_mul(int(4), int(4))).sqrt();
 }
 
+// panics: WideSqrt::sqrt
 #[test]
 #[should_panic(expected: 'Fixed: sqrt negative')]
 fn test_wide_sqrt_w3_negative_panics() {
     let _ = wide_mul(f(1), f(1)).sub(wide_mul(f(1), f(1))).sub(wide_mul(f(1), f(1))).sqrt();
 }
 
+// panics: WideSqrt::sqrt
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_wide_sqrt_overflow_panics() {
@@ -436,6 +448,7 @@ fn test_det3_overflow_panics() {
     let _ = det3(big, ZERO, ZERO, ZERO, big, ZERO, ZERO, ZERO, big); // 2^33
 }
 
+// panics: fixed::wide::norm3_squared
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_norm_squared_overflow_panics() {
@@ -472,12 +485,14 @@ fn test_norm4_wide_sum_of_squares_2_pow_128_panics() {
     let _ = norm4_wide(MIN, MIN, MIN, MIN);
 }
 
+// panics: Norm::to_fixed
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_norm_to_fixed_overflow_panics() {
     let _ = norm2_wide(MIN, MIN).to_fixed();
 }
 
+// panics: fixed::wide::distance2
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_distance_overflow_panics() {
@@ -496,6 +511,7 @@ fn test_distance4_overflow_panics() {
     let _ = distance4(MIN, MIN, MIN, MIN, MAX, MAX, MAX, MAX);
 }
 
+// panics: fixed::wide::distance2_squared
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_distance_squared_overflow_panics() {
@@ -538,24 +554,28 @@ fn test_normalize4_sum_of_squares_2_pow_128_panics() {
     let _ = normalize4(MIN, MIN, MIN, MIN);
 }
 
+// panics: Norm::recip
 #[test]
 #[should_panic(expected: 'Fixed: division by zero')]
 fn test_norm_recip_zero_panics() {
     let _ = norm2_wide(ZERO, ZERO).recip();
 }
 
+// panics: Recip::new
 #[test]
 #[should_panic(expected: 'Fixed: division by zero')]
 fn test_recip_new_zero_panics() {
     let _ = RecipTrait::new(ZERO);
 }
 
+// panics: Recip::mul
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_recip_mul_overflow_panics() {
     let _ = RecipTrait::new(HALF).mul(MAX);
 }
 
+// panics: Recip::mul
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_recip_mul_negative_overflow_panics() {

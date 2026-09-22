@@ -200,6 +200,7 @@ fn test_inverse_singular_panics() {
     Affine2Trait::ZERO.inverse();
 }
 
+// panics: Affine2::transform_point2
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_transform_point_overflow_panics() {
@@ -207,6 +208,7 @@ fn test_transform_point_overflow_panics() {
         .transform_point2(Vec2 { x: f(0x200000000), y: f(0) });
 }
 
+// panics: Affine2::transform_vector2
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_transform_vector_overflow_panics() {
@@ -214,6 +216,7 @@ fn test_transform_vector_overflow_panics() {
         .transform_vector2(Vec2 { x: f(0x200000000), y: f(0) });
 }
 
+// panics: Affine2::from_scale_angle_translation
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_scale_angle_overflow_panics() {
@@ -222,12 +225,33 @@ fn test_scale_angle_overflow_panics() {
     );
 }
 
+// panics: Affine2::Affine2Mul
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_composition_overflow_panics() {
     let a = Affine2Trait::from_scale(Vec2 { x: f(0x7fffffffffffffff), y: f(0x100000000) });
     let b = Affine2Trait::from_scale(Vec2 { x: f(0x200000000), y: f(0x100000000) });
     let _ = a * b;
+}
+
+#[should_panic(expected: 'Fixed: overflow')]
+#[test]
+fn test_to_scale_angle_translation_overflow_panics() {
+    // |x_axis| = sqrt(2) * MAX
+    let x_axis = Vec2 { x: f(0x7fffffffffffffff), y: f(0x7fffffffffffffff) };
+    Affine2Trait::from_cols(x_axis, Vec2Trait::Y, Vec2Trait::ZERO).to_scale_angle_translation();
+}
+
+#[should_panic(expected: 'Fixed: overflow')]
+#[test]
+fn test_mul_mat3_overflow_panics() {
+    let a = Affine2Trait::from_scale(Vec2 { x: f(0x7fffffffffffffff), y: f(0x100000000) });
+    a
+        .mul_mat3(
+            Mat3Trait::from_diagonal(
+                Vec3 { x: f(0x200000000), y: f(0x100000000), z: f(0x100000000) },
+            ),
+        );
 }
 
 #[should_panic(expected: 'Fixed: overflow')]

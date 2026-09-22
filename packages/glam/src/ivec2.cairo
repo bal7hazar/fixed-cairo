@@ -1411,6 +1411,12 @@ pub impl IVec2BitNot of BitNot<IVec2> {
 /// `v[i]`. Panics with `'IVec2: index out of bounds'` if `index >= 2`.
 ///
 /// Mirrors `impl Index<usize> for glam::IVec2`.
+/// #### Panics
+/// * `'IVec2: index out of bounds'` if `index >= 2`.
+/// #### Deviations
+/// * `IndexView` returns the element by value; `IndexMut` is not ported (see the struct).
+/// * The panic message is the `felt252` `'IVec2: index out of bounds'` (glam-rs panics with
+///   `index out of bounds`).
 pub impl IVec2IndexView of IndexView<IVec2, usize> {
     type Target = i32;
     #[inline(always)]

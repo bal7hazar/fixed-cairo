@@ -489,6 +489,12 @@ fn test_move_towards_min_step_panics() {
     let _ = ONE.move_towards(ZERO, MIN);
 }
 
+#[test]
+#[should_panic(expected: 'i64_sub Overflow')]
+fn test_move_towards_away_overflow_panics() {
+    let _ = MAX.move_towards(ZERO, f(-1)); // self - d = MAX + 1 ULP
+}
+
 // ------------------------------------------------------------------ properties (seeded fuzzing)
 
 #[test]

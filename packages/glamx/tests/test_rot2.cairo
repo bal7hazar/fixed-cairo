@@ -385,8 +385,15 @@ fn test_rotate_towards_panics_min_budget() {
     let _ = Rot2Trait::IDENTITY.rotate_towards(target, f(-0x8000000000000000));
 }
 
+// panics: Rot2::from_rotation_arc
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_rotation_arc_panics_overflow() {
     let _ = Rot2Trait::from_rotation_arc(MAX_VEC, MAX_VEC);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_vec2_panics_overflow() {
+    let _ = MAX_ROT.mul_vec2(MAX_VEC);
 }

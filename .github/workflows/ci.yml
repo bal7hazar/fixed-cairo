@@ -25,6 +25,8 @@ jobs:
       - run: python3 scripts/api_parity.py --check
       # README gas tables must match gas/*.snap (regenerate with scripts/gas_tables.py).
       - run: python3 scripts/gas_tables.py --check
+      # Every documented panic of a public item has a should_panic test on that item.
+      - run: python3 scripts/panic_coverage.py --check
 
   test:
     name: Test ${{ matrix.package }}

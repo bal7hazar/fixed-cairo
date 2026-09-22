@@ -1042,7 +1042,12 @@ def operators(t):
     # indexing
     arms = "\n".join(f"{i} => *self.{c}," for i, c in enumerate(t.c))
     impl(f"`v[i]`. Panics with `'{T}: index out of bounds'` if `index >= {n}`.\n///\n"
-         f"/// Mirrors `impl Index<usize> for glam::{T}`.",
+         f"/// Mirrors `impl Index<usize> for glam::{T}`.\n"
+         f"/// #### Panics\n/// * `'{T}: index out of bounds'` if `index >= {n}`.\n"
+         "/// #### Deviations\n"
+         "/// * `IndexView` returns the element by value; `IndexMut` is not ported (see the struct).\n"
+         f"/// * The panic message is the `felt252` `'{T}: index out of bounds'` (glam-rs panics with\n"
+         "///   `index out of bounds`).",
          f"{T}IndexView of IndexView<{T}, usize>", f"index(self: @{T}, index: usize) -> {S}",
          f"match index {{\n{arms}\n_ => core::panic_with_felt252('{T}: index out of bounds'),\n}}",
          extra=f"    type Target = {S};\n")

@@ -426,66 +426,77 @@ fn fuzz_sdp2(a: i64, b: i64, c: i64, d: i64) {
 // ------------------------------------------------------------------------------------------------
 // Panic paths.
 
+// panics: SdpMatrix3::inverse_unchecked
 #[test]
 #[should_panic(expected: 'SdpMatrix3: singular')]
 fn test_inverse_unchecked_singular() {
     let _ = SdpMatrix3Trait::from_sdp_matrix(m3([1, 2, 3, 2, 4, 6, 3, 6, 9])).inverse_unchecked();
 }
 
+// panics: SdpMatrix3::inverse_unchecked
 #[test]
 #[should_panic(expected: 'SdpMatrix3: singular')]
 fn test_inverse_unchecked_zero() {
     let _ = SdpMatrix3Trait::zero().inverse_unchecked();
 }
 
+// panics: SdpMatrix2::inverse_unchecked
 #[test]
 #[should_panic(expected: 'SdpMatrix2: singular')]
 fn test_inverse_unchecked2_singular() {
     let _ = SdpMatrix2Trait::new(n(1), n(2), n(4)).inverse_unchecked();
 }
 
+// panics: SdpMatrix2::inverse_and_get_determinant_unchecked
 #[test]
 #[should_panic(expected: 'SdpMatrix2: singular')]
 fn test_inverse_and_get_determinant2_singular() {
     let _ = SdpMatrix2Trait::zero().inverse_and_get_determinant_unchecked();
 }
 
+// panics: SdpMatrix3::mul_scalar
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_scalar_overflow() {
     let _ = SdpMatrix3Trait::diagonal(n(100000)).mul_scalar(n(100000));
 }
 
+// panics: SdpMatrix2::mul_scalar
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_scalar2_overflow() {
     let _ = SdpMatrix2Trait::diagonal(n(100000)).mul_scalar(n(100000));
 }
 
+// panics: SdpMatrix3::mul_vec
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_vec_overflow() {
     let _ = SdpMatrix3Trait::diagonal(n(100000)).mul_vec(v3(100000, 0, 0));
 }
 
+// panics: SdpMatrix2::mul_vec
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_vec2_overflow() {
     let _ = SdpMatrix2Trait::diagonal(n(100000)).mul_vec(Vec2 { x: n(100000), y: n(0) });
 }
 
+// panics: SdpMatrix3::quadform
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_quadform_overflow() {
     let _ = SdpMatrix3Trait::diagonal(n(1000)).quadform(Mat3Trait::from_diagonal(v3(2000, 1, 1)));
 }
 
+// panics: SdpMatrix3::quadform3x2
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_quadform3x2_overflow() {
     let _ = SdpMatrix3Trait::diagonal(n(1000)).quadform3x2(n(2000), n(0), n(0), n(1), n(0), n(0));
 }
 
+// panics: SdpMatrix3::from_rotated_diagonal_mat3
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_from_rotated_diagonal_overflow() {
@@ -494,6 +505,7 @@ fn test_from_rotated_diagonal_overflow() {
     );
 }
 
+// panics: SdpMatrix3::inverse
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_inverse_overflow() {
@@ -501,6 +513,7 @@ fn test_inverse_overflow() {
     let _ = SdpMatrix3Trait::new(f(1), n(0), n(0), n(1), n(0), n(1)).inverse();
 }
 
+// panics: SdpMatrix::SdpMatrix3Add
 #[test]
 #[should_panic(expected: 'i64_add Overflow')]
 fn test_add_overflow() {
@@ -508,14 +521,89 @@ fn test_add_overflow() {
     let _ = big + big;
 }
 
+// panics: SdpMatrix::SdpMatrix2Sub
 #[test]
 #[should_panic(expected: 'i64_sub Underflow')]
 fn test_sub_underflow() {
     let _ = SdpMatrix2Trait::diagonal(f(-0x7fffffffffffffff)) - SdpMatrix2Trait::identity();
 }
 
+// panics: SdpMatrix3::add_diagonal
 #[test]
 #[should_panic(expected: 'i64_add Overflow')]
 fn test_add_diagonal_overflow() {
     let _ = SdpMatrix3Trait::diagonal(f(0x7fffffffffffffff)).add_diagonal(f(1));
+}
+
+// panics: SdpMatrix2::add_diagonal
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_add_diagonal2_overflow() {
+    let _ = SdpMatrix2Trait::diagonal(f(0x7fffffffffffffff)).add_diagonal(f(1));
+}
+
+// panics: SdpMatrix::SdpMatrix2Add
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_add2_overflow() {
+    let big = SdpMatrix2Trait::diagonal(f(0x7fffffffffffffff));
+    let _ = big + big;
+}
+
+// panics: SdpMatrix::SdpMatrix3Sub
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_sub3_underflow() {
+    let _ = SdpMatrix3Trait::diagonal(f(-0x7fffffffffffffff)) - SdpMatrix3Trait::identity();
+}
+
+// panics: SdpMatrix2::inverse_unchecked
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_unchecked2_overflow() {
+    // det = 1 raw, cofactor m11 = 1: 2^32 does not fit
+    let _ = SdpMatrix2Trait::new(f(1), n(0), n(1)).inverse_unchecked();
+}
+
+// panics: SdpMatrix2::inverse_and_get_determinant_unchecked
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_and_get_determinant2_overflow() {
+    let _ = SdpMatrix2Trait::new(f(1), n(0), n(1)).inverse_and_get_determinant_unchecked();
+}
+
+// panics: SdpMatrix2::inverse
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse2_overflow() {
+    let _ = SdpMatrix2Trait::new(f(1), n(0), n(1)).inverse();
+}
+
+// panics: SdpMatrix3::inverse_unchecked
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_unchecked_overflow() {
+    let _ = SdpMatrix3Trait::new(f(1), n(0), n(0), n(1), n(0), n(1)).inverse_unchecked();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_vector_overflow() {
+    let _ = SdpMatrix3Trait::diagonal(n(100000)).transform_vector(v3(100000, 0, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_mat_overflow() {
+    let _ = SdpMatrix3Trait::diagonal(n(100000))
+        .mul_mat(Mat3Trait::from_diagonal(v3(100000, 1, 1)));
+}
+
+// panics: SdpMatrix3::from_rotated_diagonal
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_rotated_diagonal_quat_overflow() {
+    // a non-unit quaternion: from_quat(2, 0, 0, 0) = diag(1, -7, -7), 49 * 2^26 >= 2^31
+    let q = Quat { x: n(2), y: n(0), z: n(0), w: n(0) };
+    let _ = SdpMatrix3Trait::from_rotated_diagonal(q, v3(1, 0x4000000, 1));
 }

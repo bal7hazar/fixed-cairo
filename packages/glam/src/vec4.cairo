@@ -2066,6 +2066,12 @@ pub impl Vec4RemAssignScalar of RemAssign<Vec4, Fixed> {
 /// `v[i]`. Panics with `'Vec4: index out of bounds'` if `index >= 4`.
 ///
 /// Mirrors `impl Index<usize> for glam::Vec4`.
+/// #### Panics
+/// * `'Vec4: index out of bounds'` if `index >= 4`.
+/// #### Deviations
+/// * `IndexView` returns the element by value; `IndexMut` is not ported (see the struct).
+/// * The panic message is the `felt252` `'Vec4: index out of bounds'` (glam-rs panics with
+///   `index out of bounds`).
 pub impl Vec4IndexView of IndexView<Vec4, usize> {
     type Target = Fixed;
     #[inline(always)]

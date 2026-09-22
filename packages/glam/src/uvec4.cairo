@@ -1392,6 +1392,12 @@ pub impl UVec4BitNot of BitNot<UVec4> {
 /// `v[i]`. Panics with `'UVec4: index out of bounds'` if `index >= 4`.
 ///
 /// Mirrors `impl Index<usize> for glam::UVec4`.
+/// #### Panics
+/// * `'UVec4: index out of bounds'` if `index >= 4`.
+/// #### Deviations
+/// * `IndexView` returns the element by value; `IndexMut` is not ported (see the struct).
+/// * The panic message is the `felt252` `'UVec4: index out of bounds'` (glam-rs panics with
+///   `index out of bounds`).
 pub impl UVec4IndexView of IndexView<UVec4, usize> {
     type Target = u32;
     #[inline(always)]

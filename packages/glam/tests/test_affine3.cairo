@@ -249,18 +249,21 @@ fn test_inverse_overflow_panics() {
     Affine3Trait::from_scale(v(1, ONE, ONE)).inverse();
 }
 
+// panics: Affine3::transform_point3
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_transform_point_overflow_panics() {
     Affine3Trait::from_scale(v(0x7fffffffffffffff, ONE, ONE)).transform_point3(v(2 * ONE, 0, 0));
 }
 
+// panics: Affine3::transform_vector3
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_transform_vector_overflow_panics() {
     Affine3Trait::from_scale(v(0x7fffffffffffffff, ONE, ONE)).transform_vector3(v(2 * ONE, 0, 0));
 }
 
+// panics: Affine3::Affine3Mul
 #[should_panic(expected: 'Fixed: overflow')]
 #[test]
 fn test_composition_overflow_panics() {
@@ -293,12 +296,14 @@ fn test_inv_mul_overflow_panics() {
     a.inv_mul(Affine3Trait::from_translation(v(0x7fffffffffffffff, 0, 0)));
 }
 
+// panics: Affine3::look_to_rh
 #[should_panic(expected: 'Vec3: normalize zero')]
 #[test]
 fn test_look_to_zero_dir_panics() {
     Affine3Trait::look_to_rh(Vec3Trait::ZERO, Vec3Trait::ZERO, Vec3Trait::Y);
 }
 
+// panics: Affine3::look_at_rh
 #[should_panic(expected: 'Vec3: normalize zero')]
 #[test]
 fn test_look_at_parallel_up_panics() {
@@ -309,6 +314,38 @@ fn test_look_at_parallel_up_panics() {
 #[test]
 fn test_to_scale_rotation_translation_zero_column_panics() {
     Affine3Trait::from_scale(v(0, ONE, ONE)).to_scale_rotation_translation();
+}
+
+#[should_panic(expected: 'Fixed: overflow')]
+#[test]
+fn test_to_scale_rotation_translation_overflow_panics() {
+    // |x_axis| = sqrt(2) * MAX
+    let x_axis = v(0x7fffffffffffffff, 0x7fffffffffffffff, 0);
+    Affine3Trait::from_cols(x_axis, Vec3Trait::Y, Vec3Trait::Z, Vec3Trait::ZERO)
+        .to_scale_rotation_translation();
+}
+
+#[should_panic(expected: 'Fixed: overflow')]
+#[test]
+fn test_look_to_rh_overflow_panics() {
+    // `s = (0, -1, 1) / sqrt(2)`: `-dot(eye, s)` is `sqrt(2) * MAX`
+    Affine3Trait::look_to_rh(
+        v(0, -0x8000000000000000, 0x7fffffffffffffff), Vec3Trait::X, v(0, ONE, ONE),
+    );
+}
+
+#[should_panic(expected: 'Vec3: normalize zero')]
+#[test]
+fn test_look_at_lh_eye_is_center_panics() {
+    Affine3Trait::look_at_lh(Vec3Trait::ONE, Vec3Trait::ONE, Vec3Trait::Y);
+}
+
+#[should_panic(expected: 'i64_sub Underflow')]
+#[test]
+fn test_look_at_lh_sub_underflow_panics() {
+    Affine3Trait::look_at_lh(
+        v(0x7fffffffffffffff, 0, 0), v(-0x8000000000000000, 0, 0), Vec3Trait::Y,
+    );
 }
 
 /// `|x| mod 1` in raw units.

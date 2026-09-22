@@ -727,12 +727,14 @@ fn test_index_out_of_bounds() {
     let _ = Vec2Trait::ONE[2];
 }
 
+// panics: Vec2::as_uvec2
 #[test]
 #[should_panic(expected: 'Vec2: cast out of range')]
 fn test_as_uvec_negative() {
     let _ = Vec2Trait::NEG_ONE.as_uvec2();
 }
 
+// panics: Vec2::UVec2IntoVec2
 #[test]
 #[should_panic(expected: 'Vec2: cast out of range')]
 fn test_from_uvec_overflow() {
@@ -961,6 +963,186 @@ fn test_rotate_angle_overflow() {
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_rotate_towards_overflow() {
     let _ = Vec2Trait::MAX.rotate_towards(Vec2Trait::MAX, f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_rotate_overflow() {
+    let _ = Vec2Trait::MAX.rotate(Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_dot_into_vec_overflow() {
+    let _ = Vec2Trait::MAX.dot_into_vec(Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_copysign_overflow() {
+    let _ = Vec2Trait::MIN.copysign(Vec2Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_recip_overflow() {
+    let _ = Vec2Trait::splat(f(1)).recip();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_powf_overflow() {
+    let _ = Vec2Trait::splat(f(8589934592)).powf(f(171798691840));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_powf_zero_negative() {
+    let _ = Vec2Trait::ZERO.powf(f(-4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_powf_min() {
+    let _ = Vec2Trait::MIN.powf(f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Overflow')]
+fn test_smoothstep_overflow() {
+    let _ = Vec2Trait::MAX.smoothstep(Vec2Trait::MIN, Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_length_recip_zero() {
+    let _ = Vec2Trait::ZERO.length_recip();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_length_recip_overflow() {
+    let _ = Vec2Trait::splat(f(1)).length_recip();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance_squared_overflow() {
+    let _ = Vec2Trait::MAX.distance_squared(Vec2Trait::MIN);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_euclid_overflow() {
+    let _ = Vec2Trait::MAX.div_euclid(Vec2Trait::splat(f(1)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_normalize_and_length_overflow() {
+    let _ = Vec2Trait::MAX.normalize_and_length();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_project_onto_overflow() {
+    let _ = Vec2Trait::MAX.project_onto(Vec2Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_reject_from_overflow() {
+    let _ = Vec2Trait::MAX.reject_from(Vec2Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_project_onto_normalized_overflow() {
+    let _ = Vec2Trait::MAX.project_onto_normalized(Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_reject_from_normalized_overflow() {
+    let _ = Vec2Trait::MAX.reject_from_normalized(Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_reflect_overflow() {
+    let _ = Vec2Trait::MAX.reflect(Vec2Trait::MAX);
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_reflect_add_overflow() {
+    let _ = Vec2Trait::MAX.reflect(Vec2Trait::X);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_refract_overflow() {
+    let _ = Vec2Trait::MAX.refract(Vec2Trait::MAX, f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_lerp_overflow() {
+    let _ = Vec2Trait::ZERO.lerp(Vec2Trait::MAX, f(8589934592));
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_move_towards_sub_underflow() {
+    let _ = Vec2Trait::MAX.move_towards(Vec2Trait::MIN, f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_move_towards_overflow() {
+    let _ = Vec2Trait::ZERO.move_towards(Vec2Trait::MAX, f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_add_overflow() {
+    let _ = Vec2Trait::MAX.mul_add(Vec2Trait::MAX, Vec2Trait::ZERO);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_clamp_length_zero() {
+    let _ = Vec2Trait::ZERO.clamp_length(f(4294967296), f(8589934592));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_clamp_length_overflow() {
+    let _ = Vec2Trait::MAX.clamp_length(f(0), f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_clamp_length_max_overflow() {
+    let _ = Vec2Trait::MAX.clamp_length_max(f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_add_scalar_overflow() {
+    let _ = Vec2Trait::MAX.add_scalar(f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_sub_scalar_underflow() {
+    let _ = Vec2Trait::MIN.sub_scalar(f(4294967296));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_scalar_overflow() {
+    let _ = Vec2Trait::MAX.div_scalar(f(1));
 }
 #[cairofmt::skip]
 const FROM_ANGLE: [[i64; 3]; 19] = [

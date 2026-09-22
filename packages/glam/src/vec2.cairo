@@ -1910,6 +1910,12 @@ pub impl Vec2RemAssignScalar of RemAssign<Vec2, Fixed> {
 /// `v[i]`. Panics with `'Vec2: index out of bounds'` if `index >= 2`.
 ///
 /// Mirrors `impl Index<usize> for glam::Vec2`.
+/// #### Panics
+/// * `'Vec2: index out of bounds'` if `index >= 2`.
+/// #### Deviations
+/// * `IndexView` returns the element by value; `IndexMut` is not ported (see the struct).
+/// * The panic message is the `felt252` `'Vec2: index out of bounds'` (glam-rs panics with
+///   `index out of bounds`).
 pub impl Vec2IndexView of IndexView<Vec2, usize> {
     type Target = Fixed;
     #[inline(always)]

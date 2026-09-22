@@ -76,6 +76,11 @@ fn om(r: Span<i64>, o: u32) -> Option<Mat4> {
     }
 }
 
+fn full(raw: i64) -> Mat4 {
+    let x = f(raw);
+    Mat4Trait::from_cols_array([x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x])
+}
+
 fn hash(m: Mat4) -> felt252 {
     PoseidonTrait::new().update_with(m).finalize()
 }
@@ -730,6 +735,7 @@ fn test_determinant_overflow() {
         .determinant();
 }
 
+// panics: Mat4::mul_vec4
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_vec_overflow() {
@@ -763,11 +769,306 @@ fn test_mul_scalar_overflow() {
 }
 
 #[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_transpose_vec4_overflow() {
+    let _ = full(9223372036854775807).mul_transpose_vec4(Vec4Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_mat4_overflow() {
+    let _ = full(9223372036854775807).mul_mat4(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_add_mat4_overflow() {
+    let _ = full(9223372036854775807).add_mat4(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_sub_mat4_underflow() {
+    let _ = full(-9223372036854775808).sub_mat4(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_scalar_overflow() {
+    let _ = full(9223372036854775807).div_scalar(f(0x80000000));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_diagonal_scale_overflow() {
+    let _ = full(9223372036854775807).mul_diagonal_scale(Vec4Trait::splat(f(9223372036854775807)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_overflow() {
+    let _ = Mat4Trait::from_cols_array(
+        [
+            f(1), f(0), f(0), f(0), f(0), f(4294967296), f(0), f(0), f(0), f(0), f(4294967296),
+            f(0), f(0), f(0), f(0), f(4294967296),
+        ],
+    )
+        .inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_try_inverse_overflow() {
+    let _ = Mat4Trait::from_cols_array(
+        [
+            f(1), f(0), f(0), f(0), f(0), f(4294967296), f(0), f(0), f(0), f(0), f(4294967296),
+            f(0), f(0), f(0), f(0), f(4294967296),
+        ],
+    )
+        .try_inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_or_zero_overflow() {
+    let _ = Mat4Trait::from_cols_array(
+        [
+            f(1), f(0), f(0), f(0), f(0), f(4294967296), f(0), f(0), f(0), f(0), f(4294967296),
+            f(0), f(0), f(0), f(0), f(4294967296),
+        ],
+    )
+        .inverse_or_zero();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_recip_overflow() {
+    let _ = full(1).recip();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_affine3_overflow() {
+    let _ = full(9223372036854775807)
+        .mul_affine3(glam::affine3::Affine3Trait::from_scale(Vec3Trait::splat(f(8589934592))));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_quat_overflow() {
+    let _ = Mat4Trait::from_quat(
+        QuatTrait::from_xyzw(
+            f(281474976710656), f(281474976710656), f(281474976710656), f(281474976710656),
+        ),
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_quat_add_overflow() {
+    let _ = Mat4Trait::from_quat(QuatTrait::from_xyzw(f(9223372036854775807), f(0), f(0), f(0)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_rotation_translation_overflow() {
+    let _ = Mat4Trait::from_rotation_translation(
+        QuatTrait::from_xyzw(
+            f(281474976710656), f(281474976710656), f(281474976710656), f(281474976710656),
+        ),
+        Vec3Trait::ZERO,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_rotation_translation_add_overflow() {
+    let _ = Mat4Trait::from_rotation_translation(
+        QuatTrait::from_xyzw(f(9223372036854775807), f(0), f(0), f(0)), Vec3Trait::ZERO,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_scale_rotation_translation_overflow() {
+    let _ = Mat4Trait::from_scale_rotation_translation(
+        Vec3Trait::ONE,
+        QuatTrait::from_xyzw(
+            f(281474976710656), f(281474976710656), f(281474976710656), f(281474976710656),
+        ),
+        Vec3Trait::ZERO,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_scale_rotation_translation_add_overflow() {
+    let _ = Mat4Trait::from_scale_rotation_translation(
+        Vec3Trait::ONE,
+        QuatTrait::from_xyzw(f(9223372036854775807), f(0), f(0), f(0)),
+        Vec3Trait::ZERO,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_to_scale_rotation_translation_zero() {
+    let _ = Mat4Trait::ZERO.to_scale_rotation_translation();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_to_scale_rotation_translation_overflow() {
+    let _ = full(9223372036854775807).to_scale_rotation_translation();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_axis_angle_overflow() {
+    let _ = Mat4Trait::from_axis_angle(
+        Vec3Trait::splat(f(9223372036854775807)), fixed::fixed::FRAC_PI_2,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_point3_overflow() {
+    let _ = full(9223372036854775807).transform_point3(Vec3Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_vector3_overflow() {
+    let _ = full(9223372036854775807).transform_vector3(Vec3Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_project_point3_overflow() {
+    let _ = full(9223372036854775807).project_point3(Vec3Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_look_to_rh_overflow() {
+    let _ = Mat4Trait::look_to_rh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(9223372036854775807)),
+        Vec3Trait::X,
+        Vec3Trait::new(f(0), f(4294967296), f(4294967296)),
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_look_to_rh_neg_underflow() {
+    let _ = Mat4Trait::look_to_rh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(0)), Vec3Trait::X, Vec3Trait::Y,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_at_rh_eye_is_center() {
+    let _ = Mat4Trait::look_at_rh(Vec3Trait::ONE, Vec3Trait::ONE, Vec3Trait::Y);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_look_at_rh_overflow() {
+    let _ = Mat4Trait::look_at_rh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(9223372036854775807)),
+        Vec3Trait::new(f(4294967296), f(-9223372036854775808), f(9223372036854775807)),
+        Vec3Trait::new(f(0), f(4294967296), f(4294967296)),
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_look_at_rh_neg_underflow() {
+    let _ = Mat4Trait::look_at_rh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(0)),
+        Vec3Trait::new(f(4294967296), f(-9223372036854775808), f(0)),
+        Vec3Trait::Y,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_look_at_rh_sub_underflow() {
+    let _ = Mat4Trait::look_at_rh(
+        Vec3Trait::new(f(9223372036854775807), f(0), f(0)),
+        Vec3Trait::new(f(-9223372036854775808), f(0), f(0)),
+        Vec3Trait::Y,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_to_lh_parallel() {
+    let _ = Mat4Trait::look_to_lh(Vec3Trait::ZERO, Vec3Trait::Y, Vec3Trait::Y);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_look_to_lh_overflow() {
+    let _ = Mat4Trait::look_to_lh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(9223372036854775807)),
+        Vec3Trait::X,
+        Vec3Trait::new(f(0), f(4294967296), f(4294967296)),
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_look_to_lh_neg_underflow() {
+    let _ = Mat4Trait::look_to_lh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(0)), Vec3Trait::X, Vec3Trait::Y,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Vec3: normalize zero')]
+fn test_look_at_lh_eye_is_center() {
+    let _ = Mat4Trait::look_at_lh(Vec3Trait::ONE, Vec3Trait::ONE, Vec3Trait::Y);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_look_at_lh_overflow() {
+    let _ = Mat4Trait::look_at_lh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(9223372036854775807)),
+        Vec3Trait::new(f(4294967296), f(-9223372036854775808), f(9223372036854775807)),
+        Vec3Trait::new(f(0), f(4294967296), f(4294967296)),
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_neg Underflow')]
+fn test_look_at_lh_neg_underflow() {
+    let _ = Mat4Trait::look_at_lh(
+        Vec3Trait::new(f(0), f(-9223372036854775808), f(0)),
+        Vec3Trait::new(f(4294967296), f(-9223372036854775808), f(0)),
+        Vec3Trait::Y,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_look_at_lh_sub_underflow() {
+    let _ = Mat4Trait::look_at_lh(
+        Vec3Trait::new(f(9223372036854775807), f(0), f(0)),
+        Vec3Trait::new(f(-9223372036854775808), f(0), f(0)),
+        Vec3Trait::Y,
+    );
+}
+
+#[test]
 #[should_panic(expected: 'Fixed: division by zero')]
 fn test_project_point3_by_zero() {
     let _ = Mat4Trait::ZERO.project_point3(Vec3Trait::ONE);
 }
 
+// panics: Mat4::look_to_rh
 #[test]
 #[should_panic(expected: 'Vec3: normalize zero')]
 fn test_look_to_parallel() {

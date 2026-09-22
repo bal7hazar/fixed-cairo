@@ -339,3 +339,57 @@ fn test_append_translation_overflow() {
 fn test_to_mat3_neg_overflow() {
     Pose2Trait::from_rotation(Rot2 { re: f(0), im: f(-0x8000000000000000) }).to_mat3();
 }
+
+#[test]
+#[should_panic(expected: ('i64_neg Underflow',))]
+fn test_inverse_neg_underflow() {
+    Pose2Trait::from_rotation(Rot2 { re: f(0), im: f(-0x8000000000000000) }).inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_prepend_translation_overflow() {
+    Pose2Trait::from_translation(v2(0x40000000, 0)).prepend_translation(v2(0x40000000, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inv_mul_overflow() {
+    let a = Pose2Trait::from_rotation(Rot2 { re: n(2), im: f(0) });
+    a.inv_mul(Pose2Trait::from_translation(v2(0x40000000, 0)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_vector_overflow() {
+    Pose2Trait::from_rotation(Rot2 { re: n(2), im: f(0) }).transform_vector(v2(0x40000000, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_transform_point_overflow() {
+    let p = Pose2Trait::from_rotation(Rot2 { re: n(2), im: f(0) });
+    p.inverse_transform_point(v2(0x40000000, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_transform_vector_overflow() {
+    let p = Pose2Trait::from_rotation(Rot2 { re: n(2), im: f(0) });
+    p.inverse_transform_vector(v2(0x40000000, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_rot2_overflow() {
+    let big = Rot2 { re: n(0x40000000), im: f(0) };
+    Pose2Trait::from_rotation(big).mul_rot2(big);
+}
+
+// panics: Rot2Pose2::mul_pose2
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_rot2_mul_pose2_overflow() {
+    let big = Rot2 { re: n(0x40000000), im: f(0) };
+    big.mul_pose2(Pose2Trait::from_rotation(big));
+}

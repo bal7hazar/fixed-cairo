@@ -432,3 +432,61 @@ fn test_nlerp_zero() {
     let z = Pose3Trait::from_parts(Vec3Trait::ZERO, QuatTrait::ZERO);
     z.nlerp(z, f(ONE / 2));
 }
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_prepend_translation_overflow() {
+    let p = Pose3Trait::from_parts(v3(0x40000000, 0, 0), QuatTrait::IDENTITY);
+    p.prepend_translation(v3(0x40000000, 0, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inv_mul_overflow() {
+    // w = 2: the conjugate rotation scales by 4
+    let a = Pose3Trait::from_rotation(quat(f(0), f(0), f(0), n(2)));
+    a.inv_mul(Pose3Trait::from_translation(v3(0x20000000, 0, 0)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_vector_overflow() {
+    let p = Pose3Trait::from_rotation(quat(f(0), f(0), f(0), n(2)));
+    p.transform_vector(v3(0x20000000, 0, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_transform_point_overflow() {
+    let p = Pose3Trait::from_rotation(quat(f(0), f(0), f(0), n(2)));
+    p.inverse_transform_point(v3(0x20000000, 0, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_transform_vector_overflow() {
+    let p = Pose3Trait::from_rotation(quat(f(0), f(0), f(0), n(2)));
+    p.inverse_transform_vector(v3(0x20000000, 0, 0));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_to_mat4_overflow() {
+    // 1 - 2 y^2 with y = 2^16
+    let _ = Pose3Trait::from_rotation(quat(f(0), n(0x10000), f(0), f(0))).to_mat4();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_rot3_overflow() {
+    let big = quat(f(0), f(0), f(0), n(0x40000000));
+    Pose3Trait::from_rotation(big).mul_rot3(big);
+}
+
+// panics: Rot3Pose3::mul_pose3
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_rot3_mul_pose3_overflow() {
+    let big = quat(f(0), f(0), f(0), n(0x40000000));
+    big.mul_pose3(Pose3Trait::from_rotation(big));
+}

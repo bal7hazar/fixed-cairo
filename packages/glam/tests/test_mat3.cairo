@@ -85,6 +85,11 @@ fn om(r: Span<i64>, o: u32) -> Option<Mat3> {
     }
 }
 
+fn full(raw: i64) -> Mat3 {
+    let x = f(raw);
+    Mat3Trait::from_cols_array([x, x, x, x, x, x, x, x, x])
+}
+
 fn hash(m: Mat3) -> felt252 {
     PoseidonTrait::new().update_with(m).finalize()
 }
@@ -719,6 +724,7 @@ fn test_determinant_overflow() {
         .determinant();
 }
 
+// panics: Mat3::mul_vec3
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_vec_overflow() {
@@ -743,6 +749,121 @@ fn test_mul_scalar_overflow() {
         ],
     )
         .mul_scalar(f(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_transpose_vec3_overflow() {
+    let _ = full(9223372036854775807).mul_transpose_vec3(Vec3Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_mat3_overflow() {
+    let _ = full(9223372036854775807).mul_mat3(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_add_mat3_overflow() {
+    let _ = full(9223372036854775807).add_mat3(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_sub_mat3_underflow() {
+    let _ = full(-9223372036854775808).sub_mat3(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_scalar_overflow() {
+    let _ = full(9223372036854775807).div_scalar(f(0x80000000));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_diagonal_scale_overflow() {
+    let _ = full(9223372036854775807).mul_diagonal_scale(Vec3Trait::splat(f(9223372036854775807)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_overflow() {
+    let _ = Mat3Trait::from_cols_array(
+        [f(1), f(0), f(0), f(0), f(4294967296), f(0), f(0), f(0), f(4294967296)],
+    )
+        .inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_try_inverse_overflow() {
+    let _ = Mat3Trait::from_cols_array(
+        [f(1), f(0), f(0), f(0), f(4294967296), f(0), f(0), f(0), f(4294967296)],
+    )
+        .try_inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_or_zero_overflow() {
+    let _ = Mat3Trait::from_cols_array(
+        [f(1), f(0), f(0), f(0), f(4294967296), f(0), f(0), f(0), f(4294967296)],
+    )
+        .inverse_or_zero();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_recip_overflow() {
+    let _ = full(1).recip();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_quat_overflow() {
+    let _ = Mat3Trait::from_quat(
+        QuatTrait::from_xyzw(
+            f(281474976710656), f(281474976710656), f(281474976710656), f(281474976710656),
+        ),
+    );
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_from_quat_add_overflow() {
+    let _ = Mat3Trait::from_quat(QuatTrait::from_xyzw(f(9223372036854775807), f(0), f(0), f(0)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_axis_angle_overflow() {
+    let _ = Mat3Trait::from_axis_angle(
+        Vec3Trait::splat(f(9223372036854775807)), fixed::fixed::FRAC_PI_2,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_scale_angle_translation_overflow() {
+    let _ = Mat3Trait::from_scale_angle_translation(
+        Vec2Trait::new(f(-9223372036854775808), f(-9223372036854775808)),
+        fixed::fixed::FRAC_PI_2,
+        Vec2Trait::ZERO,
+    );
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_point2_overflow() {
+    let _ = full(9223372036854775807).transform_point2(Vec2Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_transform_vector2_overflow() {
+    let _ = full(9223372036854775807).transform_vector2(Vec2Trait::ONE);
 }
 
 #[test]

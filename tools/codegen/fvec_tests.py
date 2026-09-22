@@ -400,8 +400,12 @@ class Gen:
         a = "".join(f"#[{x}]\n" for x in attrs)
         self.out.append(f"#[test]\n{a}fn {name}() {{\n{body}\n}}\n")
 
-    def panic(self, name, msg, lines):
+    def panic(self, name, msg, lines, marker=None):
+        """A `should_panic` test; `marker` (`<Owner>::<item>`) emits the `// panics:` line that
+        attributes it for `scripts/panic_coverage.py` when its name does not."""
         self.test(name, lines, attrs=[f"should_panic(expected: {msg})"])
+        if marker:
+            self.out[-1] = f"// panics: {marker}\n" + self.out[-1]
 
     def fuzz(self, name, seed, args, lines):
         body = "\n".join("    " + l for l in lines)
@@ -891,13 +895,15 @@ def gen_tests(t):
                              eq(f"Vec3Trait::from_homogeneous({c['v']})", "e")])
 
     # ------------------------------------------------------------------------------- panics
-    sp = lambda name, msg, expr: panic(name, msg, [f"let _ = {expr};"])
+    sp = lambda name, msg, expr, marker=None: panic(name, msg, [f"let _ = {expr};"], marker)
     zero = f"{Tt}::ZERO"
     sp("test_normalize_zero", f"'{T}: normalize zero'", f"{zero}.normalize()")
     sp("test_index_out_of_bounds", f"'{T}: index out of bounds'", f"{Tt}::ONE[{n}]")
-    sp("test_as_uvec_negative", f"'{T}: cast out of range'", f"{Tt}::NEG_ONE.as_{t.umod}()")
+    sp("test_as_uvec_negative", f"'{T}: cast out of range'", f"{Tt}::NEG_ONE.as_{t.umod}()",
+       f"{T}::as_{t.umod}")
     sp("test_from_uvec_overflow", f"'{T}: cast out of range'",
-       f"Into::<{t.U}, {T}>::into({t.umod}(" + ", ".join(["0x80000000"] * n) + "))")
+       f"Into::<{t.U}, {T}>::into({t.umod}(" + ", ".join(["0x80000000"] * n) + "))",
+       f"{T}::{t.U}Into{T}")
     sp("test_add_overflow", "'i64_add Overflow'", f"{Tt}::MAX + {Tt}::ONE")
     sp("test_sub_underflow", "'i64_sub Underflow'", f"{Tt}::MIN - {Tt}::ONE")
     sp("test_neg_overflow", "'i64_neg Underflow'", f"-{Tt}::MIN")
@@ -959,6 +965,76 @@ def gen_tests(t):
         for ax in "xyz":
             sp(f"test_rotate_{ax}_overflow", "'Fixed: overflow'",
                f"{Tt}::MAX.rotate_{ax}(f(3373259426))")
+
+    # One test per documented (item, message) of `scripts/panic_coverage.py`. Not generated,
+    # unreachable: `Fixed: overflow` of `normalize`, `try_normalize`, `normalize_or`,
+    # `normalize_or_zero` for Vec2 / Vec3 (`|x| <= floor(len)`, so `|x| * floor(2^96 / len)`
+    # rounds to at most `2^32`), of `midpoint` (the floor of the exact midpoint lies between the
+    # operands) and `i64_sub` of `Vec3::rotate_towards` (`angle_between - PI >= -PI`).
+    ovf, sub_o, add_o, neg_u = ("'Fixed: overflow'", "'i64_sub Overflow'", "'i64_add Overflow'",
+                                "'i64_neg Underflow'")
+    mx, mn, sp1 = f"{Tt}::MAX", f"{Tt}::MIN", f"{Tt}::splat(f(1))"
+    if n == 3:
+        sp("test_from_homogeneous_overflow", ovf,
+           f"{Tt}::from_homogeneous(vec4(f({MAX_RAW}), f(0), f(0), f({ONE // 2})))")
+    if n == 4:
+        sp("test_project_overflow", ovf, f"{t.mod}(f({MAX_RAW}), f(0), f(0), f({ONE // 2})).project()")
+    if n == 2:
+        sp("test_rotate_overflow", ovf, f"{mx}.rotate({mx})")
+    sp("test_dot_into_vec_overflow", ovf, f"{mx}.dot_into_vec({mx})")
+    sp("test_copysign_overflow", ovf, f"{mn}.copysign({Tt}::ONE)")
+    sp("test_recip_overflow", ovf, f"{sp1}.recip()")
+    sp("test_powf_overflow", ovf, f"{Tt}::splat(f({2 * ONE})).powf(f({40 * ONE}))")
+    sp("test_powf_zero_negative", "'Fixed: division by zero'", f"{zero}.powf(f({-ONE}))")
+    sp("test_powf_min", neg_u, f"{mn}.powf(f({ONE}))")
+    sp("test_smoothstep_overflow", sub_o, f"{mx}.smoothstep({mn}, {mx})")
+    sp("test_length_recip_zero", "'Fixed: division by zero'", f"{zero}.length_recip()")
+    sp("test_length_recip_overflow", ovf, f"{sp1}.length_recip()")
+    sp("test_distance_squared_overflow", ovf, f"{mx}.distance_squared({mn})")
+    sp("test_div_euclid_overflow", ovf, f"{mx}.div_euclid({sp1})")
+    if n == 4:
+        # the sum of squares of four `MIN` is 2^128, the only overflow of `norm4_wide`
+        sp("test_normalize_overflow", ovf, f"{mn}.normalize()")
+        sp("test_try_normalize_overflow", ovf, f"{mn}.try_normalize()")
+        sp("test_normalize_or_overflow", ovf, f"{mn}.normalize_or({zero})")
+        sp("test_normalize_or_zero_overflow", ovf, f"{mn}.normalize_or_zero()")
+    sp("test_normalize_and_length_overflow", ovf, f"{mx}.normalize_and_length()")
+    sp("test_project_onto_overflow", ovf, f"{mx}.project_onto({Tt}::ONE)")
+    sp("test_reject_from_overflow", ovf, f"{mx}.reject_from({Tt}::ONE)")
+    sp("test_project_onto_normalized_overflow", ovf, f"{mx}.project_onto_normalized({mx})")
+    sp("test_reject_from_normalized_overflow", ovf, f"{mx}.reject_from_normalized({mx})")
+    sp("test_reflect_overflow", ovf, f"{mx}.reflect({mx})")
+    sp("test_reflect_add_overflow", add_o, f"{mx}.reflect({Tt}::X)")
+    sp("test_refract_overflow", ovf, f"{mx}.refract({mx}, f({ONE}))")
+    if n == 3:
+        sp("test_rotate_axis_overflow", ovf, f"{mx}.rotate_axis({Tt}::Z, f(3373259426))")
+        sp("test_rotate_towards_dot_overflow", ovf, f"{mx}.rotate_towards({mx}, f({ONE}))")
+        sp("test_any_orthogonal_vector_min", neg_u,
+           f"vec3(f(1), f(0), f({MIN_RAW})).any_orthogonal_vector()")
+        sp("test_any_orthonormal_vector_overflow", ovf,
+           f"{mx}.with_z(f(0)).any_orthonormal_vector()")
+        # `a = -1 / (1 + z)` is -2 raw: the `y` component is `1 - 2^31` and fits
+        sp("test_any_orthonormal_vector_min", neg_u,
+           f"vec3(f(0), f({MIN_RAW}), f({MAX_RAW - ONE})).any_orthonormal_vector()")
+        sp("test_any_orthonormal_pair_overflow", ovf, f"{mx}.with_z(f(0)).any_orthonormal_pair()")
+        sp("test_any_orthonormal_pair_min", neg_u,
+           f"vec3(f({MIN_RAW}), f(0), f({-ONE})).any_orthonormal_pair()")
+        sp("test_slerp_zero", "'Fixed: division by zero'",
+           f"{zero}.slerp({Tt}::X, f({ONE // 2}))")
+        sp("test_slerp_overflow", ovf, f"{mx}.slerp({mx}, f({ONE // 2}))")
+        sp("test_slerp_sub_overflow", sub_o, f"{Tt}::X.slerp({Tt}::Y, f({MIN_RAW}))")
+    sp("test_lerp_overflow", ovf, f"{zero}.lerp({mx}, f({2 * ONE}))")
+    sp("test_move_towards_sub_underflow", "'i64_sub Underflow'",
+       f"{mx}.move_towards({mn}, f({ONE}))")
+    sp("test_move_towards_overflow", ovf, f"{zero}.move_towards({mx}, f({ONE}))")
+    sp("test_mul_add_overflow", ovf, f"{mx}.mul_add({mx}, {zero})")
+    sp("test_clamp_length_zero", "'Fixed: division by zero'",
+       f"{zero}.clamp_length(f({ONE}), f({2 * ONE}))")
+    sp("test_clamp_length_overflow", ovf, f"{mx}.clamp_length(f(0), f({ONE}))")
+    sp("test_clamp_length_max_overflow", ovf, f"{mx}.clamp_length_max(f({ONE}))")
+    sp("test_add_scalar_overflow", add_o, f"{mx}.add_scalar(f({ONE}))")
+    sp("test_sub_scalar_underflow", "'i64_sub Underflow'", f"{mn}.sub_scalar(f({ONE}))")
+    sp("test_div_scalar_overflow", ovf, f"{mx}.div_scalar(f(1))")
 
     # ----------------------------------------------------------- angles and rotations
     nz = [(x, y) for x, y in small if any(x) and any(y)]

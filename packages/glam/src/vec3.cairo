@@ -2269,6 +2269,12 @@ pub impl Vec3RemAssignScalar of RemAssign<Vec3, Fixed> {
 /// `v[i]`. Panics with `'Vec3: index out of bounds'` if `index >= 3`.
 ///
 /// Mirrors `impl Index<usize> for glam::Vec3`.
+/// #### Panics
+/// * `'Vec3: index out of bounds'` if `index >= 3`.
+/// #### Deviations
+/// * `IndexView` returns the element by value; `IndexMut` is not ported (see the struct).
+/// * The panic message is the `felt252` `'Vec3: index out of bounds'` (glam-rs panics with
+///   `index out of bounds`).
 pub impl Vec3IndexView of IndexView<Vec3, usize> {
     type Target = Fixed;
     #[inline(always)]

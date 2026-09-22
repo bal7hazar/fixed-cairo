@@ -64,6 +64,11 @@ fn om(r: Span<i64>, o: u32) -> Option<Mat2> {
     }
 }
 
+fn full(raw: i64) -> Mat2 {
+    let x = f(raw);
+    Mat2Trait::from_cols_array([x, x, x, x])
+}
+
 fn hash(m: Mat2) -> felt252 {
     PoseidonTrait::new().update_with(m).finalize()
 }
@@ -486,6 +491,7 @@ fn test_determinant_overflow() {
         .determinant();
 }
 
+// panics: Mat2::mul_vec2
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mul_vec_overflow() {
@@ -508,6 +514,74 @@ fn test_mul_scalar_overflow() {
         ],
     )
         .mul_scalar(f(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_transpose_vec2_overflow() {
+    let _ = full(9223372036854775807).mul_transpose_vec2(Vec2Trait::ONE);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_mat2_overflow() {
+    let _ = full(9223372036854775807).mul_mat2(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'i64_add Overflow')]
+fn test_add_mat2_overflow() {
+    let _ = full(9223372036854775807).add_mat2(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'i64_sub Underflow')]
+fn test_sub_mat2_underflow() {
+    let _ = full(-9223372036854775808).sub_mat2(full(9223372036854775807));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_scalar_overflow() {
+    let _ = full(9223372036854775807).div_scalar(f(0x80000000));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mul_diagonal_scale_overflow() {
+    let _ = full(9223372036854775807).mul_diagonal_scale(Vec2Trait::splat(f(9223372036854775807)));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_overflow() {
+    let _ = Mat2Trait::from_cols_array([f(1), f(0), f(0), f(4294967296)]).inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_try_inverse_overflow() {
+    let _ = Mat2Trait::from_cols_array([f(1), f(0), f(0), f(4294967296)]).try_inverse();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_inverse_or_zero_overflow() {
+    let _ = Mat2Trait::from_cols_array([f(1), f(0), f(0), f(4294967296)]).inverse_or_zero();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_recip_overflow() {
+    let _ = full(1).recip();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_from_scale_angle_overflow() {
+    let _ = Mat2Trait::from_scale_angle(
+        Vec2Trait::new(f(-9223372036854775808), f(-9223372036854775808)), fixed::fixed::FRAC_PI_2,
+    );
 }
 
 #[test]

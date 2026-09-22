@@ -538,12 +538,15 @@ def gen_tests(t):
         sp("test_add_underflow", "'i32_add Underflow'", f"{Tt}::MIN + {Tt}::NEG_X")
         sp("test_sub_underflow", "'i32_sub Underflow'", f"{Tt}::MIN - {Tt}::X")
         sp("test_sub_overflow", "'i32_sub Overflow'", f"{Tt}::MAX - {Tt}::NEG_X")
+        sp("test_sub_scalar_underflow", "'i32_sub Underflow'", f"{Tt}::MIN.sub_scalar(1)")
         sp("test_neg_overflow", "'i32_neg Underflow'", f"-{Tt}::MIN")
         sp("test_abs_overflow", "'i32_neg Underflow'", f"{Tt}::MIN.abs()")
         sp("test_div_overflow", "'attempt to divide with overflow'", f"{Tt}::MIN / {Tt}::NEG_ONE")
         sp("test_rem_overflow", "'attempt to divide with overflow'", f"{Tt}::MIN % {Tt}::NEG_ONE")
         sp("test_div_scalar_overflow", "'attempt to divide with overflow'",
            f"{Tt}::MIN.div_scalar(-1)")
+        sp("test_rem_scalar_overflow", "'attempt to divide with overflow'",
+           f"{Tt}::MIN.rem_scalar(-1)")
         sp("test_div_euclid_overflow", "'attempt to divide with overflow'",
            f"{Tt}::MIN.div_euclid({Tt}::NEG_ONE)")
         sp("test_div_euclid_by_zero", "'Division by 0'", f"{Tt}::ONE.div_euclid({Tt}::X)")

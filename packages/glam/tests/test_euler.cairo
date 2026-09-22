@@ -407,6 +407,7 @@ fn fuzz_reversed_frames(a: i64, b: i64, c: i64) {
     }
 }
 
+// panics: QuatEuler::to_euler
 #[test]
 #[should_panic(expected: 'i64_add Overflow')]
 fn test_quat_to_euler_overflow() {
@@ -416,6 +417,7 @@ fn test_quat_to_euler_overflow() {
     let _ = q.to_euler(EulerRot::YXZ);
 }
 
+// panics: Mat3Euler::to_euler
 #[test]
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_mat3_to_euler_overflow() {
@@ -423,5 +425,15 @@ fn test_mat3_to_euler_overflow() {
     // whose entries are near the extremes. A rotation matrix never reaches it.
     let big = f(0x7f00000000000000);
     let m = Mat3Trait::from_cols(vec3(big, big, big), vec3(big, big, big), vec3(big, big, big));
+    let _ = m.to_euler(EulerRot::XYZ);
+}
+
+// panics: Mat4Euler::to_euler
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_mat4_to_euler_overflow() {
+    let big = f(0x7f00000000000000);
+    let m = Mat3Trait::from_cols(vec3(big, big, big), vec3(big, big, big), vec3(big, big, big));
+    let m = Mat4Trait::from_mat3(m);
     let _ = m.to_euler(EulerRot::XYZ);
 }
