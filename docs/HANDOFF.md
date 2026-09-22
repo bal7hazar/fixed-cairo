@@ -48,28 +48,27 @@ this repository; nothing depends on a previous session's scratchpad, worktrees o
 
 ## What remains (see `docs/PORTING_STATUS.md` for the live state)
 
-- Every porting task of `docs/PLAN.md` is merged as of 2026-09-21 (glam-rs 0.33.8 parity: 0
-  missing item in `docs/API_PARITY.md`; `glamx`: `Rot2`, `Rot3`, `Pose2`, `Pose3`, `SdpMatrix2/3`,
-  `SymmetricEigen3`). No pull request is open, no agent is running, no work is left in a local
-  worktree.
-- R1, the release audit:
-  - optimizer pass over the hottest benches (`gas/*.snap`, headline numbers in the READMEs'
-    generated tables): candidates already noted are `SymmetricEigen3` (586k gas on a generic
-    matrix: skip the polish of `v3`, a values-only path for `eigenvalues`; PR #29), the
-    shared non-inlined `slerp` helper (+1 880 gas, PR #26), `camera_impl::look_to_mat4_rh`
-    duplicating `Mat4::look_to_rh` (PR #16), a cheaper single-division path than `Recip`
-    (`project_onto`, `length_recip`, PR #9), a `norm_squared_wide` kernel so that
-    `is_normalized` does not panic on long vectors (PR #9), the 15-minute CI bench job (one
-    compile for the two snforge runs);
-  - review of every `#### Deviations` entry against `docs/DESIGN.md` section 3, in particular
-    `Rot2::lerp` (normalised here, not upstream) and the thresholds re-derived in ULPs;
-  - bytecode size of a consumer contract (never measured; `inline(always)` and polynomial
-    segments trade bytecode for gas);
-  - `v0.1.0`: tag, GitHub release from `CHANGELOG.md`, publication on scarbs.xyz in dependency
-    order (`fixed`, `glam`, `glamx`). Publishing is outward-facing: confirm with the owner first.
-- Coordination with the sibling repositories: `nalgebra.cairo` appeared to define its own
-  generic scalar (`simba::fixed`, `Real` trait) while this repository publishes the concrete
-  `fixed` package meant to be shared (DESIGN section 2: concrete types, because
-  `#[inline(always)]` is rejected on impl-generic functions). Report 06 also narrows what
-  `nalgebra.cairo` is still needed for (fixed-capacity `Vec6` / `Mat6` / Jacobians and a small LU
-  for multibody). Both points need the owner's decision.
+- Every porting task of `docs/PLAN.md` and the R1 release audit are merged as of 2026-09-22
+  (glam-rs 0.33.8 parity: 0 missing item; `glamx`: `Rot2`, `Rot3`, `Pose2`, `Pose3`,
+  `SdpMatrix2/3`, `SymmetricEigen3`; audits in `docs/audits/`: deviations, bytecode size, panic
+  coverage; checkers `scripts/{deviations,panic_coverage,bytecode_size}.py`). `CHANGELOG.md` is
+  frozen at `0.1.0`.
+- `v0.1.0`: the tag and the GitHub release are cut by the orchestrator with the owner's
+  go-ahead; `scarb publish -p fixed`, then `glam`, then `glamx` (each depends on the previous
+  one being on the registry) need the owner's scarbs.xyz token (`SCARB_REGISTRY_AUTH_TOKEN`),
+  which the orchestrator never handles.
+- Known debt, not blocking: six test files exceed the 1 200-line budget (camera, vec2/3/4,
+  ivec3/4; `Test glam` ~23 min in CI); splitting them into `test_<m>_panics.cairo` needs the
+  orchestrator-owned `tests/lib.cairo`. The appendix of `docs/audits/R1-deviations.md` is a
+  snapshot of 2026-09-21 (not gated).
+- Next: whatever the sibling repositories escalate (missing `fixed` kernels get added here with
+  their bench and snapshot; any numeric change is a MINOR bump, DESIGN section 6). Coordination
+  decision taken on 2026-09-22: `nalgebra.cairo` keeps its `simba` trait layer and drops its
+  duplicate Q32.32 scalar in favour of `fixed` pinned on `v0.1.0` (the Rust model: one primitive
+  scalar, simba is traits only).
+- Operational lessons of the R1 session (all recorded in `docs/ORCHESTRATOR.md`): launch agents
+  as systemd user units (`scripts/agent.sh`), never as children of the session; Sonnet agents
+  end their turn on background commands despite the written rule, so the launch prompt itself
+  must say "foreground only"; a shared machine at full CPU gets agents OOM-killed, resume them
+  with their context rather than relaunching; `gh pr merge --delete-branch` fails on the agent's
+  untracked `REPORT.md`, archive it and remove the worktree by hand.

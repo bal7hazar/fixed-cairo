@@ -31,6 +31,15 @@ large directly.
   codex session id being the UUID of `~/.codex/sessions/<date>/rollout-*.jsonl` whose `cwd` is
   the worktree. Uncommitted work survives in the worktree; a build that was running at the time
   of the kill reports a spurious failure.
+- Sonnet agents end their turn on a background command (gate, `gh pr checks --watch`) despite
+  the rule in the brief (twice on R1m): put "run everything in the foreground, never
+  `run_in_background`, your turn ends when REPORT.md is written" in the launch prompt itself
+  for Sonnet, and expect to resume once. Opus and codex followed the brief.
+- Machine at full CPU / memory (other repositories' agents): expect OOM kills and transient API
+  529s; `scripts/agent.sh status` first, then resume with the context, never relaunch from
+  scratch. Merge with `gh pr merge --squash` without `--delete-branch` (the agent's untracked
+  `REPORT.md` blocks the worktree removal): archive the report, `git worktree remove --force`,
+  delete the branch by hand.
 - A shared machine needs a lock around the full gate: briefs say
   `flock /tmp/glam-cairo-gate.lock scripts/check.sh` (the `glam_tests` compile peaks at ~12 GB).
 - The agent writes a `REPORT.md` (not committed) at the root of its worktree: the orchestrator

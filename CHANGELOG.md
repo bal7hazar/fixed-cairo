@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-09-22
+
+First release: `fixed` (Q32.32 scalar, fused kernels, transcendentals), `glam` (glam-rs 0.33.8
+parity, 0 missing item) and `glamx` (Dimforge glamx 0.3.1 physics extensions), after the R1
+release audit (`docs/audits/`). Siblings pin `tag = "v0.1.0"`.
+
 ### Added
 - Research reports and benchmark prototype (`docs/research/`), design (`docs/DESIGN.md`) and
   execution plan (`docs/PLAN.md`).
@@ -48,3 +56,4 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 - `glam::Quat`: `rotate_towards` reuses its dot / angle / interpolation work (162 720 -> 129 100 gas), `slerp` / `slerp_long` 124 060 -> 122 180 / 121 650, `is_normalized` and `is_near_identity` total on long inputs through `fixed::wide::is_unit4` (~2x cheaper); bit-exact. The intermittent `fuzz_mul_quat_drift` failure came from the test helper (quaternions up to 5 ULP off unit), now normalised (#36).
 - Panic coverage: `scripts/panic_coverage.py` maps every documented `(item, panic message)` pair to a `#[should_panic]` test and runs in CI; 324 tests added so that no documented panic is untested; doc template on the vector `IndexView` impls (#37).
 - Deviation wording fixes from the audit: stale camera module doc, overflow / division-by-zero deviations documented on `fixed`, `Mat*::abs`, the `wide` kernels and the `glamx` items, non-semantic notes moved out of `#### Deviations` (#38).
+- Panic-coverage follow-up: the 21 `Quat` panic tests, unreachable documented panics removed and wrong native messages fixed on `Fixed::move_towards`, `SdpMatrix*`, camera `orthographic` / `frustum` (#39).

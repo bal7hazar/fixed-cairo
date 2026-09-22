@@ -38,7 +38,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | X3a | parity closure of `Vec2/3/4` (element-wise transcendentals, `step`/`smoothstep`/`saturate`, `From<BVec>`, homogeneous, `project`) | done | #25 |
 | X3b | parity closure of `Quat`, `Mat3/4`, `Affine2/3`, camera views | done | #26 |
 | R1b | generated gas tables in the READMEs (`scripts/gas_tables.py`, checked in CI) | done | #28 |
-| R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (see `docs/HANDOFF.md`, briefs `docs/briefs/R1-common.md` + `R1c`..`R1i`) | inprogress | |
+| R1 | release audit: optimizer pass, deviation review, bytecode size, `v0.1.0` (briefs `docs/briefs/R1-common.md` + `R1c`..`R1m`) | done | #30-#39 |
 | R1c | optimizer pass on `glamx::eigen3`: metered one-rotation iterations (zero pivots free), polish-free `eigenvalues`, diagonal short-circuit: `new` -8.6 %, `eigenvalues` -15.9 %, diagonal -45.5 %; rotation order changed (numeric change, all overall worst cases improve) | done | #34 |
 | R1d | optimizer pass on `quat`: `rotate_towards` 162 720 -> 129 100 gas, `slerp` back to 122 180, `is_normalized` / `is_near_identity` total and ~2x cheaper; flaky `fuzz_mul_quat_drift` fixed (test helper built quaternions 5 ULP off unit) | done | #36 |
 | R1e | optimizer pass on `fixed::wide` + `Vec2/3/4`: `is_unit2/3/4` kernels (`is_normalized` total and ~2x cheaper), shared norm in `Vec3::rotate_towards`; single-division and `slerp` candidates measured and kept in `benches::alt` | done | #32 |
@@ -47,7 +47,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1h | audit of every `#### Deviations` entry against DESIGN section 3 (`docs/audits/R1-deviations.md`); 8 rows added to DESIGN section 3 | done | #30 |
 | R1j | `glamx::rot2`: `lerp` aligned with upstream (not normalised, 15 330 -> 4 880 gas), `is_normalized` added (audit P0) | done | #35 |
 | R1k | panic coverage: `scripts/panic_coverage.py` (item -> `should_panic` test, checked in CI), 324 tests added (372 missing pairs -> 0), doc template on the nine `IndexView` impls | done | #37 |
-| R1m | follow-up of #37: the 21 allowlisted `quat` panic tests, and the 25 escalated doc gaps (documented panics that cannot happen, wrong native messages on `move_towards` / sdp); brief `docs/briefs/R1m-panic-followup.md` | inprogress | |
+| R1m | follow-up of #37: the 21 allowlisted `quat` panic tests, and the 25 escalated doc gaps (documented panics that cannot happen, wrong native messages on `move_towards` / sdp); brief `docs/briefs/R1m-panic-followup.md` | done | #39 |
 | R1l | doc-only deviation fixes: stale camera module doc, `Deviations: None.` replaced on items that panic where upstream continues, non-semantic bullets moved out of `Deviations` | done | #38 |
 | R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining; `gas/bytecode.size` checked in CI | done | #31 |
-| R1z | `v0.1.0`: changelog, tag, GitHub release, scarbs.xyz (owner's confirmation required) | todo | |
+| R1z | `v0.1.0`: changelog frozen, tag + GitHub release by the orchestrator, `scarb publish` by the owner (registry token) | inprogress | |
