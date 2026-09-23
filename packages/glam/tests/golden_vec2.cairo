@@ -135,9 +135,9 @@ fn golden_vec2_mul() {
         case += 1;
     }
 }
-// vec2::div_rem: 8 cases, tolerance 1 ULP - the quotient truncates toward zero (1 ULP vs round to
-// nearest); the remainder is exact (a difference of representable values), so its own bound is 0
-// and the shared tolerance is 1.
+// vec2::div_rem: 8 cases, tolerance 1 ULP - the quotient rounds to nearest, ties to even (at most
+// 1 ULP from the rounded oracle); the remainder is exact (a difference of representable values),
+// so its own bound is 0 and the shared tolerance is 1.
 #[cairofmt::skip]
 const DIV_REM_CASES: [i64; 64] = [
     4294967296, 8589934592, 17179869184, 21474836480,
@@ -584,8 +584,8 @@ fn golden_vec2_fract_pair() {
         case += 1;
     }
 }
-// vec2::recip: 7 cases, tolerance 1 ULP - one truncated division per component vs round to
-// nearest: |diff| <= 1.
+// vec2::recip: 7 cases, tolerance 1 ULP - one division rounded half to even vs the oracle rounded
+// to nearest: |diff| <= 1.
 #[cairofmt::skip]
 const RECIP_CASES: [i64; 28] = [
     4294967296, -4294967296, 4294967296, -4294967296,
@@ -676,7 +676,7 @@ fn golden_vec2_length_pair() {
     }
 }
 // vec2::length_recip: 5 cases, tolerance 2 ULP - 1 ULP on the length (floor sqrt) divided by
-// len^2 <= 1 ULP for len >= 1, plus one truncated division vs round to nearest.
+// len^2 <= 1 ULP for len >= 1, plus one division rounded to nearest.
 #[cairofmt::skip]
 const LENGTH_RECIP_CASES: [i64; 15] = [
     -39132654926, 255062448521, 71486005,
@@ -884,7 +884,7 @@ fn golden_vec2_mul_add() {
     }
 }
 // vec2::project_reject: 6 cases, tolerance 20 ULP - dot(self, rhs) and dot(rhs, rhs) are floored
-// (1 ULP each), their truncated quotient k carries <= 2 ULP for dot(rhs, rhs) >= 1, and each
+// (1 ULP each), their rounded quotient k carries <= 2 ULP for dot(rhs, rhs) >= 1, and each
 // component multiplies it by |rhs| <= 8 before a last floor rescale: <= 8 * 2 + 1 = 17 ULP,
 // rounded up. The rejection subtracts `self` inside the same rescale.
 #[cairofmt::skip]
@@ -1407,9 +1407,9 @@ fn golden_vec2_step_saturate() {
         case += 1;
     }
 }
-// vec2::smoothstep: 3 cases, tolerance 3 ULP - t = trunc((x - e0) / (e1 - e0)) is within 1 ULP
-// below the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then
-// one floor rescale (1) and the half ULP of the oracle quantization: 3.0.
+// vec2::smoothstep: 3 cases, tolerance 3 ULP - t = round((x - e0) / (e1 - e0)) is within 1 ULP of
+// the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then one
+// floor rescale (1) and the half ULP of the oracle quantization: 3.0.
 #[cairofmt::skip]
 const SMOOTHSTEP_CASES: [i64; 24] = [
     2147483648, 6442450944, 0, -4294967296, 4294967296, 4294967296, 2147483648, 4294967296,

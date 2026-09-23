@@ -43,11 +43,11 @@ pub mod opengl {
     ///   near)` and `near * far / (far - near)` are below `2^30`, e.g. for `far >= 2 * near` and
     ///   `far < 2^29`. `near * far` itself is never formed as a `Fixed`.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
-    /// * One division `q = far / (far - near)` (truncated) for both depth terms: `zz = +-(2 q - 1)`
+    /// * One division `q = far / (far - near)` (rounded) for both depth terms: `zz = +-(2 q - 1)`
     ///   is within 2 ULP of the exact value and `tz = -2 near q` (one fused product, one floor
     ///   rescale) within `2 near + 1` ULP.
     /// * `near > far` (a reversed depth range) is accepted, as in glam-rs.
@@ -122,7 +122,7 @@ pub mod opengl {
     ///   `'i64_sub Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit, escalation 2).
     /// * `xx`, `yy`, `zx` and `zy` are quotients rounded to nearest (one shared `Recip` per axis):
     ///   each is within 1 ULP of the exact value.
-    /// * The depth terms are those of `perspective`: one truncated division and one fused product.
+    /// * The depth terms are those of `perspective`: one rounded division and one fused product.
     ///   `zz` is within 2 ULP and `tz` within `2 near + 1` ULP.
     /// * `near > far` is accepted, as in glam-rs.
     #[inline(always)]
@@ -172,11 +172,11 @@ pub mod vulkan {
     ///   near)` and `near * far / (far - near)` are below `2^31`, e.g. for `far >= 2 * near` and
     ///   `far < 2^31`. `near * far` itself is never formed as a `Fixed`.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
-    /// * One division `q = far / (far - near)` (truncated) for both depth terms: `zz = +-q` is
+    /// * One division `q = far / (far - near)` (rounded) for both depth terms: `zz = +-q` is
     ///   within 1 ULP of the exact value and `tz = -near * q` (one fused product, one floor
     ///   rescale) within `near + 1` ULP.
     /// * `near > far` (a reversed depth range) is accepted, as in glam-rs.
@@ -211,7 +211,7 @@ pub mod vulkan {
     /// * `'Fixed: overflow'` if `cot(vertical_fov / 2)` (`vertical_fov` below about `1e-9`), `xx`
     ///   or `near` does not fit the scalar range.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
@@ -248,7 +248,7 @@ pub mod vulkan {
     /// * `'Fixed: overflow'` if `cot(vertical_fov / 2)` (`vertical_fov` below about `1e-9`), `xx`
     ///   or `near` does not fit the scalar range.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
@@ -324,7 +324,7 @@ pub mod vulkan {
     ///   `'i64_sub Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit, escalation 2).
     /// * `xx`, `yy`, `zx` and `zy` are quotients rounded to nearest (one shared `Recip` per axis):
     ///   each is within 1 ULP of the exact value.
-    /// * The depth terms are those of `perspective`: one truncated division and one fused product.
+    /// * The depth terms are those of `perspective`: one rounded division and one fused product.
     ///   `zz` is within 1 ULP and `tz` within `near + 1` ULP.
     /// * `near > far` is accepted, as in glam-rs.
     #[inline(always)]
@@ -374,11 +374,11 @@ pub mod directx {
     ///   near)` and `near * far / (far - near)` are below `2^31`, e.g. for `far >= 2 * near` and
     ///   `far < 2^31`. `near * far` itself is never formed as a `Fixed`.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
-    /// * One division `q = far / (far - near)` (truncated) for both depth terms: `zz = +-q` is
+    /// * One division `q = far / (far - near)` (rounded) for both depth terms: `zz = +-q` is
     ///   within 1 ULP of the exact value and `tz = -near * q` (one fused product, one floor
     ///   rescale) within `near + 1` ULP.
     /// * `near > far` (a reversed depth range) is accepted, as in glam-rs.
@@ -413,7 +413,7 @@ pub mod directx {
     /// * `'Fixed: overflow'` if `cot(vertical_fov / 2)` (`vertical_fov` below about `1e-9`), `xx`
     ///   or `near` does not fit the scalar range.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
@@ -451,7 +451,7 @@ pub mod directx {
     /// * `'Fixed: overflow'` if `cot(vertical_fov / 2)` (`vertical_fov` below about `1e-9`), `xx`
     ///   or `near` does not fit the scalar range.
     /// #### Deviations
-    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one truncated
+    /// * `cot(vertical_fov / 2)` is one `sin_cos` (`fixed::trig`, 1.02 ULP) and one rounded
     ///   division: `yy` is within `4 (1 + yy)^2` ULP of the exact value (the floored half angle,
     ///   the two `sin_cos` errors and the division), `xx = yy / aspect_ratio` within that over
     ///   `|aspect_ratio|` plus 1 ULP.
@@ -525,7 +525,7 @@ pub mod directx {
     ///   `'i64_sub Underflow'`), not `'Fixed: overflow'` (R1 panic-coverage audit, escalation 2).
     /// * `xx`, `yy`, `zx` and `zy` are quotients rounded to nearest (one shared `Recip` per axis):
     ///   each is within 1 ULP of the exact value.
-    /// * The depth terms are those of `perspective`: one truncated division and one fused product.
+    /// * The depth terms are those of `perspective`: one rounded division and one fused product.
     ///   `zz` is within 1 ULP and `tz` within `near + 1` ULP.
     /// * `near > far` is accepted, as in glam-rs.
     #[inline(always)]

@@ -86,12 +86,19 @@ def narrow64(t):
     return i64(t >> 64)
 
 
-def div_trunc(a, b):
-    """`Fixed / Fixed`: truncated."""
+def _half_even(n, d):
+    """`round_half_even(n / d)` of two integers, `d != 0`."""
+    if d < 0:
+        n, d = -n, -d
+    q, r = divmod(n, d)
+    return q + 1 if 2 * r > d or (2 * r == d and q % 2) else q
+
+
+def div(a, b):
+    """`Fixed / Fixed`: round_half_even(a * 2^32 / b)."""
     if b == 0:
         raise Panic("Fixed: division by zero")
-    q = (abs(a) << FRAC) // abs(b)
-    return i64(-q if (a < 0) != (b < 0) else q)
+    return i64(_half_even(a << FRAC, b))
 
 
 def recip_new(d):
@@ -196,7 +203,7 @@ def rotate(app, aqq, apq, arp, arq, vp, vq, vectors=True):
     two = i64(apq + apq)
     r = i64(isqrt(d * d + two * two))
     den = i64(d + r) if d >= 0 else i64(d - r)
-    t = div_trunc(two, den)
+    t = div(two, den)
     h = wsqrt(t * t + (ONE << FRAC))
     rec = recip_new(h)
     c = recip_mul(rec, ONE)
@@ -358,10 +365,10 @@ def closed_eigenvalues(a):
     a11, a12, a13, a22, a23, a33 = a
     if a12 == 0 and a13 == 0 and a23 == 0:
         return sorted([a11, a22, a33])
-    q = div_trunc(i64(a11 + a22 + a33), 3 * ONE)
+    q = div(i64(a11 + a22 + a33), 3 * ONE)
     d1, d2, d3 = a11 - q, a22 - q, a33 - q
     p2 = narrow32(d1 * d1 + d2 * d2 + d3 * d3 + 2 * (a12 * a12 + a13 * a13 + a23 * a23))
-    p = fsqrt(div_trunc(p2, 6 * ONE))
+    p = fsqrt(div(p2, 6 * ONE))
     if p != 0:
         rec = recip_new(p)
         b = [recip_mul(rec, x) for x in (d1, a12, a13, d2, a23, d3)]
@@ -378,7 +385,7 @@ def closed_eigenvalues(a):
     elif r >= ONE:
         phi = 0
     else:
-        phi = div_trunc(trig().acos(r), 3 * ONE)
+        phi = div(trig().acos(r), 3 * ONE)
     two_p = i64(p + p)
     e1 = narrow32(two_p * trig().cos(phi) + (q << FRAC))
     e3 = narrow32(two_p * trig().cos(i64(phi + TWO_PI_3)) + (q << FRAC))
@@ -409,7 +416,7 @@ def any_orthonormal_pair(v):
     sign = -ONE if neg else ONE
     sx = -v[0] if neg else v[0]
     den = i64(sign + v[2])
-    a = -i64(((1 << 64) // abs(den)) * (-1 if den < 0 else 1))
+    a = -i64(_half_even(1 << 64, den))
     b = narrow64(v[0] * v[1] * a)
     u = [narrow64((ONE << 64) + sx * v[0] * a), -b if neg else b, -sx]
     w = [b, narrow64((sign << 64) + v[1] * v[1] * a), -v[1]]
@@ -434,7 +441,7 @@ def closed_eigenvector2(a, w, lam):
 
     def unit(big, small):
         """(1, small / big) normalised: returns (n_big, n_small)."""
-        ratio = div_trunc(small, big)
+        ratio = div(small, big)
         rec = recip_new(wsqrt(ratio * ratio + (ONE << FRAC)))
         return recip_mul(rec, ONE), recip_mul(rec, ratio)
 

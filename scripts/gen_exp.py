@@ -200,12 +200,19 @@ def narrow64_round(v):
     return i64((v + (1 << 63)) >> 64)
 
 
-def div_trunc(a, b):
-    """`Fixed / Fixed`: trunc(a / b)."""
+def _half_even(n, d):
+    """`round_half_even(n / d)` of two integers, `d != 0`."""
+    if d < 0:
+        n, d = -n, -d
+    q, r = divmod(n, d)
+    return q + 1 if 2 * r > d or (2 * r == d and q % 2) else q
+
+
+def div(a, b):
+    """`Fixed / Fixed`: round_half_even(a * 2^32 / b)."""
     if b == 0:
         raise ZeroDivisionError("Fixed: division by zero")
-    q = (abs(a) << FRAC) // abs(b)
-    return i64(-q if (a < 0) != (b < 0) else q)
+    return i64(_half_even(a << FRAC, b))
 
 
 def exp2_core(idx, u):
@@ -321,7 +328,7 @@ def ln_1p(raw):
 
 
 def log(raw, base):
-    return div_trunc(log2_core(raw), log2_core(base))
+    return div(log2_core(raw), log2_core(base))
 
 
 def pow_pos(x, n):
@@ -391,7 +398,7 @@ def alt_log2_atanh(raw, atanh):
     """alt: `log2(m) = s * P(s^2)`, `s = (m - 1) / (m + 1)` (one division)."""
     c, ek = normalize(raw)
     m = (raw * c) >> 30  # the mantissa at Q32.32, in [1, 2)
-    s = div_trunc(m - ONE, m + ONE)
+    s = div(m - ONE, m + ONE)
     acc = horner_w(atanh, s * s)
     a = ek + ((s * acc) >> 32)
     return narrow64(a * 256 * ONE)

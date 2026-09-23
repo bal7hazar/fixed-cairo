@@ -46,8 +46,8 @@ pub fn lerp_glam(lhs: Vec3, rhs: Vec3, s: Fixed) -> Vec3 {
     }
 }
 
-/// Alternative to `Vec3::div_scalar`. One truncated `Fixed / Fixed` per component, as glam-rs
-/// spells it.
+/// Alternative to `Vec3::div_scalar`. One correctly rounded `Fixed / Fixed` per component, as
+/// glam-rs spells it.
 #[inline(always)]
 pub fn div_scalar_plain(lhs: Vec3, rhs: Fixed) -> Vec3 {
     Vec3 { x: lhs.x / rhs, y: lhs.y / rhs, z: lhs.z / rhs }
@@ -78,7 +78,7 @@ pub fn length_recip_wide(lhs: Vec3) -> Fixed {
 }
 
 /// Alternative to `Vec3::project_onto`. One shared `Recip` (rounded to nearest) instead of the
-/// single truncated `Fixed / Fixed`: a reciprocal only pays off from two divisions on.
+/// single correctly rounded `Fixed / Fixed`: a reciprocal only pays off from two divisions on.
 #[inline(always)]
 pub fn project_onto_recip(lhs: Vec3, rhs: Vec3) -> Vec3 {
     let k = RecipTrait::new(Vec3Trait::dot(rhs, rhs)).mul(Vec3Trait::dot(lhs, rhs));
@@ -206,7 +206,7 @@ pub fn from_bvec_felt(lhs: BVec3) -> Vec3 {
 }
 
 /// Alternative to `Vec3::smoothstep`. The literal glam-rs vector expression `t * t * (3 - 2 * t)`:
-/// one rescale per vector operation, and a truncated division per element.
+/// one rescale per vector operation, and a correctly rounded division per element.
 #[inline(always)]
 pub fn smoothstep_glam(lhs: Vec3, edge0: Vec3, edge1: Vec3) -> Vec3 {
     let t = Vec3Trait::saturate((lhs - edge0) / (edge1 - edge0));
@@ -215,8 +215,8 @@ pub fn smoothstep_glam(lhs: Vec3, edge0: Vec3, edge1: Vec3) -> Vec3 {
     t * t * (three - two * t)
 }
 
-/// Alternative to `Vec3::from_homogeneous`. Three truncated `Fixed / Fixed` instead of one shared
-/// `Recip`.
+/// Alternative to `Vec3::from_homogeneous`. Three correctly rounded `Fixed / Fixed` instead of one
+/// shared `Recip`.
 #[inline(always)]
 pub fn from_homogeneous_div(v: Vec4) -> Vec3 {
     Vec3 { x: v.x / v.w, y: v.y / v.w, z: v.z / v.w }

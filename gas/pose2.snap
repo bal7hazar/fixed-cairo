@@ -14,7 +14,7 @@ bench_pose2::inv_mul: 9920 84 20 0 0
 bench_pose2::inverse: 5180 45 8 0 0
 bench_pose2::inverse_transform_point: 6160 52 12 0 0
 bench_pose2::inverse_transform_vector: 4680 40 8 0 0
-bench_pose2::lerp: 77440 585 134 0 0
+bench_pose2::lerp: 78950 590 134 0 0
 bench_pose2::mul: 8840 76 16 0 0
 bench_pose2::mul_pose2: 8440 72 16 0 0
 bench_pose2::mul_rot2: 4880 42 8 0 0

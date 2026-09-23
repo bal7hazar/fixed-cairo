@@ -2,7 +2,7 @@
 # Oracles: tools/refgen/src/oracles/mat2.rs. Format: tools/refgen/README.md.
 # Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen mat2
 #
-# Tolerances. The Cairo kernels floor (one rescale per output scalar) or truncate toward zero,
+# Tolerances. The Cairo kernels floor (one rescale per output scalar) or round a division to nearest,
 # while the f64 oracle is rounded to nearest at quantization: one rescale = 1 raw ULP. The
 # composite entries (`inverse`, `from_scale_angle`) state the propagated bound.
 #
@@ -144,7 +144,7 @@ args = [{ type = "Mat2", nonzero = true, min_abs = 0.01 }]
 ret = "Mat2"
 cases = 4
 tolerance = 1
-justification = "one truncated division per element vs round to nearest: |diff| <= 1."
+justification = "one division rounded half to even vs the oracle rounded to nearest: |diff| <= 1."
 
 [[function]]
 name = "diagonal_pair"

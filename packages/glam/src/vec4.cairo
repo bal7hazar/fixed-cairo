@@ -204,9 +204,10 @@ pub trait Vec4Trait {
     /// `Vec3::from_homogeneous(self)`.
     ///
     /// One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one
-    /// fused product per component, instead of three truncated `Fixed / Fixed`: it pays
-    /// off from two divisions on (`alt_project_div` in `gas/vec4.snap`). A result may
-    /// differ by 1 ULP from the truncated division.
+    /// fused product per component, instead of three correctly rounded `Fixed / Fixed`: it
+    /// pays off from two divisions on (`alt_project_div` in `gas/vec4.snap`). A result may
+    /// differ by 1 ULP from the correctly rounded division (ties toward +infinity, `|x| /
+    /// 2^64` term).
     ///
     /// Mirrors `glam::Vec4::project`.
     /// #### Panics
@@ -720,9 +721,9 @@ pub trait Vec4Trait {
     /// * `'Fixed: overflow'` if the length or its reciprocal does not fit the scalar
     ///   range.
     /// #### Deviations
-    /// * The length is floored, then the division truncates: at most 2 ULP off the exact
-    ///   value for `|self| >= 1`. For valid results `self` must not be of length zero: it
-    ///   panics instead of returning infinity.
+    /// * The length is floored, then the reciprocal rounds to nearest: under 1.5 ULP off
+    ///   the exact value for `|self| >= 1`. For valid results `self` must not be of length
+    ///   zero: it panics instead of returning infinity.
     fn length_recip(self: Vec4) -> Fixed;
     /// Computes the Euclidean distance between two points in space.
     ///
@@ -857,9 +858,9 @@ pub trait Vec4Trait {
     ///
     /// `rhs` must be of non-zero length.
     ///
-    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (truncated toward zero), then
-    /// one floor rescale per component. A shared `Recip` is measurably more expensive for
-    /// one division: it is kept in `benches::alt`.
+    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (rounded to nearest), then one
+    /// floor rescale per component. A shared `Recip` is measurably more expensive for one
+    /// division: it is kept in `benches::alt`.
     ///
     /// Mirrors `glam::Vec4::project_onto`.
     /// #### Panics
@@ -1090,7 +1091,7 @@ pub trait Vec4Trait {
     ///
     /// One division shared by the components (`Recip`) and one fused multiplication each,
     /// rounded to nearest: cheaper than, and up to 1 ULP away from, the component-wise
-    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    /// correctly rounded `Fixed / Fixed` kept in `benches::alt`.
     ///
     /// Mirrors `impl Div<f32> for glam::Vec4`.
     /// #### Panics
@@ -1989,8 +1990,8 @@ pub impl Vec4Mul of Mul<Vec4> {
     }
 }
 
-/// Component-wise `/`. Truncated toward zero. Panics with `'Fixed: division by zero'` or `'Fixed:
-/// overflow'`.
+/// Component-wise `/`. Rounded to nearest, ties to even. Panics with `'Fixed: division by zero'` or
+/// `'Fixed: overflow'`.
 ///
 /// Mirrors `impl Div for glam::Vec4`.
 pub impl Vec4Div of Div<Vec4> {

@@ -211,7 +211,7 @@ pub trait QuatTrait {
     ///
     /// Implementation notes:
     /// * `0.5 / sqrt(4 c^2)` is one `fixed::wide::Recip` of `2 sqrt(4 c^2)`, shared by the four
-    ///   components and rounded to nearest, instead of a truncated `Fixed` reciprocal
+    ///   components and rounded to nearest, instead of a rounded `Fixed` reciprocal
     ///   multiplied four times: one rounding instead of two, and 130 gas cheaper as well
     ///   (19 770 against 19 900, `alt_from_rotation_axes_fixed_recip`). The square root is the
     ///   floor of the exact one, so each component is within `1 + |component| / |c|` ULP of the
@@ -474,7 +474,7 @@ pub trait QuatTrait {
     /// * `'Fixed: division by zero'` if the length is zero.
     /// * `'Fixed: overflow'` if the length or the result does not fit the scalar range.
     /// #### Deviations
-    /// * The reciprocal of the floored length, truncated: at most 2 ULP from the exact value
+    /// * The reciprocal of the floored length, rounded: at most 2 ULP from the exact value
     ///   for a length of at least one.
     fn length_recip(self: Quat) -> Fixed;
     /// Returns `self` normalized to length one.
@@ -547,7 +547,7 @@ pub trait QuatTrait {
     ///   `2.1e-5` rad noise of [`QuatTrait::angle_between`] near zero, so the branch is taken
     ///   on the same side as the exact computation whenever the angle is outside
     ///   `1e-4 +- 2.1e-5`.
-    /// * `max_angle / angle` truncates toward zero (1 ULP).
+    /// * `max_angle / angle` rounds to nearest (1/2 ULP).
     fn rotate_towards(self: Quat, rhs: Quat, max_angle: Fixed) -> Quat;
     /// Returns `true` if the absolute difference of all elements between `self` and `rhs` is
     /// less than or equal to `max_abs_diff`.

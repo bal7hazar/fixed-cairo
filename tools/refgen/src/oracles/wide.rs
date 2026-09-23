@@ -80,6 +80,29 @@ fn div_round(n: i128, d: i128) -> i128 {
     }
 }
 
+/// `n / d` rounded to nearest, ties to even (the rounding of `f64 /`). `d != 0`.
+fn div_half_even(n: i128, d: i128) -> i128 {
+    let (n, d) = if d < 0 { (-n, -d) } else { (n, d) };
+    // n = q * d + r with 0 <= r < d: the exact quotient is q + r / d, in [q, q + 1).
+    let (q, r) = (n.div_euclid(d), n.rem_euclid(d));
+    match (2 * r).cmp(&d) {
+        Ordering::Less => q,
+        Ordering::Equal => q + q.rem_euclid(2),
+        Ordering::Greater => q + 1,
+    }
+}
+
+/// `(x.div_nearest(d), RecipNearestTrait::new(d).div_nearest(x))`: the same exact value twice.
+fn div_nearest_pair(x: i128, d: i128) -> Out {
+    match d {
+        0 => skip("division by zero"),
+        d => {
+            let q = div_half_even(x << FRAC_BITS, d);
+            Out::from((out(Some(q)), out(Some(q))))
+        }
+    }
+}
+
 fn tuple2(v: Option<Vec<i64>>) -> Out {
     match v {
         Some(v) => Out::from((Out::raw(v[0]), Out::raw(v[1]))),
@@ -173,6 +196,12 @@ pub fn register(r: &mut Registry) {
         0 => skip("division by zero"),
         d => out(Some(div_round(raw(a, 1) << FRAC_BITS, d))),
     });
+
+    // --- correctly rounded division: round half to even of the exact quotient --------------
+    // (x.div_nearest(d), RecipNearestTrait::new(d).div_nearest(x)): bit-identical by contract.
+    r.add("div_nearest", |a| div_nearest_pair(raw(a, 0), raw(a, 1)));
+    // (d.recip_nearest(), RecipNearestTrait::new(d).div_nearest(ONE)).
+    r.add("recip_nearest", |a| div_nearest_pair(1 << FRAC_BITS, raw(a, 0)));
 }
 
 #[cfg(test)]
@@ -205,6 +234,17 @@ mod tests {
         assert_eq!(div_round(-7, -2), 4); // 3.5 -> 4
         assert_eq!(div_round(5, -2), -2); // -2.5 -> -2
         assert_eq!(div_round(-5, 3), -2);
+        // Ties to even, both signs, odd and even truncated quotients.
+        assert_eq!(div_half_even(1, 2), 0); // 0.5 -> 0
+        assert_eq!(div_half_even(3, 2), 2); // 1.5 -> 2
+        assert_eq!(div_half_even(5, 2), 2); // 2.5 -> 2
+        assert_eq!(div_half_even(-1, 2), 0); // -0.5 -> 0
+        assert_eq!(div_half_even(-3, 2), -2); // -1.5 -> -2
+        assert_eq!(div_half_even(3, -2), -2);
+        assert_eq!(div_half_even(-5, -2), 2);
+        assert_eq!(div_half_even(-7, 3), -2); // -2.33 -> -2
+        assert_eq!(div_half_even(-8, 3), -3); // -2.67 -> -3
+        assert_eq!(div_half_even(12, -4), -3); // exact
         // det3 of the identity is 1.
         let id = fixed(&[one(), 0, 0, 0, one(), 0, 0, 0, one()]);
         let mut reg = Registry::default();

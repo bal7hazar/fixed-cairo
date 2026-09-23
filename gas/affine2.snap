@@ -22,6 +22,6 @@ bench_affine2::mul_assign: 12600 108 24 0 0
 bench_affine2::mul_mat3: 19340 167 36 0 0
 bench_affine2::to_cols_array: 600 6 0 0 0
 bench_affine2::to_cols_array_2d: 600 6 0 0 0
-bench_affine2::to_scale_angle_translation: 37410 282 61 0 0
+bench_affine2::to_scale_angle_translation: 38920 287 61 0 0
 bench_affine2::transform_point2: 5080 44 8 0 0
 bench_affine2::transform_vector2: 4680 40 8 0 0

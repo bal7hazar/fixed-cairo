@@ -5,7 +5,7 @@ bench_sdp::add_diagonal: 3740 32 6 0 0
 bench_sdp::add_diagonal2: 2700 23 4 0 0
 bench_sdp::alt_from_rotated_diagonal_literal_from_rotated_diagonal: 54200 461 114 0 0
 bench_sdp::alt_from_rotated_diagonal_mat3_two_stage_from_rotated_diagonal_mat3: 28520 242 60 0 0
-bench_sdp::alt_inverse_plain_inverse_regular: 49900 418 112 0 0
+bench_sdp::alt_inverse_plain_inverse_regular: 52650 442 112 0 0
 bench_sdp::alt_inverse_separate_det_inverse_regular: 27360 233 56 0 0
 bench_sdp::alt_inverse_via_mat3_inverse_regular: 39230 325 80 0 0
 bench_sdp::alt_mul_vec_unfused_mul_vec: 20780 173 48 0 0

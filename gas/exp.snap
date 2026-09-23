@@ -4,8 +4,8 @@ bench_exp::alt_exp2_single_poly_large: 29240 238 63 0 0
 bench_exp::alt_exp_cody_waite: 21040 170 43 0 0
 bench_exp::alt_exp_cody_waite_negative: 21040 170 43 0 0
 bench_exp::alt_exp_naive: 20740 167 43 0 0
-bench_exp::alt_log2_atanh: 29510 236 61 0 0
-bench_exp::alt_log2_atanh_large: 29510 238 61 0 0
+bench_exp::alt_log2_atanh: 31020 241 61 0 0
+bench_exp::alt_log2_atanh_large: 31020 243 61 0 0
 bench_exp::alt_normalize_clz__large: 14470 94 15 0 0
 bench_exp::alt_normalize_clz__mid: 14470 65 7 0 0
 bench_exp::alt_normalize_clz__small: 14470 111 19 0 0
@@ -27,7 +27,7 @@ bench_exp::exp_m1: 21680 175 45 0 0
 bench_exp::ln_1p: 21280 175 39 0 0
 bench_exp::ln__below_one: 19520 158 37 0 0
 bench_exp::ln__large: 19520 160 37 0 0
-bench_exp::log: 40710 327 72 0 0
+bench_exp::log: 42220 332 72 0 0
 bench_exp::log10: 19520 160 37 0 0
 bench_exp::log2__below_one: 19520 158 37 0 0
 bench_exp::log2__epsilon: 19520 157 36 0 0

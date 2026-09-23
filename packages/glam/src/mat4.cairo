@@ -278,7 +278,7 @@ pub trait Mat4Trait {
     ///
     /// One division shared by the 16 elements (`Recip`) and one fused multiplication each,
     /// rounded to nearest: cheaper than, and up to 1 ULP away from, the element-wise
-    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    /// correctly rounded `Fixed / Fixed` kept in `benches::alt`.
     ///
     /// Mirrors `glam::Mat4::div_scalar`.
     /// #### Panics

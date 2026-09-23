@@ -600,11 +600,6 @@ def div_leaf(floor):
     return leaf
 
 
-fn(
-    "`trunc((a * 2^32) / b)`: rounds toward zero, like the corelib signed division.",
-    "div_trunc(a: i64, b: i64) -> i64",
-    four_way(div_leaf(False)),
-)
 
 
 def rem_leaf(a_neg, b_neg, mag, den):
@@ -687,10 +682,80 @@ def recip_body(floor):
     return out + f"            {V('q', q).down()}\n        }},\n    }}"
 
 
+
+
+# Round half to even of `num / den` on magnitudes, then re-sign and range-check. Two formulations
+# of the rounding step (benchmarked, the loser goes to `benches::alt::fixed`):
+#   "cmp":  (q, r) = num div_rem den; c = 2 r - den: c < 0 -> q, c > 0 -> q + 1, c == 0 (tie)
+#           -> q + (q mod 2);
+#   "bias": (Q, R) = (2 num + den) div_rem (2 den) (round half up); R == 0 (tie) -> 2 (Q div 2).
+def fin(qv, neg):
+    return (qv.neg() if neg else qv).down()
+
+
+def nearest_lines(num, den, dname, neg, variant):
+    """num: V (bound to `num`), den: the `NonZero` divisor V named `dname`."""
+    nv, dv = V("num", num.rng), V("dv", den.rng)
+    lines = [f"let num: {tyr(num.rng)} = {num};", f"let dv: {tyr(den.rng)} = {dname}.into();"]
+    if variant == "bias":
+        n2 = nv.mul(2).add(dv)
+        d2 = V("d2", dv.mul(2).rng)
+        q, _, e = V("n2", n2.rng).div_rem(d2)
+        hq, _, he = V("q", q).div_rem(2)
+        return lines + [
+            f"let n2 = {n2};",
+            f"let d2 = bounded_int::mul::<_, NonZero<UnitInt<0x2>>>({dname}, 0x2);",
+            f"let (q, r) = {e};",
+            "match Into::<_, felt252>::into(r) {",
+            f"    0 => {{\n        let (hq, _p) = {he};\n"
+            f"        {fin(V('hq', hq).mul(2), neg)}\n    }},",
+            f"    _ => {fin(V('q', q), neg)},",
+            "}",
+        ]
+    q, r, e = nv.div_rem(den)
+    c = V("r", r).mul(2).sub(dv)
+    constrain0(c.rng)
+    _, p, pe = V("q", q).div_rem(2)
+    return lines + [
+        f"let (q, r) = {e};",
+        f"let c = {c};",
+        f"match bounded_int::constrain::<{tyr(c.rng)}, 0>(c) {{",
+        f"    Ok(_) => {fin(V('q', q), neg)},",
+        "    Err(nn) => if Into::<_, felt252>::into(nn) == 0 {",
+        f"        let (_h, p) = {pe};\n        {fin(V('q', q).add(V('p', p)), neg)}",
+        f"    }} else {{\n        {fin(V('q', q).add(1), neg)}\n    }},",
+        "}",
+    ]
+
+
+def div_nearest_body(variant):
+    def leaf(a_neg, b_neg, mag, den):
+        dname = "dn" if b_neg else "dp"
+        return ind(nearest_lines(mag.mul(ONE), den, dname, a_neg != b_neg, variant))
+
+    return four_way(leaf)
+
+
+def recip_nearest_body(variant):
+    num = V(h(1 << 64), unit(1 << 64))
+    out = NZ + "    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {\n"
+    out += "        Ok(bn) => {\n            let dn = bn.negate();\n"
+    out += "".join(f"            {x}\n" for x in nearest_lines(num, DN, "dn", True, variant))
+    out += "        },\n        Err(dp) => {\n"
+    out += "".join(f"            {x}\n" for x in nearest_lines(num, DP, "dp", False, variant))
+    return out + "        },\n    }"
+
+
+DIV_NEAREST = "bias"  # the winner (see gas/fixed.snap: div vs alt_div_nearest_*)
 fn(
-    "`trunc(2^64 / b)`: the reciprocal, rounded like `div_trunc` (one sign split instead of two).",
-    "recip_trunc(b: i64) -> i64",
-    recip_body(False),
+    "`round_half_even((a * 2^32) / b)`: the correctly rounded quotient (ties to even).",
+    "div_nearest(a: i64, b: i64) -> i64",
+    div_nearest_body(DIV_NEAREST),
+)
+fn(
+    "`round_half_even(2^64 / b)`: the correctly rounded reciprocal (one sign split).",
+    "recip_nearest(b: i64) -> i64",
+    recip_nearest_body(DIV_NEAREST),
 )
 
 # ------------------------------------------------------------------ wide reciprocal
@@ -727,6 +792,148 @@ fn(
     "recip_mul(r: BR, x: i64) -> i64",
     f"    narrow64_round({V('r', BR).mul(x).felt()})",
 )
+
+# Correctly rounded division by a shared divisor `d` (`wide::RecipNearest`): the divisor is
+# prepared once (`2 |d|` as a `NonZero` divisor and `|d|`, tagged by the sign of `d`: `upcast`
+# does not accept `NonZero` types, so each sign keeps its own ranges), each division is then the
+# "bias" rounding step of `div_nearest` without the zero test and the sign split of `d`
+# (measured cheaper than a 96-bit reciprocal plus an exact remainder correction, which stays in
+# `benches::alt::fixed` as `recip_nearest_recip_*`).
+RD = (0, 1 << 63)  # |d|, used by the alternative below
+D2N, D2P = V("dn", DN.rng).mul(2), V("dp", DP.rng).mul(2)  # declares the `NonZero` product helpers
+DIVISOR = (
+    "/// A non-zero divisor prepared for `recip_nearest_div`: `(2 |d|, |d|)`, tagged by the sign\n"
+    "/// of `d`.\n#[derive(Copy, Drop)]\npub enum Divisor {\n"
+    f"    Neg: (NonZero<{tyr(D2N.rng)}>, {tyr(DN.rng)}),\n"
+    f"    Pos: (NonZero<{tyr(D2P.rng)}>, {tyr(DP.rng)}),\n}}"
+)
+ALIASES.append(DIVISOR)
+
+
+def prepared_arm(dname, den):
+    return (
+        f"            let d2 = bounded_int::mul::<_, NonZero<UnitInt<0x2>>>({dname}, 0x2);\n"
+        f"            let dv: {tyr(den.rng)} = {dname}.into();\n"
+    )
+
+
+fn(
+    "`Divisor` of `b`: `(2 |b|, |b|)` tagged by the sign of `b`.",
+    "recip_nearest_new(b: i64) -> Divisor",
+    NZ
+    + "    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {\n"
+    "        Ok(bn) => {\n            let dn = bn.negate();\n"
+    + prepared_arm("dn", DN) + "            Divisor::Neg((d2, dv))\n        },\n"
+    "        Err(dp) => {\n" + prepared_arm("dp", DP) + "            Divisor::Pos((d2, dv))\n"
+    "        },\n    }",
+)
+
+
+def prepared_leaf(mag, neg, den):
+    num = mag.mul(ONE)
+    n2 = V("num", num.rng).mul(2).add(V("d", den.rng))
+    q, _, e = V("n2", n2.rng).div_rem(V("d2", V("", den.rng).mul(2).rng))
+    hq, _, he = V("q", q).div_rem(2)
+    return [
+        f"let num: {tyr(num.rng)} = {num};",
+        f"let n2 = {n2};",
+        f"let (q, r) = {e};",
+        "match Into::<_, felt252>::into(r) {",
+        f"    0 => {{\n        let (hq, _p) = {he};\n"
+        f"        {fin(V('hq', hq).mul(2), neg)}\n    }},",
+        f"    _ => {fin(V('q', q), neg)},",
+        "}",
+    ]
+
+
+def x_split(leaf, d_neg):
+    out = "        match bounded_int::constrain::<i64, 0>(x) {\n"
+    for x_neg in (True, False):
+        arm, mag = ("Ok(n)", n_.neg()) if x_neg else ("Err(p)", p_)
+        out += f"            {arm} => {{\n"
+        out += "".join(f"                {l}\n" for l in leaf(mag, x_neg != d_neg))
+        out += "            },\n"
+    return out + "        }\n"
+
+
+fn(
+    "`round_half_even(x * 2^32 / b)` from `recip_nearest_new(b)`: bit-identical to\n"
+    "`div_nearest(x, b)` (same rounding step, divisor prepared).",
+    "recip_nearest_div(p: Divisor, x: i64) -> i64",
+    "    match p {\n"
+    "        Divisor::Neg((d2, d)) => {\n"
+    + x_split(lambda m, ng: prepared_leaf(m, ng, DN), True)
+    + "        },\n        Divisor::Pos((d2, d)) => {\n"
+    + x_split(lambda m, ng: prepared_leaf(m, ng, DP), False)
+    + "        },\n    }",
+)
+
+
+def shared_div_body(leaf):
+    out = "    if neg {\n"
+    out += x_split(leaf, True)
+    out += "    } else {\n"
+    out += x_split(leaf, False)
+    return out + "    }"
+
+
+# Alternative of `wide::RecipNearest` (emitted in `benches::alt::fixed`): the magnitudes
+# `v = floor(2^96 / |d|)`, `|d|` and the sign of `d` are kept. For `|x| <= 2^63` the approximation
+# `y = |x| v / 2^64` satisfies `0 <= t - y < |x| / 2^64 <= 1/2`, `t = |x| 2^32 / |d|` being the
+# exact quotient, and `q0 = ceil(y - 1/2) = floor((|x| v + 2^63 - 1) / 2^64)` satisfies
+# `y - 1/2 <= q0 < y + 1/2`: hence `-1/2 < t - q0 < 1` and `round_half_even(t)` is `q0` or
+# `q0 + 1`. The exact remainder `e = |x| 2^32 - q0 |d|` (`= |d| (t - q0)`) decides it with one
+# sign test of `2 e - |d|` (negative: `q0`, positive: `q0 + 1`, zero: the even one of the two).
+# `q0 >= 2^64` (the `felt252 -> u128` conversion fails) implies `t > 2^64 - 1/2`: an overflow of
+# the exact division as well, so the panics are those of `div_nearest`.
+RV = (0, R96)  # v = floor(2^96 / |d|)
+
+
+def recip_nearest_leaf(mag, neg):
+    q0, _, e0 = V("u", U128).div_rem(1 << 64)
+    q0v, dv = V("q0", q0), V("d", RD)
+    err = V("ax", mag.rng).mul(ONE).sub(q0v.mul(dv))
+    c = V("e", err.rng).mul(2).sub(dv)
+    constrain0(c.rng)
+    _, p, pe = q0v.div_rem(2)
+    return [
+        f"let ax: {tyr(mag.rng)} = {mag};",
+        f"let f: felt252 = {V('ax', mag.rng).mul(V('v', RV)).felt()} + {h((1 << 63) - 1)};",
+        f"let u: u128 = or_overflow(f.try_into());",
+        f"let (q0, _r) = {e0};",
+        f"let e = {err};",
+        f"let c = {c};",
+        f"match bounded_int::constrain::<{tyr(c.rng)}, 0>(c) {{",
+        f"    Ok(_) => {fin(q0v, neg)},",
+        "    Err(nn) => if Into::<_, felt252>::into(nn) == 0 {",
+        f"        let (_h, p) = {pe};\n        {fin(q0v.add(V('p', p)), neg)}",
+        f"    }} else {{\n        {fin(q0v.add(1), neg)}\n    }},",
+        "}",
+    ]
+
+
+def emit_recip_nearest_recip():
+    qn, _, en = cv.div_rem(DN)
+    qp, _, ep = cv.div_rem(DP)
+    fn(
+        "`(floor(2^96 / |b|), |b|, b < 0)`: the divisor of `recip_nearest_recip_div_raw`.",
+        f"recip_nearest_recip_new_raw(b: i64) -> ({tyr(RV)}, {tyr(RD)}, bool)",
+        NZ + f"    {decl}\n"
+        "    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {\n"
+        "        Ok(bn) => {\n            let dn = bn.negate();\n"
+        f"            let (q, _r) = {en};\n            let dv: {tyr(DN.rng)} = dn.into();\n"
+        f"            ({V('q', qn).up(RV)}, {V('dv', DN.rng).up(RD)}, true)\n        }},\n"
+        f"        Err(dp) => {{\n            let (q, _r) = {ep};\n"
+        f"            let dv: {tyr(DP.rng)} = dp.into();\n"
+        f"            ({V('q', qp).up(RV)}, {V('dv', DP.rng).up(RD)}, false)\n        }},\n    }}",
+    )
+    fn(
+        "`round_half_even(x * 2^32 / b)` from `recip_nearest_recip_new_raw(b)`: bit-identical to\n"
+        "`div_nearest(x, b)` (one approximate quotient through `v`, one exact remainder check).",
+        f"recip_nearest_recip_div_raw(v: {tyr(RV)}, d: {tyr(RD)}, neg: bool, x: i64) -> i64",
+        shared_div_body(recip_nearest_leaf),
+    )
+
 
 # ------------------------------------------------------------------ output
 HEADER = "// GENERATED by scripts/gen_bounded.py - do not edit by hand.\n"
@@ -819,6 +1026,17 @@ fn(
     four_way(div_leaf(True)),
 )
 fn(
+    "`trunc((a * 2^32) / b)`: rounds toward zero, like the corelib signed division (the `/` of\n"
+    "`fixed` up to 0.2; 400 gas less than round half to even).",
+    "div_trunc_raw(a: i64, b: i64) -> i64",
+    four_way(div_leaf(False)),
+)
+fn(
+    "`trunc(2^64 / b)`: the reciprocal rounded toward zero (`recip` up to 0.2).",
+    "recip_trunc_raw(b: i64) -> i64",
+    recip_body(False),
+)
+fn(
     "`floor(2^64 / b)`: reciprocal rounded toward negative infinity.",
     "recip_floor_raw(b: i64) -> i64",
     recip_body(True),
@@ -848,6 +1066,20 @@ fn(
     f"    if neg {{\n        {V('q', NUM).neg().down()}\n    }} else {{\n"
     f"        {V('q', NUM).down()}\n    }}",
 )
+# -- div_nearest / recip_nearest: the losing rounding step
+ALT_NEAREST = "bias" if DIV_NEAREST == "cmp" else "cmp"
+fn(
+    f"`round_half_even((a * 2^32) / b)` with the `{ALT_NEAREST}` rounding step.",
+    f"div_nearest_{ALT_NEAREST}_raw(a: i64, b: i64) -> i64",
+    div_nearest_body(ALT_NEAREST),
+)
+fn(
+    f"`round_half_even(2^64 / b)` with the `{ALT_NEAREST}` rounding step.",
+    f"recip_nearest_{ALT_NEAREST}_raw(b: i64) -> i64",
+    recip_nearest_body(ALT_NEAREST),
+)
+# -- RecipNearest through a 96-bit reciprocal plus an exact remainder correction
+emit_recip_nearest_recip()
 # -- abs / round with `downcast` instead of `trim_max`; sqrt with a `constrain` sign test
 fn(
     "`|x|` with a `downcast` (one more range check than `trim_max`).",
@@ -948,12 +1180,48 @@ pub fn powi_loop(x: Fixed, n: i32) -> Fixed {
 }
 """
 
+ALT_FIXED_STATIC += f"""
+/// `wide::RecipNearest` through a 96-bit reciprocal `v = floor(2^96 / |d|)`, an approximate
+/// quotient within `(-1/2, 1)` of the exact one and an exact remainder correction (see
+/// `scripts/gen_bounded.py`): bit-identical to the library, but each division costs more than a
+/// plain `div_nearest`, so the library prepares the divisor instead.
+#[derive(Copy, Drop)]
+pub struct RecipNearestRecip {{
+    v: {tyr(RV)},
+    d: {tyr(RD)},
+    neg: bool,
+}}
+
+/// Prepares `d` for `recip_nearest_recip_div`.
+#[inline(always)]
+pub fn recip_nearest_recip_new(d: Fixed) -> RecipNearestRecip {{
+    let (v, d, neg) = recip_nearest_recip_new_raw(d.raw);
+    RecipNearestRecip {{ v, d, neg }}
+}}
+
+/// `x / d` rounded half to even through the reciprocal of `recip_nearest_recip_new(d)`.
+#[inline(always)]
+pub fn recip_nearest_recip_div(r: RecipNearestRecip, x: Fixed) -> Fixed {{
+    Fixed {{ raw: recip_nearest_recip_div_raw(r.v, r.d, r.neg, x.raw) }}
+}}
+"""
+
 FIVE = "a: Fixed, b: Fixed, c: Fixed, d: Fixed, e: Fixed"
 ALT_WRAPPERS = [
     ("mul_bias_downcast", "a: Fixed, b: Fixed", "a.raw, b.raw", "Prototype rescale of `mul`."),
     ("div_floor", "a: Fixed, b: Fixed", "a.raw, b.raw", "Floor-rounded `div`."),
+    ("div_trunc", "a: Fixed, b: Fixed", "a.raw, b.raw", "Truncated `div` (up to 0.2)."),
+    ("recip_trunc", "b: Fixed", "b.raw", "Truncated `recip` (up to 0.2)."),
     ("div_trunc_flat", "a: Fixed, b: Fixed", "a.raw, b.raw", "Flat sign-split `div`."),
     ("recip_floor", "b: Fixed", "b.raw", "Floor-rounded `recip`."),
+    (
+        f"div_nearest_{ALT_NEAREST}", "a: Fixed, b: Fixed", "a.raw, b.raw",
+        f"`div_nearest` with the `{ALT_NEAREST}` rounding step.",
+    ),
+    (
+        f"recip_nearest_{ALT_NEAREST}", "b: Fixed", "b.raw",
+        f"`recip_nearest` with the `{ALT_NEAREST}` rounding step.",
+    ),
     ("abs_downcast", "x: Fixed", "x.raw", "`abs` with `downcast`."),
     ("round_downcast", "x: Fixed", "x.raw", "`round` with `downcast`."),
     ("sqrt_constrain", "x: Fixed", "x.raw", "`sqrt` with `constrain`."),
@@ -978,9 +1246,10 @@ def alt_fixed_file():
         "//! documented stable-API fallback of the `core::internal::bounded_int` kernels.\n"
         + FEATURE
         + "use core::internal::bounded_int::{\n"
-        "    self, AddHelper, BoundedInt, DivRemHelper, MulHelper, NegateHelper, SubHelper, UnitInt,\n"
-        "    downcast, upcast,\n};\n"
-        "use core::num::traits::{Sqrt, WideMul};\nuse fixed::{Fixed, FixedTrait, ONE};\n",
+        "    self, AddHelper, BoundedInt, ConstrainHelper, DivRemHelper, MulHelper, NegateHelper,\n"
+        "    SubHelper, UnitInt, downcast, upcast,\n};\n"
+        "use core::num::traits::{Sqrt, WideMul};\n"
+        "use fixed::{Fixed, FixedTrait, ONE};\n",
         ALT_FIXED_STATIC,
     ]
     impls = [i.replace("pub impl", "impl") for i in IMPLS.values()]

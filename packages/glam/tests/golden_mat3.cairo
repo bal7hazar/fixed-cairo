@@ -567,8 +567,8 @@ fn golden_mat3_transpose_abs() {
         case += 1;
     }
 }
-// mat3::recip: 3 cases, tolerance 1 ULP - one truncated division per element vs round to nearest:
-// |diff| <= 1.
+// mat3::recip: 3 cases, tolerance 1 ULP - one division rounded half to even vs the oracle rounded
+// to nearest: |diff| <= 1.
 #[cairofmt::skip]
 const RECIP_CASES: [i64; 54] = [
     -1569810546688, 377283000541, -1769526525952, -3311693463791, 2694936887174, 3423088934912,

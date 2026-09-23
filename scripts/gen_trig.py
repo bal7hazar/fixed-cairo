@@ -251,10 +251,17 @@ def narrow64_round(v):
     return i64((v + (1 << 63)) >> 64)
 
 
-def div_trunc(a, b):
-    """`Fixed / Fixed`: trunc(a / b)."""
-    q = (abs(a) << FRAC) // abs(b)
-    return i64(-q if (a < 0) != (b < 0) else q)
+def _half_even(n, d):
+    """`round_half_even(n / d)` of two integers, `d != 0`."""
+    if d < 0:
+        n, d = -n, -d
+    q, r = divmod(n, d)
+    return q + 1 if 2 * r > d or (2 * r == d and q % 2) else q
+
+
+def div(a, b):
+    """`Fixed / Fixed`: round_half_even(a * 2^32 / b)."""
+    return i64(_half_even(a << FRAC, b))
 
 
 def horner(coeffs, x):
@@ -337,7 +344,7 @@ class Mirror:
         ac = abs(c)
         if ac <= 2 and abs(s) >= ac * (1 << 31):
             raise OverflowError("Fixed: tan overflow")
-        return div_trunc(s, c)
+        return div(s, c)
 
     # -- inverse circular functions -------------------------------------
     def atan_core(self, z):
@@ -359,7 +366,7 @@ class Mirror:
             return 0
         if mx > I64_MAX:
             mn, mx = mn >> 1, mx >> 1
-        a = self.atan_core(div_trunc(mn, mx))
+        a = self.atan_core(div(mn, mx))
         if swap:
             a = FRAC_PI_2_RAW - a
         if x < 0:
@@ -391,8 +398,8 @@ class Mirror:
 
 
 def recip(a):
-    """`FixedTrait::recip`: trunc(2^64 / a)."""
-    return i64((1 << 64) // a) if a > 0 else -i64((1 << 64) // -a)
+    """`FixedTrait::recip`: round_half_even(2^64 / a)."""
+    return i64(_half_even(1 << 64, a))
 
 
 DEG_TO_RAD_S = int(round(float(PI_D / 180) * SC))

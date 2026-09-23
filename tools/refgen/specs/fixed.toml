@@ -4,8 +4,9 @@
 #
 # Every oracle is an exact integer oracle (i128 on the raw values, whole i64 range where the
 # operation allows it), so every tolerance is 0: the result of each function is exactly defined by
-# the rounding rules of docs/DESIGN.md section 2 (`*`, `mul_add`, `lerp` floor; `/`, `%`, `recip`,
-# `from_ratio` truncate toward zero; `round` half away from zero; `sqrt` floor of the exact root).
+# the rounding rules of docs/DESIGN.md section 2 (`*`, `mul_add`, `lerp` floor; `/`, `recip`,
+# `from_ratio` round to nearest, ties to even, like `f64 /`; `%` is the exact remainder of the
+# truncated division; `round` half away from zero; `sqrt` floor of the exact root).
 # Panic paths carry the exact message of the implementation.
 #
 # The generated file is capped at 1 500 lines (the CI runner kills compiles of huge test crates),
@@ -53,7 +54,7 @@ args = [
 ret = "Fixed"
 cases = 6
 tolerance = 0
-justification = "exact: trunc(num * 2^32 / den) on plain integers; results outside the scalar range are panic cases."
+justification = "exact: round_half_even(num * 2^32 / den) on plain integers; results outside the scalar range are panic cases."
 edges = [[1, 3], [-1, 3], [1, -3], [-1, -3], [7, 2], [2147483647, 1], [-2147483648, 1]]
 
 [[function.panics]]
@@ -211,7 +212,7 @@ args = [{ type = "Fixed", domain = "full" }, { type = "Fixed", domain = "full", 
 ret = "(Fixed, Fixed)"
 cases = 6
 tolerance = 0
-justification = "exact: (trunc(a * 2^32 / b), a % b): toward zero, the remainder has the sign of the dividend; quotients outside the scalar range are panic cases."
+justification = "exact: (round_half_even(a * 2^32 / b), a % b): the quotient to nearest, ties to even; the remainder is that of the truncated division (sign of the dividend); quotients outside the scalar range are panic cases."
 edges = [
     [7.5, -2.5],
     [-7.5, 2],
@@ -238,7 +239,7 @@ args = [{ type = "Fixed", domain = "full", nonzero = true }]
 ret = "Fixed"
 cases = 4
 tolerance = 0
-justification = "exact: trunc(2^64 / raw), toward zero (raw in 0..=2 is a panic case)."
+justification = "exact: round_half_even(2^64 / raw) (raw -1, 0, 1 and 2 are panic cases; never a tie)."
 edges = [[1], [-3], [0.5], ["raw:3"], ["raw:-2"], ["raw:0x7fffffffffffffff"]]
 
 [[function.panics]]
@@ -310,7 +311,7 @@ args = [
 ret = "Fixed"
 cases = 6
 tolerance = 0
-justification = "exact: trunc((v - a) * 2^32 / (b - a)); the native subtractions and the quotient range are panic cases."
+justification = "exact: round_half_even((v - a) * 2^32 / (b - a)); the native subtractions and the quotient range are panic cases."
 edges = [[0, 10, 5], [0, 10, 10], [10, 0, 2.5], [-1, 1, 0], [1, 3, 2.5]]
 
 [[function.panics]]
@@ -356,7 +357,7 @@ args = [{ type = "Fixed", domain = "small" }, { type = "i32", min = -5, max = 5 
 ret = "Fixed"
 cases = 6
 tolerance = 0
-justification = "exact: the documented algorithm, every product floored (n = 2, 3 floor of the exact power, n = 4 floor(floor(x^2)^2), n >= 5 binary exponentiation LSB first), negative n = recip (truncated) of the power."
+justification = "exact: the documented algorithm, every product floored (n = 2, 3 floor of the exact power, n = 4 floor(floor(x^2)^2), n >= 5 binary exponentiation LSB first), negative n = recip (rounded half to even) of the power."
 edges = [
     [2, 0],
     [-3, 3],
@@ -390,7 +391,7 @@ args = [
 ret = "Fixed"
 cases = 6
 tolerance = 0
-justification = "exact: t = saturate(trunc((x - e0) / (e1 - e0))), then floor(t^2 (3 - 2t)) evaluated at the Q96.96 scale."
+justification = "exact: t = saturate(round_half_even((x - e0) / (e1 - e0))), then floor(t^2 (3 - 2t)) evaluated at the Q96.96 scale."
 edges = [[0.5, 0, 1], [-1, 0, 1], [2, 0, 1], [0.25, 0, 1], [5, 10, 0], ["raw:1", 0, 1], [1.5, -2, 6]]
 
 [[function.panics]]

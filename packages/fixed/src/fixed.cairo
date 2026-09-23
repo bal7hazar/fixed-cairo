@@ -2,8 +2,10 @@
 //!
 //! * `value = raw / 2^32`, range `[-2^31, 2^31)`, resolution `2^-32` (1 ULP, [`EPSILON`]).
 //! * Rounding: `*`, [`FixedTrait::mul_add`], [`FixedTrait::lerp`] and every fused kernel round
-//!   toward negative infinity (floor); `/`, `%` and [`FixedTrait::recip`] round toward zero like
-//!   the integer division of the corelib (and of Rust).
+//!   toward negative infinity (floor); `/`, [`FixedTrait::recip`] and [`FixedTrait::from_ratio`]
+//!   are correctly rounded (to nearest, ties to even) like `f64 /` in Rust
+//!   ([`FixedTrait::div_nearest`] and [`FixedTrait::recip_nearest`] are named aliases); `%` is the
+//!   exact remainder of the truncated division, like Rust's float `%`.
 //! * Overflow panics, it never wraps nor saturates: `'Fixed: overflow'` for everything that
 //!   rescales, the corelib messages for the native `+`, `-` and unary `-` (`'i64_add Overflow'` /
 //!   `'i64_add Underflow'`, `'i64_sub Overflow'` / `'i64_sub Underflow'`, `'i64_neg Underflow'`):
@@ -109,8 +111,8 @@ pub trait FixedTrait {
     /// #### Deviations
     /// * None.
     fn from_int(v: i32) -> Fixed;
-    /// Builds `num / den` from two integers, rounded toward zero like `/`. The operands are plain
-    /// integers, not raw values: `from_ratio(1, 3)` is one third.
+    /// Builds `num / den` from two integers, rounded to nearest (ties to even) like `/`. The
+    /// operands are plain integers, not raw values: `from_ratio(1, 3)` is one third.
     ///
     /// Convenience for literals; no glam-rs counterpart.
     /// #### Panics
@@ -280,16 +282,43 @@ pub trait FixedTrait {
     /// #### Deviations
     /// * None.
     fn fract_gl(self: Fixed) -> Fixed;
-    /// Returns `1 / self`, rounded toward zero (one sign split instead of the two of `/`).
+    /// Returns `1 / self`, rounded to nearest, ties to even, like `1.0 / x` in Rust (one sign split
+    /// instead of the two of `/`; the exact `2^64 / raw` is never a tie).
     ///
     /// Mirrors `f32::recip`.
     /// #### Panics
     /// * `'Fixed: division by zero'` if `self` is zero.
-    /// * `'Fixed: overflow'` if `self` is `1` or `2` raw (`2^64 / raw` does not fit; `-2` raw gives
-    /// `MIN`).
+    /// * `'Fixed: overflow'` if `self` is `-1`, `1` or `2` raw (`2^64 / raw` does not fit; `-2`
+    ///   raw gives `MIN`).
     /// #### Deviations
     /// * Panics instead of returning infinity.
     fn recip(self: Fixed) -> Fixed;
+    /// Named alias of `self / rhs`: the exact quotient `self.raw * 2^32 / rhs.raw` rounded to the
+    /// nearest raw value, ties to even (the rounding of `f64 /`). Exact whenever the quotient is
+    /// representable. [`crate::wide::RecipNearestTrait::div_nearest`] returns the same bits for a
+    /// divisor shared by several quotients.
+    ///
+    /// Mirrors `f32 / f32` (`Div::div`), rounding included.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if `rhs` is zero.
+    /// * `'Fixed: overflow'` if the rounded quotient does not fit the scalar range.
+    /// #### Deviations
+    /// * None on the rounding (`/` is the same kernel; up to 0.2 it truncated toward zero).
+    ///   Division by zero or overflow panics where floating-point division returns infinity:
+    ///   docs/DESIGN.md section 3, "division by zero" and "overflow".
+    fn div_nearest(self: Fixed, rhs: Fixed) -> Fixed;
+    /// Named alias of [`FixedTrait::recip`]: `1 / self` correctly rounded (to nearest, ties to
+    /// even), bit-identical to `ONE / self`, with one sign split instead of two.
+    ///
+    /// Mirrors `f32::recip`, rounding included.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if `self` is zero.
+    /// * `'Fixed: overflow'` if `self` is `-1`, `1` or `2` raw (`2^64 / raw` does not fit; `-2`
+    ///   raw gives `MIN`).
+    /// #### Deviations
+    /// * None on the rounding (up to 0.2 `recip` truncated toward zero). Panics instead of
+    ///   returning infinity.
+    fn recip_nearest(self: Fixed) -> Fixed;
     /// Returns the square root, rounded toward zero (exact integer square root of `raw * 2^32`).
     ///
     /// Mirrors `f32::sqrt`.
@@ -331,8 +360,8 @@ pub trait FixedTrait {
     /// Computes `self` to an integer power. `|n| <= 4` is unrolled (`n = 2, 3`: floor of the
     /// exact power, `n = 4`: `floor(floor(x^2)^2)`); larger exponents use binary exponentiation
     /// (least significant bit first, every product rounded toward negative infinity). A negative
-    /// `n` returns `recip` (rounded toward zero) of the positive power. Not inlined (loop): prefer
-    /// `x * x` for a constant exponent, it is 3.6x cheaper.
+    /// `n` returns `recip` (rounded to nearest, ties to even) of the positive power. Not inlined
+    /// (loop): prefer `x * x` for a constant exponent, it is 3.6x cheaper.
     ///
     /// Mirrors `f32::powi`.
     /// #### Panics
@@ -441,7 +470,7 @@ pub impl FixedImpl of FixedTrait {
     }
     #[inline(always)]
     fn from_ratio(num: i64, den: i64) -> Fixed {
-        Fixed { raw: bounded::div_trunc(num, den) }
+        Fixed { raw: bounded::div_nearest(num, den) }
     }
     #[inline(always)]
     fn to_int(self: Fixed) -> i32 {
@@ -539,7 +568,15 @@ pub impl FixedImpl of FixedTrait {
     }
     #[inline(always)]
     fn recip(self: Fixed) -> Fixed {
-        Fixed { raw: bounded::recip_trunc(self.raw) }
+        Fixed { raw: bounded::recip_nearest(self.raw) }
+    }
+    #[inline(always)]
+    fn div_nearest(self: Fixed, rhs: Fixed) -> Fixed {
+        Fixed { raw: bounded::div_nearest(self.raw, rhs.raw) }
+    }
+    #[inline(always)]
+    fn recip_nearest(self: Fixed) -> Fixed {
+        Fixed { raw: bounded::recip_nearest(self.raw) }
     }
     #[inline(always)]
     fn sqrt(self: Fixed) -> Fixed {
@@ -683,11 +720,11 @@ pub impl FixedMul of Mul<Fixed> {
 }
 
 pub impl FixedDiv of Div<Fixed> {
-    /// `trunc(lhs / rhs)`: rounds toward zero. Panics with `'Fixed: division by zero'` or
-    /// `'Fixed: overflow'`.
+    /// `lhs / rhs` rounded to nearest, ties to even, like `f64 /` (up to 0.2 it truncated toward
+    /// zero). Panics with `'Fixed: division by zero'` or `'Fixed: overflow'`.
     #[inline(always)]
     fn div(lhs: Fixed, rhs: Fixed) -> Fixed {
-        Fixed { raw: bounded::div_trunc(lhs.raw, rhs.raw) }
+        Fixed { raw: bounded::div_nearest(lhs.raw, rhs.raw) }
     }
 }
 

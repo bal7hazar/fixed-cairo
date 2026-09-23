@@ -225,7 +225,7 @@ args = [{ type = "Quat", constraint = "normalized" }]
 ret = "Fixed"
 cases = 6
 tolerance = 2
-justification = "the reciprocal of a floored length, truncated toward zero: 1 ULP for each, and the length of a unit quaternion is 1 so the relative amplification is 1."
+justification = "the reciprocal of a floored length, rounded to nearest: 1 ULP for each, and the length of a unit quaternion is 1 so the relative amplification is 1."
 
 [[function]]
 name = "normalize"
@@ -305,7 +305,7 @@ args = [
 ret = "Quat"
 cases = 10
 tolerance = 64
-justification = "the `slerp` bound (48) plus the truncation of `max_angle / angle` (1 ULP of a ratio whose denominator is at least 0.28 rad, i.e. 3.6 ULP on `s`, and `|dq/ds| <= theta <= pi`): |diff| <= 64."
+justification = "the `slerp` bound (48) plus the rounding of `max_angle / angle` (1 ULP of a ratio whose denominator is at least 0.28 rad, i.e. 3.6 ULP on `s`, and `|dq/ds| <= theta <= pi`): |diff| <= 64."
 
 # ------------------------------------------------------------------------------------------
 # Exact operations.

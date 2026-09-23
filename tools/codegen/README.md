@@ -79,9 +79,9 @@ What differs from the integer generator:
 - the bench file declares its operands as `const`s (`A`, `B`, `UNIT`, `K_HALF`, ...) instead of
   inlining `Vec3Trait::new(FixedTrait::from_raw(..), ..)` at every call site: the inline form
   wraps over three lines per input and made the file 2.6x longer;
-- `fvec_tests.py` carries a small Q32.32 oracle in Python (floor rescale, truncated division,
-  the round-to-nearest shared reciprocal, integer square root) so the tables pin the bit-exact
-  fixed-point semantics. Parity with glam-rs itself is the job of `tools/refgen`
+- `fvec_tests.py` carries a small Q32.32 oracle in Python (floor rescale, division rounded half
+  to even, the round-to-nearest shared reciprocal, integer square root) so the tables pin the
+  bit-exact fixed-point semantics. Parity with glam-rs itself is the job of `tools/refgen`
   (`tests/golden_<m>.cairo`), which uses `DVec*` as the oracle.
 
 ## fmat.py - Mat2/Mat3/Mat4 (the Q32.32 matrices)

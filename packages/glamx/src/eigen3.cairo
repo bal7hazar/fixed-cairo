@@ -63,12 +63,12 @@
 //!
 //! | | eigenvalues | `|A v - lambda v|` | `|V^T V - I|` (absolute) | `|V diag V^T - A|` |
 //! |---|---|---|---|---|
-//! | Jacobi (this module) | 0.79 | 8.3 | 3.4 | 10.1 |
+//! | Jacobi (this module) | 0.64 | 9.6 | 3.5 | 9.4 |
 //! | closed form (`alt`, first study only) | 68 477 | 54 234 | 22.5 | 46 988 |
 //!
 //! Below `2^26` the eigenvalues of a diagonal matrix are exact and its eigenvectors are exactly
-//! the axes. The worst eigenvalue error (`~0.8 ULP * |A|`) occurs for two eigenvalues separated
-//! by about `1 ULP * |A|`; well separated eigenvalues are correctly rounded most of the time.
+//! the axes. The worst eigenvalue error is `0.64 ULP * |A|` (`0.79` while `Fixed / Fixed`
+//! truncated, up to 0.2); well separated eigenvalues are correctly rounded most of the time.
 //!
 //! #### Supported range
 //!

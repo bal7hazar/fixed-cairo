@@ -120,7 +120,7 @@ pub fn is_unit3_narrowed(x: Fixed, y: Fixed, z: Fixed, max_abs_diff_raw: i64) ->
     fixed::wide::norm3_squared(x, y, z).abs_diff_eq(ONE, Fixed { raw: max_abs_diff_raw })
 }
 
-/// glam-rs formulation of `normalize`: `v * (1 / length)`, i.e. one truncated Q32.32 reciprocal
+/// glam-rs formulation of `normalize`: `v * (1 / length)`, i.e. one rounded Q32.32 reciprocal
 /// and three `Fixed * Fixed`. The reciprocal only carries 32 fractional bits: the result is off
 /// by `length * 2^-32` relative, and `normalize((3, 0, 0))` is `1 - 1 ULP`.
 #[inline(always)]

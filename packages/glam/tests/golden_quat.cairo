@@ -637,9 +637,9 @@ fn golden_quat_length_pair() {
         case += 1;
     }
 }
-// quat::length_recip: 6 cases, tolerance 2 ULP - the reciprocal of a floored length, truncated
-// toward zero: 1 ULP for each, and the length of a unit quaternion is 1 so the relative
-// amplification is 1.
+// quat::length_recip: 6 cases, tolerance 2 ULP - the reciprocal of a floored length, rounded to
+// nearest: 1 ULP for each, and the length of a unit quaternion is 1 so the relative amplification
+// is 1.
 #[cairofmt::skip]
 const LENGTH_RECIP_CASES: [i64; 30] = [
     2672240888, -3111022161, 1275701301, 123630, 4294967296,
@@ -881,9 +881,9 @@ fn golden_quat_slerp_long() {
         case += 1;
     }
 }
-// quat::rotate_towards: 10 cases, tolerance 64 ULP - the `slerp` bound (48) plus the truncation
-// of `max_angle / angle` (1 ULP of a ratio whose denominator is at least 0.28 rad, i.e. 3.6 ULP
-// on `s`, and `|dq/ds| <= theta <= pi`): |diff| <= 64.
+// quat::rotate_towards: 10 cases, tolerance 64 ULP - the `slerp` bound (48) plus the rounding of
+// `max_angle / angle` (1 ULP of a ratio whose denominator is at least 0.28 rad, i.e. 3.6 ULP on
+// `s`, and `|dq/ds| <= theta <= pi`): |diff| <= 64.
 #[cairofmt::skip]
 const ROTATE_TOWARDS_CASES: [i64; 130] = [
     1492521202, -2985042405, -2604108140, -726131650, -1246310794, 2273878023, -3423876782, 839,

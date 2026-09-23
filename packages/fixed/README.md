@@ -13,7 +13,7 @@ Compatible with Cairo 2.19.4.
 use fixed::{Fixed, FixedTrait, HALF, ONE, PI};
 
 let a: Fixed = 3_i32.into();                 // exact, 100 gas
-let b = FixedTrait::from_ratio(1, 3);        // 1/3, rounded toward zero
+let b = FixedTrait::from_ratio(1, 3);        // 1/3, rounded to nearest
 let c = a * b + HALF;                        // `*` floors, `+` is a native i64 add
 assert!(c.abs_diff_eq(ONE + HALF, FixedTrait::from_raw(4)));
 let d = (PI / a).sqrt().lerp(ONE, HALF);
@@ -25,7 +25,9 @@ let d = (PI / a).sqrt().lerp(ONE, HALF);
   step saturate smoothstep move_towards abs_diff_eq`, the operators `+ - * / % -x`, their
   `*Assign` forms, `PartialOrd`, `Zero`, `One`, `Bounded`, and the `f32::consts` constants.
 - Rounding (part of the API, results are bit-exact): `*`, `mul_add`, `lerp` and every fused kernel
-  round toward negative infinity; `/`, `%`, `recip`, `from_ratio` round toward zero.
+  round toward negative infinity; `/`, `recip`, `from_ratio` round to nearest, ties to even,
+  like `f64 /` (`div_nearest` / `recip_nearest` are named aliases); `%` is the exact remainder of
+  the truncated division, like Rust's float `%`.
 - Overflow, division by zero and the square root of a negative number **panic**
   (`'Fixed: overflow'`, `'Fixed: division by zero'`, `'Fixed: sqrt negative'`; the native `+`, `-`
   and unary `-` keep the corelib messages, e.g. `'i64_add Overflow'`). Nothing wraps or saturates.
@@ -76,7 +78,7 @@ let rad = 45.into::<Fixed>().to_radians();
   cost does not depend on the value of the input, only on the branch it takes.
 - **Accurate**: 1.02 ULP for `sin` / `cos` over a whole turn, 0.55 inside one octant, 1.08 at
   `1000 * TAU` (the Cody-Waite tail of `pi / 4` keeps a large angle as accurate as a small one),
-  3.22 ULP for `atan2`, 2.96 for `acos`. The polynomial accumulators carry 24 extra fractional
+  2.78 ULP for `atan2`, 2.96 for `acos`. The polynomial accumulators carry 24 extra fractional
   bits and the **final rescale rounds to nearest** (the second exception to the floor rule of
   `docs/DESIGN.md` section 2, and a free one), so the error is centred on zero.
 - **Exact where it matters**, by construction and not by luck: `sin(-x) = -sin(x)`,
@@ -138,15 +140,15 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 |---|---:|---:|---:|
 | `+` / `-` | 840 | 7 | 2 |
 | `*` | 1 680 | 14 | 4 |
-| `/` | 3 740 | 32 | 6 |
+| `/` | 4 140 | 36 | 6 |
 | `%` | 3 170 | 27 | 5 |
 | `<` | 770 | 7 | 1 |
 | `sqrt` | 2 020 | 16 | 6 |
-| `recip` | 3 370 | 29 | 5 |
+| `recip` | 3 670 | 32 | 5 |
 | `floor` | 1 310 | 11 | 3 |
 | `round` | 2 080 | 18 | 4 |
 | `lerp` | 1 980 | 17 | 4 |
-| `smoothstep` | 8 140 | 69 | 16 |
+| `smoothstep` | 8 540 | 73 | 16 |
 | `powi(5)` | 22 950 | 205 | 32 |
 
 ### Fused kernels (`fixed::wide`)
@@ -172,9 +174,9 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `sin` | 22 730 | 152 | 37 |
 | `cos` | 22 130 | 165 | 41 |
 | `sin_cos` | 31 300 | 243 | 62 |
-| `tan` | 39 850 | 287 | 70 |
-| `atan` | 22 150 | 154 | 35 |
-| `atan2` | 28 120 | 202 | 44 |
+| `tan` | 41 360 | 292 | 70 |
+| `atan` | 23 560 | 154 | 35 |
+| `atan2` | 29 630 | 207 | 44 |
 | `asin` | 27 660 | 223 | 58 |
 | `acos` | 27 390 | 215 | 56 |
 | `acos_clamped` | 28 930 | 229 | 58 |
@@ -191,7 +193,7 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `log2` | 19 520 | 160 | 37 |
 | `log10` | 19 520 | 160 | 37 |
 | `ln_1p` | 21 280 | 175 | 39 |
-| `log` | 40 710 | 327 | 72 |
+| `log` | 42 220 | 332 | 72 |
 | `powf` | 47 630 | 341 | 81 |
 
 <!-- gas:end -->

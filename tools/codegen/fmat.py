@@ -604,7 +604,7 @@ def methods(t):
          f"{T}`); the core operator traits of Cairo are homogeneous (docs/DESIGN.md section 3).",
          f"One division shared by the {N} elements (`Recip`) and one fused multiplication each, "
          "rounded to nearest: cheaper than, and up to 1 ULP away from, the element-wise "
-         "truncated `Fixed / Fixed` kept in `benches::alt`."])
+         "correctly rounded `Fixed / Fixed` kept in `benches::alt`."])
     add("mul_diagonal_scale", f"(self: {T}, scale: {V}) -> {T}",
         "Multiplies `self` by a scaling vector `scale`. This is faster than creating a whole "
         "diagonal scaling matrix and then multiplying that. This operation is commutative.",
@@ -1466,11 +1466,12 @@ def alts(t):
             "the same kernels on transposed operands."),
         Alt("div_scalar_plain", ["div_scalar"], f"(lhs: {T}, rhs: Fixed) -> {T}",
             to_free(t, body_div_scalar(t, False)),
-            f"One truncated `Fixed / Fixed` per element ({n * n} divisions) instead of the "
+            f"One correctly rounded `Fixed / Fixed` per element ({n * n} divisions) instead of the "
             "shared `Recip`."),
         Alt("inverse_plain", ["inverse", "try_inverse_some", "try_inverse_none"],
             f"(m: {T}) -> Option<{T}>", body_inverse_checked(t, False),
-            f"One truncated division per element of the adjugate ({n * n} divisions) instead of "
+            f"One correctly rounded division per element of the adjugate ({n * n} divisions) "
+            "instead of "
             "the shared `Recip`: this is the formulation of glam-rs (`m * (1 / det)`).",
             inline="never"),
     ]

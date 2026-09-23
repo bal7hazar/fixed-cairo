@@ -6,8 +6,8 @@
 //! documented stable-API fallback of the `core::internal::bounded_int` kernels.
 #[feature("bounded-int-utils")]
 use core::internal::bounded_int::{
-    self, AddHelper, BoundedInt, DivRemHelper, MulHelper, NegateHelper, SubHelper, UnitInt,
-    downcast, upcast,
+    self, AddHelper, BoundedInt, ConstrainHelper, DivRemHelper, MulHelper, NegateHelper, SubHelper,
+    UnitInt, downcast, upcast,
 };
 use core::num::traits::{Sqrt, WideMul};
 use fixed::{Fixed, FixedTrait, ONE};
@@ -79,6 +79,30 @@ pub fn powi_loop(x: Fixed, n: i32) -> Fixed {
     } else {
         acc
     }
+}
+
+/// `wide::RecipNearest` through a 96-bit reciprocal `v = floor(2^96 / |d|)`, an approximate
+/// quotient within `(-1/2, 1)` of the exact one and an exact remainder correction (see
+/// `scripts/gen_bounded.py`): bit-identical to the library, but each division costs more than a
+/// plain `div_nearest`, so the library prepares the divisor instead.
+#[derive(Copy, Drop)]
+pub struct RecipNearestRecip {
+    v: BoundedInt<0x0, 0x1000000000000000000000000>,
+    d: BoundedInt<0x0, 0x8000000000000000>,
+    neg: bool,
+}
+
+/// Prepares `d` for `recip_nearest_recip_div`.
+#[inline(always)]
+pub fn recip_nearest_recip_new(d: Fixed) -> RecipNearestRecip {
+    let (v, d, neg) = recip_nearest_recip_new_raw(d.raw);
+    RecipNearestRecip { v, d, neg }
+}
+
+/// `x / d` rounded half to even through the reciprocal of `recip_nearest_recip_new(d)`.
+#[inline(always)]
+pub fn recip_nearest_recip_div(r: RecipNearestRecip, x: Fixed) -> Fixed {
+    Fixed { raw: recip_nearest_recip_div_raw(r.v, r.d, r.neg, x.raw) }
 }
 
 impl H0 of MulHelper<i64, i64> {
@@ -224,50 +248,234 @@ impl H25 of DivRemHelper<
     type DivT = BoundedInt<0x0, 0x7fffffffffffffff00000000>;
     type RemT = BoundedInt<0x0, 0x7ffffffffffffffe>;
 }
-impl H26 of DivRemHelper<UnitInt<0xffffffffffffffff>, BoundedInt<0x1, 0x8000000000000000>> {
-    type DivT = BoundedInt<0x1, 0xffffffffffffffff>;
+impl H26 of DivRemHelper<
+    BoundedInt<0x0, 0x7fffffffffffffff00000000>, BoundedInt<0x1, 0x8000000000000000>,
+> {
+    type DivT = BoundedInt<0x0, 0x7fffffffffffffff00000000>;
     type RemT = BoundedInt<0x0, 0x7fffffffffffffff>;
 }
-impl H27 of MulHelper<BoundedInt<0x1, 0xffffffffffffffff>, UnitInt<-0x1>> {
-    type Result = BoundedInt<-0xffffffffffffffff, -0x1>;
+impl H27 of MulHelper<BoundedInt<0x0, 0x7fffffffffffffff00000000>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x7fffffffffffffff00000000, 0x0>;
 }
-impl H28 of SubHelper<BoundedInt<-0xffffffffffffffff, -0x1>, UnitInt<0x1>> {
+impl H28 of DivRemHelper<
+    BoundedInt<0x100000000, 0x800000000000000000000000>, BoundedInt<0x0, 0x7fffffffffffffff>,
+> {
+    type DivT = BoundedInt<0x0, 0x800000000000000000000000>;
+    type RemT = BoundedInt<0x0, 0x7ffffffffffffffe>;
+}
+impl H29 of MulHelper<BoundedInt<0x0, 0x800000000000000000000000>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x800000000000000000000000, 0x0>;
+}
+impl H30 of DivRemHelper<UnitInt<0x10000000000000000>, BoundedInt<0x1, 0x8000000000000000>> {
+    type DivT = BoundedInt<0x2, 0x10000000000000000>;
+    type RemT = BoundedInt<0x0, 0x7fffffffffffffff>;
+}
+impl H31 of MulHelper<BoundedInt<0x2, 0x10000000000000000>, UnitInt<-0x1>> {
     type Result = BoundedInt<-0x10000000000000000, -0x2>;
 }
-impl H29 of DivRemHelper<UnitInt<0x10000000000000000>, BoundedInt<0x0, 0x7fffffffffffffff>> {
+impl H32 of DivRemHelper<UnitInt<0x10000000000000000>, BoundedInt<0x0, 0x7fffffffffffffff>> {
     type DivT = BoundedInt<0x2, 0x10000000000000000>;
     type RemT = BoundedInt<0x0, 0x7ffffffffffffffe>;
 }
-impl H30 of DivRemHelper<
+impl H33 of DivRemHelper<UnitInt<0xffffffffffffffff>, BoundedInt<0x1, 0x8000000000000000>> {
+    type DivT = BoundedInt<0x1, 0xffffffffffffffff>;
+    type RemT = BoundedInt<0x0, 0x7fffffffffffffff>;
+}
+impl H34 of MulHelper<BoundedInt<0x1, 0xffffffffffffffff>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0xffffffffffffffff, -0x1>;
+}
+impl H35 of SubHelper<BoundedInt<-0xffffffffffffffff, -0x1>, UnitInt<0x1>> {
+    type Result = BoundedInt<-0x10000000000000000, -0x2>;
+}
+impl H36 of DivRemHelper<
     BoundedInt<0x0, 0x800000000000000000000000>, BoundedInt<0x0, 0x7fffffffffffffff>,
 > {
     type DivT = BoundedInt<0x0, 0x800000000000000000000000>;
     type RemT = BoundedInt<0x0, 0x7ffffffffffffffe>;
 }
-impl H31 of DivRemHelper<
+impl H37 of DivRemHelper<
     BoundedInt<0x0, 0x800000000000000000000000>, BoundedInt<0x1, 0x8000000000000000>,
 > {
     type DivT = BoundedInt<0x0, 0x800000000000000000000000>;
     type RemT = BoundedInt<0x0, 0x7fffffffffffffff>;
 }
-impl H32 of MulHelper<BoundedInt<0x0, 0x800000000000000000000000>, UnitInt<-0x1>> {
-    type Result = BoundedInt<-0x800000000000000000000000, 0x0>;
+impl H38 of MulHelper<BoundedInt<0x0, 0x7fffffffffffffff>, UnitInt<0x2>> {
+    type Result = BoundedInt<0x0, 0xfffffffffffffffe>;
 }
-impl H33 of AddHelper<BoundedInt<0x1, 0x8000000000000000>, UnitInt<0x80000000>> {
+impl H39 of SubHelper<BoundedInt<0x0, 0xfffffffffffffffe>, BoundedInt<0x1, 0x8000000000000000>> {
+    type Result = BoundedInt<-0x8000000000000000, 0xfffffffffffffffd>;
+}
+impl H40 of ConstrainHelper<BoundedInt<-0x8000000000000000, 0xfffffffffffffffd>, 0> {
+    type LowT = BoundedInt<-0x8000000000000000, -0x1>;
+    type HighT = BoundedInt<0x0, 0xfffffffffffffffd>;
+}
+impl H41 of DivRemHelper<BoundedInt<0x0, 0x800000000000000000000000>, UnitInt<0x2>> {
+    type DivT = BoundedInt<0x0, 0x400000000000000000000000>;
+    type RemT = BoundedInt<0x0, 0x1>;
+}
+impl H42 of AddHelper<BoundedInt<0x0, 0x800000000000000000000000>, BoundedInt<0x0, 0x1>> {
+    type Result = BoundedInt<0x0, 0x800000000000000000000001>;
+}
+impl H43 of AddHelper<BoundedInt<0x0, 0x800000000000000000000000>, UnitInt<0x1>> {
+    type Result = BoundedInt<0x1, 0x800000000000000000000001>;
+}
+impl H44 of DivRemHelper<BoundedInt<0x0, 0x7fffffffffffffff00000000>, UnitInt<0x2>> {
+    type DivT = BoundedInt<0x0, 0x3fffffffffffffff80000000>;
+    type RemT = BoundedInt<0x0, 0x1>;
+}
+impl H45 of AddHelper<BoundedInt<0x0, 0x7fffffffffffffff00000000>, BoundedInt<0x0, 0x1>> {
+    type Result = BoundedInt<0x0, 0x7fffffffffffffff00000001>;
+}
+impl H46 of MulHelper<BoundedInt<0x0, 0x7fffffffffffffff00000001>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x7fffffffffffffff00000001, 0x0>;
+}
+impl H47 of AddHelper<BoundedInt<0x0, 0x7fffffffffffffff00000000>, UnitInt<0x1>> {
+    type Result = BoundedInt<0x1, 0x7fffffffffffffff00000001>;
+}
+impl H48 of MulHelper<BoundedInt<0x1, 0x7fffffffffffffff00000001>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x7fffffffffffffff00000001, -0x1>;
+}
+impl H49 of MulHelper<BoundedInt<0x0, 0x7ffffffffffffffe>, UnitInt<0x2>> {
+    type Result = BoundedInt<0x0, 0xfffffffffffffffc>;
+}
+impl H50 of SubHelper<BoundedInt<0x0, 0xfffffffffffffffc>, BoundedInt<0x0, 0x7fffffffffffffff>> {
+    type Result = BoundedInt<-0x7fffffffffffffff, 0xfffffffffffffffc>;
+}
+impl H51 of ConstrainHelper<BoundedInt<-0x7fffffffffffffff, 0xfffffffffffffffc>, 0> {
+    type LowT = BoundedInt<-0x7fffffffffffffff, -0x1>;
+    type HighT = BoundedInt<0x0, 0xfffffffffffffffc>;
+}
+impl H52 of MulHelper<BoundedInt<0x0, 0x800000000000000000000001>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x800000000000000000000001, 0x0>;
+}
+impl H53 of MulHelper<BoundedInt<0x1, 0x800000000000000000000001>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x800000000000000000000001, -0x1>;
+}
+impl H54 of DivRemHelper<BoundedInt<0x2, 0x10000000000000000>, UnitInt<0x2>> {
+    type DivT = BoundedInt<0x1, 0x8000000000000000>;
+    type RemT = BoundedInt<0x0, 0x1>;
+}
+impl H55 of AddHelper<BoundedInt<0x2, 0x10000000000000000>, BoundedInt<0x0, 0x1>> {
+    type Result = BoundedInt<0x2, 0x10000000000000001>;
+}
+impl H56 of MulHelper<BoundedInt<0x2, 0x10000000000000001>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x10000000000000001, -0x2>;
+}
+impl H57 of AddHelper<BoundedInt<0x2, 0x10000000000000000>, UnitInt<0x1>> {
+    type Result = BoundedInt<0x3, 0x10000000000000001>;
+}
+impl H58 of MulHelper<BoundedInt<0x3, 0x10000000000000001>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x10000000000000001, -0x3>;
+}
+impl H59 of DivRemHelper<
+    UnitInt<0x1000000000000000000000000>, BoundedInt<0x1, 0x8000000000000000>,
+> {
+    type DivT = BoundedInt<0x200000000, 0x1000000000000000000000000>;
+    type RemT = BoundedInt<0x0, 0x7fffffffffffffff>;
+}
+impl H60 of DivRemHelper<
+    UnitInt<0x1000000000000000000000000>, BoundedInt<0x0, 0x7fffffffffffffff>,
+> {
+    type DivT = BoundedInt<0x200000000, 0x1000000000000000000000000>;
+    type RemT = BoundedInt<0x0, 0x7ffffffffffffffe>;
+}
+impl H61 of DivRemHelper<u128, UnitInt<0x10000000000000000>> {
+    type DivT = BoundedInt<0x0, 0xffffffffffffffff>;
+    type RemT = BoundedInt<0x0, 0xffffffffffffffff>;
+}
+impl H62 of MulHelper<BoundedInt<0x0, 0xffffffffffffffff>, BoundedInt<0x0, 0x8000000000000000>> {
+    type Result = BoundedInt<0x0, 0x7fffffffffffffff8000000000000000>;
+}
+impl H63 of SubHelper<
+    BoundedInt<0x100000000, 0x800000000000000000000000>,
+    BoundedInt<0x0, 0x7fffffffffffffff8000000000000000>,
+> {
+    type Result = BoundedInt<-0x7fffffffffffffff7fffffff00000000, 0x800000000000000000000000>;
+}
+impl H64 of MulHelper<
+    BoundedInt<-0x7fffffffffffffff7fffffff00000000, 0x800000000000000000000000>, UnitInt<0x2>,
+> {
+    type Result = BoundedInt<-0xfffffffffffffffefffffffe00000000, 0x1000000000000000000000000>;
+}
+impl H65 of SubHelper<
+    BoundedInt<-0xfffffffffffffffefffffffe00000000, 0x1000000000000000000000000>,
+    BoundedInt<0x0, 0x8000000000000000>,
+> {
+    type Result = BoundedInt<-0xffffffffffffffff7ffffffe00000000, 0x1000000000000000000000000>;
+}
+impl H66 of ConstrainHelper<
+    BoundedInt<-0xffffffffffffffff7ffffffe00000000, 0x1000000000000000000000000>, 0,
+> {
+    type LowT = BoundedInt<-0xffffffffffffffff7ffffffe00000000, -0x1>;
+    type HighT = BoundedInt<0x0, 0x1000000000000000000000000>;
+}
+impl H67 of DivRemHelper<BoundedInt<0x0, 0xffffffffffffffff>, UnitInt<0x2>> {
+    type DivT = BoundedInt<0x0, 0x7fffffffffffffff>;
+    type RemT = BoundedInt<0x0, 0x1>;
+}
+impl H68 of MulHelper<
+    BoundedInt<0x1, 0x8000000000000000>, BoundedInt<0x0, 0x1000000000000000000000000>,
+> {
+    type Result = BoundedInt<0x0, 0x8000000000000000000000000000000000000000>;
+}
+impl H69 of AddHelper<BoundedInt<0x0, 0xffffffffffffffff>, BoundedInt<0x0, 0x1>> {
+    type Result = BoundedInt<0x0, 0x10000000000000000>;
+}
+impl H70 of AddHelper<BoundedInt<0x0, 0xffffffffffffffff>, UnitInt<0x1>> {
+    type Result = BoundedInt<0x1, 0x10000000000000000>;
+}
+impl H71 of SubHelper<
+    BoundedInt<0x0, 0x7fffffffffffffff00000000>,
+    BoundedInt<0x0, 0x7fffffffffffffff8000000000000000>,
+> {
+    type Result = BoundedInt<-0x7fffffffffffffff8000000000000000, 0x7fffffffffffffff00000000>;
+}
+impl H72 of MulHelper<
+    BoundedInt<-0x7fffffffffffffff8000000000000000, 0x7fffffffffffffff00000000>, UnitInt<0x2>,
+> {
+    type Result = BoundedInt<-0xffffffffffffffff0000000000000000, 0xfffffffffffffffe00000000>;
+}
+impl H73 of SubHelper<
+    BoundedInt<-0xffffffffffffffff0000000000000000, 0xfffffffffffffffe00000000>,
+    BoundedInt<0x0, 0x8000000000000000>,
+> {
+    type Result = BoundedInt<-0xffffffffffffffff8000000000000000, 0xfffffffffffffffe00000000>;
+}
+impl H74 of ConstrainHelper<
+    BoundedInt<-0xffffffffffffffff8000000000000000, 0xfffffffffffffffe00000000>, 0,
+> {
+    type LowT = BoundedInt<-0xffffffffffffffff8000000000000000, -0x1>;
+    type HighT = BoundedInt<0x0, 0xfffffffffffffffe00000000>;
+}
+impl H75 of MulHelper<
+    BoundedInt<0x0, 0x7fffffffffffffff>, BoundedInt<0x0, 0x1000000000000000000000000>,
+> {
+    type Result = BoundedInt<0x0, 0x7fffffffffffffff000000000000000000000000>;
+}
+impl H76 of MulHelper<BoundedInt<0x0, 0xffffffffffffffff>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0xffffffffffffffff, 0x0>;
+}
+impl H77 of MulHelper<BoundedInt<0x0, 0x10000000000000000>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x10000000000000000, 0x0>;
+}
+impl H78 of MulHelper<BoundedInt<0x1, 0x10000000000000000>, UnitInt<-0x1>> {
+    type Result = BoundedInt<-0x10000000000000000, -0x1>;
+}
+impl H79 of AddHelper<BoundedInt<0x1, 0x8000000000000000>, UnitInt<0x80000000>> {
     type Result = BoundedInt<0x80000001, 0x8000000080000000>;
 }
-impl H34 of DivRemHelper<BoundedInt<0x80000001, 0x8000000080000000>, UnitInt<0x100000000>> {
+impl H80 of DivRemHelper<BoundedInt<0x80000001, 0x8000000080000000>, UnitInt<0x100000000>> {
     type DivT = BoundedInt<0x0, 0x80000000>;
     type RemT = BoundedInt<0x0, 0xffffffff>;
 }
-impl H35 of AddHelper<BoundedInt<0x0, 0x7fffffffffffffff>, UnitInt<0x80000000>> {
+impl H81 of AddHelper<BoundedInt<0x0, 0x7fffffffffffffff>, UnitInt<0x80000000>> {
     type Result = BoundedInt<0x80000000, 0x800000007fffffff>;
 }
-impl H36 of DivRemHelper<BoundedInt<0x80000000, 0x800000007fffffff>, UnitInt<0x100000000>> {
+impl H82 of DivRemHelper<BoundedInt<0x80000000, 0x800000007fffffff>, UnitInt<0x100000000>> {
     type DivT = BoundedInt<0x0, 0x80000000>;
     type RemT = BoundedInt<0x0, 0xffffffff>;
 }
-impl H37 of MulHelper<BoundedInt<0x0, 0x80000000>, UnitInt<0x100000000>> {
+impl H83 of MulHelper<BoundedInt<0x0, 0x80000000>, UnitInt<0x100000000>> {
     type Result = BoundedInt<0x0, 0x8000000000000000>;
 }
 /// Unwraps `o` or panics with `Fixed: overflow` (out-of-line `panic_with_const_felt252`).
@@ -392,6 +600,61 @@ fn div_floor_raw(a: i64, b: i64) -> i64 {
         },
     }
 }
+/// `trunc((a * 2^32) / b)`: rounds toward zero, like the corelib signed division (the `/` of
+/// `fixed` up to 0.2; 400 gas less than round half to even).
+#[inline(always)]
+fn div_trunc_raw(a: i64, b: i64) -> i64 {
+    let b_nz: NonZero<i64> = or_division_by_zero(b.try_into());
+    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {
+        Ok(bn) => {
+            let dn = bn.negate();
+            match bounded_int::constrain::<i64, 0>(a) {
+                Ok(n) => {
+                    let num = bounded_int::mul::<_, UnitInt<0x100000000>>(n.negate(), 0x100000000);
+                    let (q, _r) = bounded_int::div_rem(num, dn);
+                    or_overflow(downcast(q))
+                },
+                Err(p) => {
+                    let num = bounded_int::mul::<_, UnitInt<0x100000000>>(p, 0x100000000);
+                    let (q, _r) = bounded_int::div_rem(num, dn);
+                    or_overflow(downcast(q.negate()))
+                },
+            }
+        },
+        Err(dp) => {
+            match bounded_int::constrain::<i64, 0>(a) {
+                Ok(n) => {
+                    let num = bounded_int::mul::<_, UnitInt<0x100000000>>(n.negate(), 0x100000000);
+                    let (q, _r) = bounded_int::div_rem(num, dp);
+                    or_overflow(downcast(q.negate()))
+                },
+                Err(p) => {
+                    let num = bounded_int::mul::<_, UnitInt<0x100000000>>(p, 0x100000000);
+                    let (q, _r) = bounded_int::div_rem(num, dp);
+                    or_overflow(downcast(q))
+                },
+            }
+        },
+    }
+}
+/// `trunc(2^64 / b)`: the reciprocal rounded toward zero (`recip` up to 0.2).
+#[inline(always)]
+fn recip_trunc_raw(b: i64) -> i64 {
+    let b_nz: NonZero<i64> = or_division_by_zero(b.try_into());
+    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {
+        Ok(bn) => {
+            let dn = bn.negate();
+            let c: UnitInt<0x10000000000000000> = 0x10000000000000000;
+            let (q, _r) = bounded_int::div_rem(c, dn);
+            or_overflow(downcast(q.negate()))
+        },
+        Err(dp) => {
+            let c: UnitInt<0x10000000000000000> = 0x10000000000000000;
+            let (q, _r) = bounded_int::div_rem(c, dp);
+            or_overflow(downcast(q))
+        },
+    }
+}
 /// `floor(2^64 / b)`: reciprocal rounded toward negative infinity.
 #[inline(always)]
 fn recip_floor_raw(b: i64) -> i64 {
@@ -441,6 +704,280 @@ fn div_trunc_flat_raw(a: i64, b: i64) -> i64 {
         or_overflow(downcast(q))
     }
 }
+/// `round_half_even((a * 2^32) / b)` with the `cmp` rounding step.
+#[inline(always)]
+fn div_nearest_cmp_raw(a: i64, b: i64) -> i64 {
+    let b_nz: NonZero<i64> = or_division_by_zero(b.try_into());
+    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {
+        Ok(bn) => {
+            let dn = bn.negate();
+            match bounded_int::constrain::<i64, 0>(a) {
+                Ok(n) => {
+                    let num: BoundedInt<0x100000000, 0x800000000000000000000000> =
+                        bounded_int::mul::<
+                        _, UnitInt<0x100000000>,
+                    >(n.negate(), 0x100000000);
+                    let dv: BoundedInt<0x1, 0x8000000000000000> = dn.into();
+                    let (q, r) = bounded_int::div_rem(num, dn);
+                    let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(r, 0x2), dv);
+                    match bounded_int::constrain::<
+                        BoundedInt<-0x8000000000000000, 0xfffffffffffffffd>, 0,
+                    >(c) {
+                        Ok(_) => or_overflow(downcast(q)),
+                        Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                            let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q, 0x2);
+                            or_overflow(downcast(bounded_int::add(q, p)))
+                        } else {
+                            or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q, 0x1)))
+                        },
+                    }
+                },
+                Err(p) => {
+                    let num: BoundedInt<0x0, 0x7fffffffffffffff00000000> = bounded_int::mul::<
+                        _, UnitInt<0x100000000>,
+                    >(p, 0x100000000);
+                    let dv: BoundedInt<0x1, 0x8000000000000000> = dn.into();
+                    let (q, r) = bounded_int::div_rem(num, dn);
+                    let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(r, 0x2), dv);
+                    match bounded_int::constrain::<
+                        BoundedInt<-0x8000000000000000, 0xfffffffffffffffd>, 0,
+                    >(c) {
+                        Ok(_) => or_overflow(downcast(q.negate())),
+                        Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                            let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q, 0x2);
+                            or_overflow(downcast(bounded_int::add(q, p).negate()))
+                        } else {
+                            or_overflow(
+                                downcast(bounded_int::add::<_, UnitInt<0x1>>(q, 0x1).negate()),
+                            )
+                        },
+                    }
+                },
+            }
+        },
+        Err(dp) => {
+            match bounded_int::constrain::<i64, 0>(a) {
+                Ok(n) => {
+                    let num: BoundedInt<0x100000000, 0x800000000000000000000000> =
+                        bounded_int::mul::<
+                        _, UnitInt<0x100000000>,
+                    >(n.negate(), 0x100000000);
+                    let dv: BoundedInt<0x0, 0x7fffffffffffffff> = dp.into();
+                    let (q, r) = bounded_int::div_rem(num, dp);
+                    let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(r, 0x2), dv);
+                    match bounded_int::constrain::<
+                        BoundedInt<-0x7fffffffffffffff, 0xfffffffffffffffc>, 0,
+                    >(c) {
+                        Ok(_) => or_overflow(downcast(q.negate())),
+                        Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                            let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q, 0x2);
+                            or_overflow(downcast(bounded_int::add(q, p).negate()))
+                        } else {
+                            or_overflow(
+                                downcast(bounded_int::add::<_, UnitInt<0x1>>(q, 0x1).negate()),
+                            )
+                        },
+                    }
+                },
+                Err(p) => {
+                    let num: BoundedInt<0x0, 0x7fffffffffffffff00000000> = bounded_int::mul::<
+                        _, UnitInt<0x100000000>,
+                    >(p, 0x100000000);
+                    let dv: BoundedInt<0x0, 0x7fffffffffffffff> = dp.into();
+                    let (q, r) = bounded_int::div_rem(num, dp);
+                    let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(r, 0x2), dv);
+                    match bounded_int::constrain::<
+                        BoundedInt<-0x7fffffffffffffff, 0xfffffffffffffffc>, 0,
+                    >(c) {
+                        Ok(_) => or_overflow(downcast(q)),
+                        Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                            let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q, 0x2);
+                            or_overflow(downcast(bounded_int::add(q, p)))
+                        } else {
+                            or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q, 0x1)))
+                        },
+                    }
+                },
+            }
+        },
+    }
+}
+/// `round_half_even(2^64 / b)` with the `cmp` rounding step.
+#[inline(always)]
+fn recip_nearest_cmp_raw(b: i64) -> i64 {
+    let b_nz: NonZero<i64> = or_division_by_zero(b.try_into());
+    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {
+        Ok(bn) => {
+            let dn = bn.negate();
+            let num: UnitInt<0x10000000000000000> = 0x10000000000000000;
+            let dv: BoundedInt<0x1, 0x8000000000000000> = dn.into();
+            let (q, r) = bounded_int::div_rem(num, dn);
+            let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(r, 0x2), dv);
+            match bounded_int::constrain::<
+                BoundedInt<-0x8000000000000000, 0xfffffffffffffffd>, 0,
+            >(c) {
+                Ok(_) => or_overflow(downcast(q.negate())),
+                Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                    let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q, 0x2);
+                    or_overflow(downcast(bounded_int::add(q, p).negate()))
+                } else {
+                    or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q, 0x1).negate()))
+                },
+            }
+        },
+        Err(dp) => {
+            let num: UnitInt<0x10000000000000000> = 0x10000000000000000;
+            let dv: BoundedInt<0x0, 0x7fffffffffffffff> = dp.into();
+            let (q, r) = bounded_int::div_rem(num, dp);
+            let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(r, 0x2), dv);
+            match bounded_int::constrain::<
+                BoundedInt<-0x7fffffffffffffff, 0xfffffffffffffffc>, 0,
+            >(c) {
+                Ok(_) => or_overflow(downcast(q)),
+                Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                    let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q, 0x2);
+                    or_overflow(downcast(bounded_int::add(q, p)))
+                } else {
+                    or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q, 0x1)))
+                },
+            }
+        },
+    }
+}
+/// `(floor(2^96 / |b|), |b|, b < 0)`: the divisor of `recip_nearest_recip_div_raw`.
+#[inline(always)]
+fn recip_nearest_recip_new_raw(
+    b: i64,
+) -> (BoundedInt<0x0, 0x1000000000000000000000000>, BoundedInt<0x0, 0x8000000000000000>, bool) {
+    let b_nz: NonZero<i64> = or_division_by_zero(b.try_into());
+    let c: UnitInt<0x1000000000000000000000000> = 0x1000000000000000000000000;
+    match bounded_int::constrain::<NonZero<i64>, 0>(b_nz) {
+        Ok(bn) => {
+            let dn = bn.negate();
+            let (q, _r) = bounded_int::div_rem(c, dn);
+            let dv: BoundedInt<0x1, 0x8000000000000000> = dn.into();
+            (upcast(q), upcast(dv), true)
+        },
+        Err(dp) => {
+            let (q, _r) = bounded_int::div_rem(c, dp);
+            let dv: BoundedInt<0x0, 0x7fffffffffffffff> = dp.into();
+            (upcast(q), upcast(dv), false)
+        },
+    }
+}
+/// `round_half_even(x * 2^32 / b)` from `recip_nearest_recip_new_raw(b)`: bit-identical to
+/// `div_nearest(x, b)` (one approximate quotient through `v`, one exact remainder check).
+#[inline(always)]
+fn recip_nearest_recip_div_raw(
+    v: BoundedInt<0x0, 0x1000000000000000000000000>,
+    d: BoundedInt<0x0, 0x8000000000000000>,
+    neg: bool,
+    x: i64,
+) -> i64 {
+    if neg {
+        match bounded_int::constrain::<i64, 0>(x) {
+            Ok(n) => {
+                let ax: BoundedInt<0x1, 0x8000000000000000> = n.negate();
+                let f: felt252 = upcast(bounded_int::mul(ax, v)) + 0x7fffffffffffffff;
+                let u: u128 = or_overflow(f.try_into());
+                let (q0, _r) = bounded_int::div_rem::<
+                    _, UnitInt<0x10000000000000000>,
+                >(u, 0x10000000000000000);
+                let e = bounded_int::sub(
+                    bounded_int::mul::<_, UnitInt<0x100000000>>(ax, 0x100000000),
+                    bounded_int::mul(q0, d),
+                );
+                let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(e, 0x2), d);
+                match bounded_int::constrain::<
+                    BoundedInt<-0xffffffffffffffff7ffffffe00000000, 0x1000000000000000000000000>, 0,
+                >(c) {
+                    Ok(_) => or_overflow(downcast(q0)),
+                    Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                        let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q0, 0x2);
+                        or_overflow(downcast(bounded_int::add(q0, p)))
+                    } else {
+                        or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q0, 0x1)))
+                    },
+                }
+            },
+            Err(p) => {
+                let ax: BoundedInt<0x0, 0x7fffffffffffffff> = p;
+                let f: felt252 = upcast(bounded_int::mul(ax, v)) + 0x7fffffffffffffff;
+                let u: u128 = or_overflow(f.try_into());
+                let (q0, _r) = bounded_int::div_rem::<
+                    _, UnitInt<0x10000000000000000>,
+                >(u, 0x10000000000000000);
+                let e = bounded_int::sub(
+                    bounded_int::mul::<_, UnitInt<0x100000000>>(ax, 0x100000000),
+                    bounded_int::mul(q0, d),
+                );
+                let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(e, 0x2), d);
+                match bounded_int::constrain::<
+                    BoundedInt<-0xffffffffffffffff8000000000000000, 0xfffffffffffffffe00000000>, 0,
+                >(c) {
+                    Ok(_) => or_overflow(downcast(q0.negate())),
+                    Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                        let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q0, 0x2);
+                        or_overflow(downcast(bounded_int::add(q0, p).negate()))
+                    } else {
+                        or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q0, 0x1).negate()))
+                    },
+                }
+            },
+        }
+    } else {
+        match bounded_int::constrain::<i64, 0>(x) {
+            Ok(n) => {
+                let ax: BoundedInt<0x1, 0x8000000000000000> = n.negate();
+                let f: felt252 = upcast(bounded_int::mul(ax, v)) + 0x7fffffffffffffff;
+                let u: u128 = or_overflow(f.try_into());
+                let (q0, _r) = bounded_int::div_rem::<
+                    _, UnitInt<0x10000000000000000>,
+                >(u, 0x10000000000000000);
+                let e = bounded_int::sub(
+                    bounded_int::mul::<_, UnitInt<0x100000000>>(ax, 0x100000000),
+                    bounded_int::mul(q0, d),
+                );
+                let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(e, 0x2), d);
+                match bounded_int::constrain::<
+                    BoundedInt<-0xffffffffffffffff7ffffffe00000000, 0x1000000000000000000000000>, 0,
+                >(c) {
+                    Ok(_) => or_overflow(downcast(q0.negate())),
+                    Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                        let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q0, 0x2);
+                        or_overflow(downcast(bounded_int::add(q0, p).negate()))
+                    } else {
+                        or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q0, 0x1).negate()))
+                    },
+                }
+            },
+            Err(p) => {
+                let ax: BoundedInt<0x0, 0x7fffffffffffffff> = p;
+                let f: felt252 = upcast(bounded_int::mul(ax, v)) + 0x7fffffffffffffff;
+                let u: u128 = or_overflow(f.try_into());
+                let (q0, _r) = bounded_int::div_rem::<
+                    _, UnitInt<0x10000000000000000>,
+                >(u, 0x10000000000000000);
+                let e = bounded_int::sub(
+                    bounded_int::mul::<_, UnitInt<0x100000000>>(ax, 0x100000000),
+                    bounded_int::mul(q0, d),
+                );
+                let c = bounded_int::sub(bounded_int::mul::<_, UnitInt<0x2>>(e, 0x2), d);
+                match bounded_int::constrain::<
+                    BoundedInt<-0xffffffffffffffff8000000000000000, 0xfffffffffffffffe00000000>, 0,
+                >(c) {
+                    Ok(_) => or_overflow(downcast(q0)),
+                    Err(nn) => if Into::<_, felt252>::into(nn) == 0 {
+                        let (_h, p) = bounded_int::div_rem::<_, UnitInt<0x2>>(q0, 0x2);
+                        or_overflow(downcast(bounded_int::add(q0, p)))
+                    } else {
+                        or_overflow(downcast(bounded_int::add::<_, UnitInt<0x1>>(q0, 0x1)))
+                    },
+                }
+            },
+        }
+    }
+}
 /// `|x|` with a `downcast` (one more range check than `trim_max`).
 #[inline(always)]
 fn abs_downcast_raw(x: i64) -> i64 {
@@ -488,6 +1025,16 @@ pub fn mul_bias_downcast(a: Fixed, b: Fixed) -> Fixed {
 pub fn div_floor(a: Fixed, b: Fixed) -> Fixed {
     Fixed { raw: div_floor_raw(a.raw, b.raw) }
 }
+/// Truncated `div` (up to 0.2).
+#[inline(always)]
+pub fn div_trunc(a: Fixed, b: Fixed) -> Fixed {
+    Fixed { raw: div_trunc_raw(a.raw, b.raw) }
+}
+/// Truncated `recip` (up to 0.2).
+#[inline(always)]
+pub fn recip_trunc(b: Fixed) -> Fixed {
+    Fixed { raw: recip_trunc_raw(b.raw) }
+}
 /// Flat sign-split `div`.
 #[inline(always)]
 pub fn div_trunc_flat(a: Fixed, b: Fixed) -> Fixed {
@@ -497,6 +1044,16 @@ pub fn div_trunc_flat(a: Fixed, b: Fixed) -> Fixed {
 #[inline(always)]
 pub fn recip_floor(b: Fixed) -> Fixed {
     Fixed { raw: recip_floor_raw(b.raw) }
+}
+/// `div_nearest` with the `cmp` rounding step.
+#[inline(always)]
+pub fn div_nearest_cmp(a: Fixed, b: Fixed) -> Fixed {
+    Fixed { raw: div_nearest_cmp_raw(a.raw, b.raw) }
+}
+/// `recip_nearest` with the `cmp` rounding step.
+#[inline(always)]
+pub fn recip_nearest_cmp(b: Fixed) -> Fixed {
+    Fixed { raw: recip_nearest_cmp_raw(b.raw) }
 }
 /// `abs` with `downcast`.
 #[inline(always)]

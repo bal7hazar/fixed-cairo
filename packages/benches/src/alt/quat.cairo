@@ -80,7 +80,7 @@ pub fn from_axis_angle_two_calls(axis: Vec3, angle: Fixed) -> Quat {
     Quat { x: axis.x * s, y: axis.y * s, z: axis.z * s, w: h.cos() }
 }
 
-/// Alternative to the `s / sin(theta)` of `Quat::slerp`. A truncated `Fixed` reciprocal followed
+/// Alternative to the `s / sin(theta)` of `Quat::slerp`. A rounded `Fixed` reciprocal followed
 /// by four multiplications, as glam-rs spells it, instead of the shared wide `Recip`:
 /// 130 750 gas against 122 180, and up to 1 ULP further from the exact quotient.
 #[inline(always)]
@@ -275,7 +275,7 @@ pub fn is_near_identity_angle(lhs: Quat) -> bool {
 }
 
 /// Alternative to `Quat::from_rotation_axes`. The literal glam-rs `0.5 / sqrt(four_csq)` as a
-/// truncated `Fixed` division followed by four multiplications, instead of the shared wide
+/// rounded `Fixed` division followed by four multiplications, instead of the shared wide
 /// `Recip` of `2 sqrt(four_csq)`: two roundings per component instead of one.
 #[inline(never)]
 pub fn from_rotation_axes_fixed_recip(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Quat {

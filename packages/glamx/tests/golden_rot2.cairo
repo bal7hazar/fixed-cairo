@@ -635,8 +635,7 @@ fn golden_rot2_angle_between() {
     }
 }
 // rot2::rotate_towards: 13 cases, tolerance 16 ULP - the non-target branch is `slerp(max_angle /
-// angle)` with one truncated division added to the slerp error; branch-boundary cases are
-// skipped.
+// angle)` with one rounded division added to the slerp error; branch-boundary cases are skipped.
 #[cairofmt::skip]
 const ROTATE_TOWARDS_CASES: [i64; 91] = [
     4294967296, 0, 0, 4294967296, 0, 4294967296, 0,

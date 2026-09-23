@@ -7,7 +7,7 @@
 //! The expected values of the tables are produced by `scripts/gen_trig.py tables`, whose Python
 //! mirror reproduces the Cairo code operation by operation; the mirror itself is swept against
 //! 60-digit references by `scripts/gen_trig.py sweep` (max 1.02 ULP for `sin` / `cos` over a
-//! turn, 3.22 ULP for `atan2`, 2.96 ULP for `acos`). The tables therefore pin the **bit-exact**
+//! turn, 2.78 ULP for `atan2`, 2.96 ULP for `acos`). The tables therefore pin the **bit-exact**
 //! results - they are API, a change of any of them is a breaking change - while the sweep is what
 //! proves them correct. The tolerances used by the property tests below are derived from those
 //! figures.
@@ -177,7 +177,7 @@ fn test_sin_cos_table() {
 const TAN: [(i64, i64); 9] = [
     (0x0, 0x0), (0x1, 0x1), (-0x1, -0x1), (0x100000000, 0x18eb245cd), (-0x100000000, -0x18eb245cd),
     (0xc90fdaa2, 0x100000000), (-0xc90fdaa2, -0x100000000), (0x3243f6a89, 0x0),
-    (0x55555555, 0x58a41296),
+    (0x55555555, 0x58a41297),
 ];
 
 #[test]
@@ -331,7 +331,8 @@ fn test_to_degrees_overflow_panics() {
 // ------------------------------------------------------------------ properties (seeded fuzzing)
 
 /// Tolerances in ULP, from the sweeps of `scripts/gen_trig.py`: 1.02 for `sin` / `cos`, 3.22 for
-/// `atan2`, 3.50 for `acos`. `sin^2 + cos^2` accumulates `2 (|ds| + |dc|) + 1`, rounded up to 16.
+/// `atan2` (2.78 since `/` rounds to nearest: the bound is kept), 3.50 for `acos`. `sin^2 + cos^2`
+/// accumulates `2 (|ds| + |dc|) + 1`, rounded up to 16.
 const TOL_PYTHAGORAS: i128 = 16;
 const TOL_ROUNDTRIP: i128 = 24;
 

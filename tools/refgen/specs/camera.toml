@@ -2,17 +2,18 @@
 # Oracles: tools/refgen/src/oracles/camera.rs. Format: tools/refgen/README.md.
 # Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen camera
 #
-# Tolerances (raw ULP, the Cairo side truncates / floors, the oracle rounds to nearest):
+# Tolerances (raw ULP, the Cairo side rounds divisions to nearest / floors products, the oracle
+# rounds to nearest):
 #
 # * `perspective*`: `yy = cot(fov / 2)` is one `sin_cos` (<= 1.02 ULP, 0.86 for cos), the half angle
-#   `fov * 0.5` floors (<= 1 ULP, moving `cot` by `1 + cot^2`) and one truncated division. On
+#   `fov * 0.5` floors (<= 1 ULP, moving `cot` by `1 + cot^2`) and one rounded division. On
 #   `fov` in [1.0, 2.6], `cot <= 1.83` and `sin(fov / 2) >= 0.479`, so `|yy - exact| <=
 #   (0.86 + 1.83 * 1.02) / 0.479 + (1 + 1.83^2) + 1 = 11.1`, and `xx = yy / aspect` (aspect >= 0.5,
-#   one truncation) is within `11.1 / 0.5 + 1 = 23.2`: with the oracle's own rounding (0.5), 24.
+#   one rounding) is within `11.1 / 0.5 + 1 = 23.2`: with the oracle's own rounding (0.5), 24.
 #   The depth terms are those of `frustum` below (<= 17); `zz`, `zw` and `tz` of the infinite ones
 #   are exact.
 # * `frustum`: `xx`, `yy`, `zx`, `zy` are `Recip` quotients rounded to nearest: 1 ULP. Depth:
-#   `q = far / (far - near)` truncated (error < 1 ULP), `zz = q` (<= 1 with the oracle's rounding),
+#   `q = far / (far - near)` rounded (error <= 1/2 ULP), `zz = q` (<= 1 with the oracle's rounding),
 #   `zz = 2 q - 1` (<= 2), `tz = floor(-near * q)` (< `near + 1 + 0.5`: 9 for `near <= 8`) and
 #   `tz = floor(-2 near q)` (< `2 near + 1 + 0.5`: 17).
 # * `orthographic`: every element is one `Recip` quotient rounded to nearest: 1 ULP.
@@ -34,7 +35,7 @@ args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, m
 ret = "Mat4"
 cases = 4
 tolerance = 26
-justification = "`cot(fov / 2)` (sin_cos, floored half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
+justification = "`cot(fov / 2)` (sin_cos, floored half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
 edges = [
     ["raw:6746518852", 2, 1, 3],
 ]
@@ -71,7 +72,7 @@ args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, m
 ret = "Mat4"
 cases = 4
 tolerance = 26
-justification = "`cot(fov / 2)` (sin_cos, floored half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
+justification = "`cot(fov / 2)` (sin_cos, floored half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
 edges = [
     ["raw:6746518852", 2, 1, 3],
 ]
@@ -126,7 +127,7 @@ args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, m
 ret = "Mat4"
 cases = 4
 tolerance = 26
-justification = "`cot(fov / 2)` (sin_cos, floored half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
+justification = "`cot(fov / 2)` (sin_cos, floored half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
 edges = [
     ["raw:6746518852", 2, 1, 3],
 ]
@@ -289,7 +290,7 @@ args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, m
 ret = "Mat4"
 cases = 4
 tolerance = 26
-justification = "`cot(fov / 2)` (sin_cos, floored half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
+justification = "`cot(fov / 2)` (sin_cos, floored half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
 edges = [
     ["raw:6746518852", 2, 1, 3],
 ]
@@ -326,7 +327,7 @@ args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, m
 ret = "Mat4"
 cases = 4
 tolerance = 26
-justification = "`cot(fov / 2)` (sin_cos, floored half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
+justification = "`cot(fov / 2)` (sin_cos, floored half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
 edges = [
     ["raw:6746518852", 2, 1, 3],
 ]
@@ -380,7 +381,7 @@ args = [{ type = "Fixed", min = 1.0, max = 2.6 }, { type = "Fixed", min = 0.5, m
 ret = "Mat4"
 cases = 4
 tolerance = 26
-justification = "`cot(fov / 2)` (sin_cos, floored half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
+justification = "`cot(fov / 2)` (sin_cos, floored half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect >= 0.5; depth terms <= 17 (header)."
 edges = [
     ["raw:6746518852", 2, 1, 3],
 ]

@@ -2,7 +2,7 @@
 # Oracles: tools/refgen/src/oracles/vec3.rs. Format: tools/refgen/README.md.
 # Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen vec3
 #
-# Tolerances. The Cairo kernels floor (one rescale per output scalar) or truncate toward zero,
+# Tolerances. The Cairo kernels floor (one rescale per output scalar) or round a division to nearest,
 # while the f64 oracle is rounded to nearest at quantization: one rescale = 1 raw ULP. Chained
 # operations add the ULPs of every rescale, scaled by the magnitude of the factors that multiply
 # them afterwards, which is why the domains of the composite functions (`project_reject`,
@@ -59,7 +59,7 @@ args = ["Vec3", { type = "Vec3", nonzero = true, min_abs = 0.01 }]
 ret = "(Vec3, Vec3)"
 cases = 6
 tolerance = 1
-justification = "the quotient truncates toward zero (1 ULP vs round to nearest); the remainder is exact (a difference of representable values), so its own bound is 0 and the shared tolerance is 1."
+justification = "the quotient rounds to nearest, ties to even (at most 1 ULP from the rounded oracle); the remainder is exact (a difference of representable values), so its own bound is 0 and the shared tolerance is 1."
 edges = [[[1, 2, 3], [4, 5, 6]], [[-1, 1, -1], [3, 3, -3]]]
 
 [[function]]
@@ -225,7 +225,7 @@ args = [{ type = "Vec3", nonzero = true, min_abs = 0.01 }]
 ret = "Vec3"
 cases = 5
 tolerance = 1
-justification = "one truncated division per component vs round to nearest: |diff| <= 1."
+justification = "one division rounded half to even vs the oracle rounded to nearest: |diff| <= 1."
 edges = [[[1, -1, 2]], [[4, 0.5, -0.25]]]
 
 [[function]]
@@ -258,7 +258,7 @@ args = [{ type = "Vec3", constraint = "nonzero", min_len = 1.0 }]
 ret = "Fixed"
 cases = 5
 tolerance = 2
-justification = "1 ULP on the length (floor sqrt) divided by len^2 <= 1 ULP for len >= 1, plus one truncated division vs round to nearest."
+justification = "1 ULP on the length (floor sqrt) divided by len^2 <= 1 ULP for len >= 1, plus one division rounded to nearest."
 
 [[function]]
 name = "distance_pair"
@@ -340,7 +340,7 @@ args = [
 ret = "(Vec3, Vec3)"
 cases = 6
 tolerance = 20
-justification = "dot(self, rhs) and dot(rhs, rhs) are floored (1 ULP each), their truncated quotient k carries <= 2 ULP for dot(rhs, rhs) >= 1, and each component multiplies it by |rhs| <= 8 before a last floor rescale: <= 8 * 2 + 1 = 17 ULP, rounded up. The rejection subtracts `self` inside the same rescale."
+justification = "dot(self, rhs) and dot(rhs, rhs) are floored (1 ULP each), their rounded quotient k carries <= 2 ULP for dot(rhs, rhs) >= 1, and each component multiplies it by |rhs| <= 8 before a last floor rescale: <= 8 * 2 + 1 = 17 ULP, rounded up. The rejection subtracts `self` inside the same rescale."
 
 [[function]]
 name = "project_onto_normalized"
@@ -416,7 +416,7 @@ args = [{ type = "Vec3", constraint = "normalized" }]
 ret = "Vec3"
 cases = 6
 tolerance = 4
-justification = "a = -1 / (sign + z) is a truncated division of magnitude <= 1 (1 ULP); every component chains at most three floor products of factors <= 1 on top of it: <= 4 ULP."
+justification = "a = -1 / (sign + z) is a rounded division of magnitude <= 1 (1 ULP); every component chains at most three floor products of factors <= 1 on top of it: <= 4 ULP."
 edges = [[[1, 0, 0]], [[0, 1, 0]], [[0, 0, 1]], [[0, 0, -1]]]
 
 [[function]]
@@ -537,7 +537,7 @@ args = [{ type = "Vec3", min = -3.0, max = 4.0 }, { type = "Vec3", min = -2.0, m
 ret = "Vec3"
 cases = 2
 tolerance = 3
-justification = "t = trunc((x - e0) / (e1 - e0)) is within 1 ULP below the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then one floor rescale (1) and the half ULP of the oracle quantization: 3.0."
+justification = "t = round((x - e0) / (e1 - e0)) is within 1 ULP of the oracle's t and the polynomial t^2 (3 - 2t) has a slope of at most 3/2: 1.5 ULP, then one floor rescale (1) and the half ULP of the oracle quantization: 3.0."
 edges = [[[0.5, 1.5, -1], [0, -1, -2], [1, 1, 2]]]
 
 [[function]]

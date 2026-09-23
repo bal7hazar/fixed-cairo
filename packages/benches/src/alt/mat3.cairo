@@ -44,8 +44,8 @@ pub fn mul_mat_transpose(lhs: Mat3, rhs: Mat3) -> Mat3 {
     }
 }
 
-/// Alternative to `Mat3::div_scalar`. One truncated `Fixed / Fixed` per element (9 divisions)
-/// instead of the shared `Recip`.
+/// Alternative to `Mat3::div_scalar`. One correctly rounded `Fixed / Fixed` per element (9
+/// divisions) instead of the shared `Recip`.
 #[inline(always)]
 pub fn div_scalar_plain(lhs: Mat3, rhs: Fixed) -> Mat3 {
     Mat3 {
@@ -55,8 +55,8 @@ pub fn div_scalar_plain(lhs: Mat3, rhs: Fixed) -> Mat3 {
     }
 }
 
-/// Alternative to `Mat3::inverse`. One truncated division per element of the adjugate (9
-/// divisions) instead of the shared `Recip`: this is the formulation of glam-rs (`m * (1 /
+/// Alternative to `Mat3::inverse`. One correctly rounded division per element of the adjugate
+/// (9 divisions) instead of the shared `Recip`: this is the formulation of glam-rs (`m * (1 /
 /// det)`).
 #[inline(never)]
 pub fn inverse_plain(m: Mat3) -> Option<Mat3> {

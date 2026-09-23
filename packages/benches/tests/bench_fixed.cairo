@@ -1097,3 +1097,125 @@ fn alt_powi_loop_5__op() {
     let _r = bb(Fixed { raw: 1 });
     sink(alt::powi_loop(b, n));
 }
+
+// ------------------------------------------------------------------ correctly rounded division
+
+#[test]
+fn div_nearest__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn div_nearest__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.div_nearest(b));
+}
+
+#[test]
+fn div_nearest_tie__base() {
+    let _a = bb(Fixed { raw: 0x3 });
+    let _b = bb(Fixed { raw: 0x200000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn div_nearest_tie__op() {
+    let a = bb(Fixed { raw: 0x3 });
+    let b = bb(Fixed { raw: 0x200000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.div_nearest(b));
+}
+
+#[test]
+fn recip_nearest__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn recip_nearest__op() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(b.recip_nearest());
+}
+
+#[test]
+fn alt_div_nearest_cmp__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_div_nearest_cmp__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::div_nearest_cmp(a, b));
+}
+
+#[test]
+fn alt_div_nearest_cmp_tie__base() {
+    let _a = bb(Fixed { raw: 0x3 });
+    let _b = bb(Fixed { raw: 0x200000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_div_nearest_cmp_tie__op() {
+    let a = bb(Fixed { raw: 0x3 });
+    let b = bb(Fixed { raw: 0x200000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::div_nearest_cmp(a, b));
+}
+
+#[test]
+fn alt_recip_nearest_cmp__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_recip_nearest_cmp__op() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::recip_nearest_cmp(b));
+}
+
+#[test]
+fn alt_div_trunc__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_div_trunc__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::div_trunc(a, b));
+}
+
+#[test]
+fn alt_recip_trunc__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_recip_trunc__op() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::recip_trunc(b));
+}

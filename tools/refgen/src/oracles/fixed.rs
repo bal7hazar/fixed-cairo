@@ -1,7 +1,7 @@
 //! Oracles of `fixed::fixed` (scalar tier A). Spec: `specs/fixed.toml`.
 //!
 //! Every oracle is an **integer oracle**: the Cairo result is exactly defined (floor / trunc /
-//! round-half-away of an exact rational, DESIGN section 2), so it is computed on the raw values in
+//! round-half-away / round-half-even of an exact rational, DESIGN section 2), so it is computed on the raw values in
 //! `i128` and compared with tolerance 0 over the whole `i64` range, where an f64 would lose up to
 //! 2^10 raw ULPs. The Rust semantics the port mirrors (`round` half away from zero,
 //! `signum(0) = +1`, `fract = x - trunc(x)`, ...) are pinned against `f64` in `mod tests` below.
@@ -31,19 +31,31 @@ fn mul_raw(a: i64, b: i64) -> Option<i64> {
     fit((i128::from(a) * i128::from(b)) >> FRAC_BITS)
 }
 
-/// `trunc(a * 2^32 / b)`: what `Fixed / Fixed` and `from_ratio` return.
-fn div_raw(a: i64, b: i64) -> Option<i64> {
-    match b {
-        0 => None,
-        b => fit((i128::from(a) << FRAC_BITS) / i128::from(b)),
+/// `n / d` rounded to nearest, ties to even (the rounding of `f64 /`). `d != 0`.
+fn div_half_even(n: i128, d: i128) -> i128 {
+    let (n, d) = if d < 0 { (-n, -d) } else { (n, d) };
+    // n = q * d + r with 0 <= r < d: the exact quotient is q + r / d, in [q, q + 1).
+    let (q, r) = (n.div_euclid(d), n.rem_euclid(d));
+    match (2 * r).cmp(&d) {
+        std::cmp::Ordering::Less => q,
+        std::cmp::Ordering::Equal => q + q.rem_euclid(2),
+        std::cmp::Ordering::Greater => q + 1,
     }
 }
 
-/// `trunc(2^64 / b)`: what `recip` returns.
+/// `round_half_even(a * 2^32 / b)`: what `Fixed / Fixed` and `from_ratio` return.
+fn div_raw(a: i64, b: i64) -> Option<i64> {
+    match b {
+        0 => None,
+        b => fit(div_half_even(i128::from(a) << FRAC_BITS, i128::from(b))),
+    }
+}
+
+/// `round_half_even(2^64 / b)`: what `recip` returns.
 fn recip_raw(b: i64) -> Option<i64> {
     match b {
         0 => None,
-        b => fit((1i128 << (2 * FRAC_BITS)) / i128::from(b)),
+        b => fit(div_half_even(1i128 << (2 * FRAC_BITS), i128::from(b))),
     }
 }
 
@@ -180,7 +192,8 @@ pub fn register(r: &mut Registry) {
 
     // --- rescaling operators ----------------------------------------------------------------
     r.add("mul", |a| out(mul_raw(a[0].raw(), a[1].raw()).map(i128::from)));
-    // (a / b, a % b): truncated quotient and remainder. The remainder is computed in i128:
+    // (a / b, a % b): quotient rounded half to even, remainder of the truncated division (exact,
+    // like Rust's float `%`). The remainder is computed in i128:
     // `MIN % -1` is a plain 0 (Rust's i64 overflows).
     r.add("div_rem", |a| match wide(&a[1]) {
         0 => skip("division by zero"),
@@ -319,10 +332,16 @@ mod tests {
     fn arithmetic_helpers_match_exact_rationals() {
         assert_eq!(mul_raw(3 << 31, -(5 << 31)), Some(-(15 << 30))); // 1.5 * -2.5 = -3.75
         assert_eq!(mul_raw(1, -1), Some(-1)); // floor(-2^-32)
-        assert_eq!(div_raw(-1, 2 * ONE), Some(0)); // trunc toward zero
-        assert_eq!(div_raw(ONE, 3 * ONE), Some(1431655765)); // 1 / 3, truncated
+        assert_eq!(div_raw(-1, 2 * ONE), Some(0)); // -0.5 ULP: tie, to even
+        assert_eq!(div_raw(-3, 2 * ONE), Some(-2)); // -1.5 ULP: tie, to even
+        assert_eq!(div_raw(3, 2 * ONE), Some(2)); // 1.5 ULP: tie, to even
+        assert_eq!(div_raw(5, -2 * ONE), Some(-2)); // -2.5 ULP: tie, to even
+        assert_eq!(div_raw(ONE, 3 * ONE), Some(1431655765)); // 1 / 3, to nearest (down)
+        assert_eq!(div_raw(2 * ONE, 3 * ONE), Some(2863311531)); // 2 / 3, to nearest (up)
         assert_eq!(div_raw(1, 0), None);
         assert_eq!(recip_raw(3), Some(6148914691236517205));
+        assert_eq!(recip_raw(6), Some(3074457345618258603)); // rounded up
+        assert_eq!(recip_raw(-1), None); // -2^64 does not fit
         assert_eq!(recip_raw(2), None); // 2^63 does not fit
         assert_eq!(recip_raw(-2), Some(i64::MIN));
         assert_eq!(lerp_raw(0, 10 * ONE, ONE / 2), Some(5 * ONE));

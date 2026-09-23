@@ -3,8 +3,8 @@
 // tools/refgen/specs/wide.toml and tools/refgen/src/oracles/wide.rs
 // Regenerate: cargo run --manifest-path tools/refgen/Cargo.toml -- gen wide
 
-use fixed::wide::RecipTrait;
-use fixed::{Fixed, wide};
+use fixed::wide::{RecipNearestTrait as RN, RecipTrait};
+use fixed::{Fixed, FixedTrait, ONE, wide};
 
 fn next_i64(ref d: Span<i64>) -> i64 {
     *d.pop_front().unwrap()
@@ -1279,6 +1279,106 @@ fn golden_wide_recip_mul_ideal() {
         let a1 = next_fixed(ref d);
         let actual: Fixed = RecipTrait::new(a0).mul(a1);
         check_fixed(actual, ref d, 1, @name, case);
+        case += 1;
+    }
+}
+// wide::div_nearest: 32 cases, tolerance 0 ULP - exact: round_half_even(x * 2^32 / d) on the
+// exact rational (i128), for both forms.
+#[cairofmt::skip]
+const DIV_NEAREST_CASES: [i64; 128] = [
+    1, 8589934592, 0, 0,
+    3, 8589934592, 2, 2,
+    -1, 8589934592, 0, 0,
+    -3, 8589934592, -2, -2,
+    1, -8589934592, 0, 0,
+    3, -8589934592, -2, -2,
+    -1, -8589934592, 0, 0,
+    -3, -8589934592, 2, 2,
+    9, 25769803776, 2, 2,
+    -15, 25769803776, -2, -2,
+    9223372036854775807, 8589934592, 4611686018427387904, 4611686018427387904,
+    -9223372036854775807, -8589934592, 4611686018427387904, 4611686018427387904,
+    32212254720, -10737418240, -12884901888, -12884901888,
+    -25769803776, 12884901888, -8589934592, -8589934592,
+    0, -1, 0, 0,
+    9223372036854775807, 4294967296, 9223372036854775807, 9223372036854775807,
+    -9223372036854775808, 4294967296, -9223372036854775808, -9223372036854775808,
+    -9223372036854775808, -9223372036854775808, 4294967296, 4294967296,
+    9223372036854775807, -9223372036854775808, -4294967296, -4294967296,
+    -9223372036854775808, 9223372036854775807, -4294967296, -4294967296,
+    1, 9223372036854775807, 0, 0,
+    1, 1, 4294967296, 4294967296,
+    -1, -1, 4294967296, 4294967296,
+    9223372036854775807, 4294967297, 9223372034707292160, 9223372034707292160,
+    9223372034707292159, 4294967295, 9223372036854775807, 9223372036854775807,
+    -9223372036854775808, 4294967296, -9223372036854775808, -9223372036854775808,
+    -2575337889764212736, 940231313904893952, -11764117882, -11764117882,
+    1771831531820548096, -5206515512632147968, -1461622166, -1461622166,
+    2948911318131999144, 8503059120272703488, 1489520123, 1489520123,
+    -661505969918132013, 2169271559678590976, -1309723762, -1309723762,
+    -1735750334628404787, 570325690117635, -13071462587828, -13071462587828,
+    -3607110379173676571, -7637602557778460672, 2028440338, 2028440338,
+];
+
+#[test]
+fn golden_wide_div_nearest() {
+    let name: ByteArray = "wide::div_nearest";
+    let mut d = DIV_NEAREST_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_fixed(ref d);
+        let a1 = next_fixed(ref d);
+        let (r0, r1): (Fixed, Fixed) = (a0.div_nearest(a1), RN::new(a1).div_nearest(a0));
+        check_fixed(r0, ref d, 0, @name, case);
+        check_fixed(r1, ref d, 0, @name, case);
+        case += 1;
+    }
+}
+// wide::div_nearest: panics (overflow).
+#[cairofmt::skip]
+const DIV_NEAREST_PANICS_OVERFLOW: [i64; 2] = [
+    -9223372036854775808, -4294967296,
+];
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn golden_wide_div_nearest_panics_overflow() {
+    let mut d = DIV_NEAREST_PANICS_OVERFLOW.span();
+    let a0 = next_fixed(ref d);
+    let a1 = next_fixed(ref d);
+    let _: (Fixed, Fixed) = (a0.div_nearest(a1), RN::new(a1).div_nearest(a0));
+}
+// wide::recip_nearest: 15 cases, tolerance 0 ULP - exact: round_half_even(2^64 / d) (never a tie:
+// 2^65 / d is not an odd integer).
+#[cairofmt::skip]
+const RECIP_NEAREST_CASES: [i64; 45] = [
+    4294967296, 4294967296, 4294967296,
+    -12884901888, -1431655765, -1431655765,
+    2147483648, 8589934592, 8589934592,
+    3, 6148914691236517205, 6148914691236517205,
+    -3, -6148914691236517205, -6148914691236517205,
+    6, 3074457345618258603, 3074457345618258603,
+    -2, -9223372036854775808, -9223372036854775808,
+    4, 4611686018427387904, 4611686018427387904,
+    7, 2635249153387078802, 2635249153387078802,
+    9223372036854775807, 2, 2,
+    -9223372036854775808, -2, -2,
+    -8214848439997386026, -2, -2,
+    1696815108955417, 10871, 10871,
+    -5656981924047867520, -3, -3,
+    -832770920779171, -22151, -22151,
+];
+
+#[test]
+fn golden_wide_recip_nearest() {
+    let name: ByteArray = "wide::recip_nearest";
+    let mut d = RECIP_NEAREST_CASES.span();
+    let mut case: usize = 0;
+    while !d.is_empty() {
+        let a0 = next_fixed(ref d);
+        let (r0, r1): (Fixed, Fixed) = (a0.recip_nearest(), RN::new(a0).div_nearest(ONE));
+        check_fixed(r0, ref d, 0, @name, case);
+        check_fixed(r1, ref d, 0, @name, case);
         case += 1;
     }
 }

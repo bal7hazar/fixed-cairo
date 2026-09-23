@@ -25,7 +25,7 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `normalize` | 6 940 | 57 | 16 |
 | `rotate` | 4 680 | 40 | 8 |
 | `from_angle` | 31 300 | 243 | 62 |
-| `to_angle` | 28 120 | 210 | 46 |
+| `to_angle` | 29 630 | 215 | 46 |
 
 ### `Vec3`
 
@@ -40,7 +40,7 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `distance` | 3 640 | 31 | 6 |
 | `lerp` | 6 860 | 59 | 12 |
 | `reflect` | 9 680 | 83 | 18 |
-| `angle_between` | 38 980 | 307 | 70 |
+| `angle_between` | 40 490 | 312 | 70 |
 
 ### `Vec4`
 
@@ -103,9 +103,9 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `slerp` | 122 180 | 923 | 225 |
 | `lerp` | 24 120 | 196 | 47 |
 | `from_axis_angle` | 40 350 | 312 | 78 |
-| `from_rotation_arc` | 52 200 | 178 | 44 |
+| `from_rotation_arc` | 53 610 | 178 | 44 |
 | `from_mat3` | 19 770 | 163 | 42 |
-| `to_axis_angle` | 40 100 | 297 | 69 |
+| `to_axis_angle` | 41 610 | 302 | 69 |
 
 ### `Affine2`
 
@@ -134,20 +134,20 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | op | l2 gas | steps | range checks |
 |---|---:|---:|---:|
 | `Quat::from_euler` | 110 800 | 874 | 214 |
-| `Quat::to_euler` | 117 530 | 883 | 181 |
+| `Quat::to_euler` | 122 060 | 898 | 181 |
 | `Mat3::from_euler` | 114 170 | 897 | 218 |
-| `Mat3::to_euler` | 94 160 | 689 | 139 |
+| `Mat3::to_euler` | 98 690 | 704 | 139 |
 | `Mat4::from_euler` | 114 870 | 904 | 218 |
 
 ### Camera (`glam::camera`)
 
 | op | l2 gas | steps | range checks |
 |---|---:|---:|---:|
-| `rh::proj::opengl::perspective` | 50 060 | 403 | 98 |
-| `rh::proj::vulkan::perspective` | 48 780 | 393 | 94 |
-| `rh::proj::vulkan::perspective_infinite_reverse` | 42 830 | 343 | 81 |
+| `rh::proj::opengl::perspective` | 51 470 | 415 | 98 |
+| `rh::proj::vulkan::perspective` | 50 190 | 405 | 94 |
+| `rh::proj::vulkan::perspective_infinite_reverse` | 43 770 | 351 | 81 |
 | `rh::proj::opengl::orthographic` | 22 440 | 189 | 48 |
-| `rh::proj::opengl::frustum` | 24 040 | 202 | 52 |
+| `rh::proj::opengl::frustum` | 24 510 | 206 | 52 |
 | `rh::view::look_at_mat4` | 38 760 | 329 | 82 |
 | `rh::view::look_to_mat4` | 28 740 | 247 | 56 |
 

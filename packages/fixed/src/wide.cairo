@@ -23,6 +23,8 @@
 //! | [`Acc`] | Q64.64 | a count-agnostic exact sum of products and aligned `Fixed` values |
 //! [`AccTrait::zero`], `add_prod`, `sub_prod`, `add`, `sub` |
 //! | [`Recip`] | Q32.96 | a reciprocal `1 / d` with 96 fractional bits | [`RecipTrait::new`] |
+//! | [`RecipNearest`] | Q32.32 | a divisor `d` prepared for correctly rounded quotients |
+//! [`RecipNearestTrait::new`] |
 //!
 //! The index is a static bound, not a count the caller must respect at run time:
 //! `Wn + Wm -> W(n+m)` and `Wn * Fixed -> Tn` are resolved by the type system (traits
@@ -42,7 +44,7 @@ pub use crate::internal::acc::{
     W11, W12, W13, W14, W15, W16, W2, W3, W4, W5, W6, W7, W8, W9, WideAdd, WideLift, WideMul,
     WideNarrow, WideNeg, WideSqrt, WideSub,
 };
-use crate::internal::bounded::{self, BR};
+use crate::internal::bounded::{self, BR, Divisor};
 
 /// Returns the exact raw Q64.64 product `a * b` (one step, no range check).
 ///
@@ -439,7 +441,8 @@ pub fn distance4_squared(
 /// `RecipTrait::new(d).mul(x)` is `x / d` **rounded to nearest** (ties toward +infinity): it is
 /// within `1/2 + |x| / 2^64 < 1` ULP of the exact quotient and exact whenever the quotient is
 /// representable (in particular `normalize` of an axis-aligned vector returns exactly `+-1`),
-/// which a truncated Q32.32 reciprocal followed by `Fixed * Fixed` is not.
+/// which a Q32.32 reciprocal followed by `Fixed * Fixed` is not. It is not always the correctly
+/// rounded `x / d` of `Fixed / Fixed` (ties, and the `|x| / 2^64` term): [`RecipNearest`] is.
 #[derive(Copy, Drop)]
 pub struct Recip {
     pub(crate) v: BR,
@@ -459,8 +462,9 @@ pub trait RecipTrait {
     /// #### Panics
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     /// #### Deviations
-    /// * Rounds to nearest (ties toward +infinity) while `Fixed / Fixed` truncates: the two may
-    ///   differ by 1 ULP.
+    /// * Rounds to nearest with ties toward +infinity, within `1/2 + |x| / 2^64` ULP of the exact
+    ///   quotient, while `Fixed / Fixed` is correctly rounded with ties to even: the two may
+    ///   differ by 1 ULP (`RecipNearestTrait::div_nearest` gives the bits of `/`).
     fn mul(self: Recip, x: Fixed) -> Fixed;
 }
 
@@ -472,6 +476,56 @@ pub impl RecipImpl of RecipTrait {
     #[inline(always)]
     fn mul(self: Recip, x: Fixed) -> Fixed {
         Fixed { raw: bounded::recip_mul(self.v, x.raw) }
+    }
+}
+
+/// A divisor `d` prepared for several correctly rounded divisions: `new(d).div_nearest(x)` is
+/// **bit-identical** to `x / d` (round to nearest, ties to even, like `f64 /`), so a shared
+/// divisor gives the same bits as per-element division, as in Rust.
+///
+/// It keeps `2 |d|` (as a non-zero divisor) and `|d|`, tagged by the sign of `d`: each division is
+/// the rounding step of `div_nearest`, `(2 |x| 2^32 + |d|) div (2 |d|)` (round half up, exact
+/// integer division) with a tie fix-up to even when the remainder is zero, without the zero
+/// test and the sign split of the divisor. A 96-bit reciprocal with an exact remainder
+/// correction (the `Recip` approach) gives the same bits but costs more per division than the
+/// division itself; it stays in `benches::alt::fixed` (`recip_nearest_recip_*`).
+///
+/// A separate type from [`Recip`]: a `Recip` can also come from a vector length
+/// (`NormTrait::recip`, up to `2^64` raw), which has no `Fixed` divisor to round against.
+#[derive(Copy, Drop)]
+pub struct RecipNearest {
+    pub(crate) d: Divisor,
+}
+
+pub trait RecipNearestTrait {
+    /// Prepares the divisor `d` (one zero test, one sign split, no division).
+    ///
+    /// Mirrors nothing in glam-rs: a shared divisor for `div_nearest`.
+    /// #### Panics
+    /// * `'Fixed: division by zero'` if `d` is zero.
+    /// #### Deviations
+    /// * None.
+    fn new(d: Fixed) -> RecipNearest;
+    /// Computes `x / d` correctly rounded (to nearest, ties to even), where `self` is
+    /// `RecipNearestTrait::new(d)`: bit-identical to `x / d` (and `x.div_nearest(d)`).
+    ///
+    /// Mirrors `f32 / f32` (`Div::div`) with a shared divisor.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the rounded quotient does not fit the scalar range.
+    /// #### Deviations
+    /// * None on the rounding (the bits of `x / d`). Overflow panics where floating-point
+    ///   division returns infinity: docs/DESIGN.md section 3, "overflow".
+    fn div_nearest(self: RecipNearest, x: Fixed) -> Fixed;
+}
+
+pub impl RecipNearestImpl of RecipNearestTrait {
+    #[inline(always)]
+    fn new(d: Fixed) -> RecipNearest {
+        RecipNearest { d: bounded::recip_nearest_new(d.raw) }
+    }
+    #[inline(always)]
+    fn div_nearest(self: RecipNearest, x: Fixed) -> Fixed {
+        Fixed { raw: bounded::recip_nearest_div(self.d, x.raw) }
     }
 }
 

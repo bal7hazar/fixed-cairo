@@ -4,14 +4,14 @@
 //! reference formulations for the porters), and the losing alternatives (`alt_*`).
 use benches::alt::{fixed as alt_fixed, wide as alt_wide};
 use benches::harness::{bb, sink};
-use fixed::Fixed;
 use fixed::wide::{
-    Acc, AccTrait, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt,
-    WideSub, det3, distance2, distance2_squared, distance3, distance3_squared, distance4,
-    distance4_squared, dot2, dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add,
-    mul_sub, norm2, norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4,
-    norm4_squared, norm4_wide, normalize2, normalize3, normalize4, wide_from, wide_mul,
+    Acc, AccTrait, NormTrait, RecipNearestTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow,
+    WideNeg, WideSqrt, WideSub, det3, distance2, distance2_squared, distance3, distance3_squared,
+    distance4, distance4_squared, dot2, dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3,
+    is_unit4, mul_add, mul_sub, norm2, norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide,
+    norm4, norm4_squared, norm4_wide, normalize2, normalize3, normalize4, wide_from, wide_mul,
 };
+use fixed::{Fixed, FixedTrait};
 
 #[derive(Copy, Drop)]
 struct V3 {
@@ -1824,4 +1824,340 @@ fn acc_from_wide__op() {
     let b = bb(Fixed { raw: -0x280000001 });
     let acc: Acc = wide_mul(a, b).into();
     sink(acc.narrow());
+}
+
+// ------------------------------------------------------------------ RecipNearest
+
+#[test]
+fn recip_nearest_new__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn recip_nearest_new__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(RecipNearestTrait::new(d).div_nearest(x0));
+}
+
+#[test]
+fn recip_nearest_div__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn recip_nearest_div__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _r = bb(Fixed { raw: 1 });
+    sink({
+        let r = RecipNearestTrait::new(d);
+        r.div_nearest(x0) + r.div_nearest(x1)
+    });
+}
+
+#[test]
+fn div_nearest_shared2__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn div_nearest_shared2__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink({
+        let r = RecipNearestTrait::new(d);
+        (r.div_nearest(x0), r.div_nearest(x1))
+    });
+}
+
+#[test]
+fn div_nearest_each2__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn div_nearest_each2__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink((x0.div_nearest(d), x1.div_nearest(d)));
+}
+
+#[test]
+fn div_nearest_shared3__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn div_nearest_shared3__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink(
+        {
+            let r = RecipNearestTrait::new(d);
+            (r.div_nearest(x0), r.div_nearest(x1), r.div_nearest(x2))
+        },
+    );
+}
+
+#[test]
+fn div_nearest_each3__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn div_nearest_each3__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink((x0.div_nearest(d), x1.div_nearest(d), x2.div_nearest(d)));
+}
+
+#[test]
+fn div_nearest_shared4__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    let _x3 = bb(Fixed { raw: 0x7fffffff });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn div_nearest_shared4__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let x3 = bb(Fixed { raw: 0x7fffffff });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink(
+        {
+            let r = RecipNearestTrait::new(d);
+            (r.div_nearest(x0), r.div_nearest(x1), r.div_nearest(x2), r.div_nearest(x3))
+        },
+    );
+}
+
+#[test]
+fn div_nearest_each4__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    let _x3 = bb(Fixed { raw: 0x7fffffff });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn div_nearest_each4__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let x3 = bb(Fixed { raw: 0x7fffffff });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink((x0.div_nearest(d), x1.div_nearest(d), x2.div_nearest(d), x3.div_nearest(d)));
+}
+
+#[test]
+fn div_nearest_shared9__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    let _x3 = bb(Fixed { raw: 0x7fffffff });
+    let _x4 = bb(Fixed { raw: -0x123456789 });
+    let _x5 = bb(Fixed { raw: 0x40000000 });
+    let _x6 = bb(Fixed { raw: -0x5 });
+    let _x7 = bb(Fixed { raw: 0x2540be400 });
+    let _x8 = bb(Fixed { raw: -0x100000000 });
+    sink(
+        bb(
+            (
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+            ),
+        ),
+    );
+}
+
+#[test]
+fn div_nearest_shared9__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let x3 = bb(Fixed { raw: 0x7fffffff });
+    let x4 = bb(Fixed { raw: -0x123456789 });
+    let x5 = bb(Fixed { raw: 0x40000000 });
+    let x6 = bb(Fixed { raw: -0x5 });
+    let x7 = bb(Fixed { raw: 0x2540be400 });
+    let x8 = bb(Fixed { raw: -0x100000000 });
+    let _r = bb(
+        (
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+        ),
+    );
+    sink(
+        {
+            let r = RecipNearestTrait::new(d);
+            (
+                r.div_nearest(x0),
+                r.div_nearest(x1),
+                r.div_nearest(x2),
+                r.div_nearest(x3),
+                r.div_nearest(x4),
+                r.div_nearest(x5),
+                r.div_nearest(x6),
+                r.div_nearest(x7),
+                r.div_nearest(x8),
+            )
+        },
+    );
+}
+
+#[test]
+fn div_nearest_each9__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    let _x3 = bb(Fixed { raw: 0x7fffffff });
+    let _x4 = bb(Fixed { raw: -0x123456789 });
+    let _x5 = bb(Fixed { raw: 0x40000000 });
+    let _x6 = bb(Fixed { raw: -0x5 });
+    let _x7 = bb(Fixed { raw: 0x2540be400 });
+    let _x8 = bb(Fixed { raw: -0x100000000 });
+    sink(
+        bb(
+            (
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+                Fixed { raw: 1 },
+            ),
+        ),
+    );
+}
+
+#[test]
+fn div_nearest_each9__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let x3 = bb(Fixed { raw: 0x7fffffff });
+    let x4 = bb(Fixed { raw: -0x123456789 });
+    let x5 = bb(Fixed { raw: 0x40000000 });
+    let x6 = bb(Fixed { raw: -0x5 });
+    let x7 = bb(Fixed { raw: 0x2540be400 });
+    let x8 = bb(Fixed { raw: -0x100000000 });
+    let _r = bb(
+        (
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+            Fixed { raw: 1 },
+        ),
+    );
+    sink(
+        (
+            x0.div_nearest(d),
+            x1.div_nearest(d),
+            x2.div_nearest(d),
+            x3.div_nearest(d),
+            x4.div_nearest(d),
+            x5.div_nearest(d),
+            x6.div_nearest(d),
+            x7.div_nearest(d),
+            x8.div_nearest(d),
+        ),
+    );
+}
+
+#[test]
+fn alt_div_nearest_shared4_recip__base() {
+    let _d = bb(Fixed { raw: -0x280000001 });
+    let _x0 = bb(Fixed { raw: 0x500000000 });
+    let _x1 = bb(Fixed { raw: -0x16a09e667 });
+    let _x2 = bb(Fixed { raw: 0x3 });
+    let _x3 = bb(Fixed { raw: 0x7fffffff });
+    sink(bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 })));
+}
+
+#[test]
+fn alt_div_nearest_shared4_recip__op() {
+    let d = bb(Fixed { raw: -0x280000001 });
+    let x0 = bb(Fixed { raw: 0x500000000 });
+    let x1 = bb(Fixed { raw: -0x16a09e667 });
+    let x2 = bb(Fixed { raw: 0x3 });
+    let x3 = bb(Fixed { raw: 0x7fffffff });
+    let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }));
+    sink(
+        {
+            let r = alt_fixed::recip_nearest_recip_new(d);
+            (
+                alt_fixed::recip_nearest_recip_div(r, x0),
+                alt_fixed::recip_nearest_recip_div(r, x1),
+                alt_fixed::recip_nearest_recip_div(r, x2),
+                alt_fixed::recip_nearest_recip_div(r, x3),
+            )
+        },
+    );
 }

@@ -210,8 +210,8 @@ pub fn mul_mat_transpose(lhs: Mat4, rhs: Mat4) -> Mat4 {
     }
 }
 
-/// Alternative to `Mat4::div_scalar`. One truncated `Fixed / Fixed` per element (16 divisions)
-/// instead of the shared `Recip`.
+/// Alternative to `Mat4::div_scalar`. One correctly rounded `Fixed / Fixed` per element (16
+/// divisions) instead of the shared `Recip`.
 #[inline(always)]
 pub fn div_scalar_plain(lhs: Mat4, rhs: Fixed) -> Mat4 {
     Mat4 {
@@ -242,8 +242,8 @@ pub fn div_scalar_plain(lhs: Mat4, rhs: Fixed) -> Mat4 {
     }
 }
 
-/// Alternative to `Mat4::inverse`. One truncated division per element of the adjugate (16
-/// divisions) instead of the shared `Recip`: this is the formulation of glam-rs (`m * (1 /
+/// Alternative to `Mat4::inverse`. One correctly rounded division per element of the adjugate
+/// (16 divisions) instead of the shared `Recip`: this is the formulation of glam-rs (`m * (1 /
 /// det)`).
 #[inline(never)]
 pub fn inverse_plain(m: Mat4) -> Option<Mat4> {

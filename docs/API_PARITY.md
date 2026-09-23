@@ -15,7 +15,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [BVec3](#bvec3) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [BVec4](#bvec4) | 19 | 4 | 0 | 0 | 0 | 82.6% |
 | [EulerRot](#eulerrot) | 1 | 0 | 0 | 0 | 1 | 100.0% |
-| [Fixed](#fixed) | 10 | 0 | 0 | 0 | 99 | 100.0% |
+| [Fixed](#fixed) | 10 | 0 | 0 | 0 | 101 | 100.0% |
 | [IVec2](#ivec2) | 123 | 71 | 10 | 0 | 9 | 65.2% |
 | [IVec3](#ivec3) | 221 | 73 | 10 | 0 | 9 | 76.0% |
 | [IVec4](#ivec4) | 474 | 72 | 10 | 0 | 9 | 87.1% |
@@ -37,8 +37,8 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 | [camera::rh::proj::opengl](#camera-rh-proj-opengl) | 3 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::proj::vulkan](#camera-rh-proj-vulkan) | 5 | 0 | 0 | 0 | 0 | 100.0% |
 | [camera::rh::view](#camera-rh-view) | 8 | 0 | 4 | 0 | 0 | 100.0% |
-| [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 37 | 100.0% |
-| **Total** | **2869** | **655** | **124** | **0** | **243** | **82.0%** |
+| [fixed::wide](#fixed-wide) | 0 | 0 | 0 | 0 | 38 | 100.0% |
+| **Total** | **2869** | **655** | **124** | **0** | **246** | **82.0%** |
 
 ## Affine2
 
@@ -342,6 +342,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 - method `clamp`
 - method `copysign`
 - method `cos`
+- method `div_nearest`
 - method `exp`
 - method `exp2`
 - method `exp_m1`
@@ -365,6 +366,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 - method `powf`
 - method `powi`
 - method `recip`
+- method `recip_nearest`
 - method `round`
 - method `signum`
 - method `sin`
@@ -4202,6 +4204,7 @@ passed by value. Percent is `(ported + renamed) / all glam-rs items`.
 - method `distance3_squared`
 - method `distance4`
 - method `distance4_squared`
+- method `div_nearest`
 - method `dot2`
 - method `dot2_add`
 - method `dot3`

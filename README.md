@@ -35,7 +35,7 @@ Same operations on a sign-magnitude `{mag, sign}` scalar (prototype figures of [
 |---|---:|---:|---:|
 | `+` | 4 050 | 840 | 4.8x |
 | `*` | 2 970 | 1 680 | 1.8x |
-| `/` | 2 970 | 3 740 | 0.8x |
+| `/` | 2 970 | 4 140 | 0.7x |
 | `Vec3::dot` | 15 750 | 2 080 | 7.6x |
 | `Mat3 * Mat3` | 134 250 | 19 640 | 6.8x |
 | `Mat4 * Mat4` | 335 800 | 36 480 | 9.2x |
@@ -50,11 +50,11 @@ Same operations on a sign-magnitude `{mag, sign}` scalar (prototype figures of [
 |---|---|---:|---:|---:|
 | `fixed` | `+` | 840 | 7 | 2 |
 | `fixed` | `*` | 1 680 | 14 | 4 |
-| `fixed` | `/` | 3 740 | 32 | 6 |
+| `fixed` | `/` | 4 140 | 36 | 6 |
 | `fixed` | `sqrt` | 2 020 | 16 | 6 |
 | `fixed` | `dot3` | 2 080 | 18 | 4 |
 | `fixed` | `sin_cos` | 31 300 | 243 | 62 |
-| `fixed` | `atan2` | 28 120 | 202 | 44 |
+| `fixed` | `atan2` | 29 630 | 207 | 44 |
 | `fixed` | `exp` | 20 840 | 168 | 43 |
 | `fixed` | `ln` | 19 520 | 160 | 37 |
 | `glam` | `Vec3::normalize` | 8 720 | 72 | 20 |

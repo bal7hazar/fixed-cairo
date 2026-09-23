@@ -8,11 +8,11 @@
 //! `tools/refgen`, and are not duplicated here.
 use fixed::fixed::{EPSILON, HALF, MAX, MIN, NEG_ONE, TWO};
 use fixed::wide::{
-    Acc, AccTrait, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt,
-    WideSub, det3, distance2, distance2_squared, distance3, distance3_squared, distance4,
-    distance4_squared, dot2, dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add,
-    mul_sub, norm2, norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4,
-    norm4_squared, norm4_wide, normalize2, normalize3, normalize4, wide_from, wide_mul,
+    Acc, AccTrait, NormTrait, RecipNearestTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow,
+    WideNeg, WideSqrt, WideSub, det3, distance2, distance2_squared, distance3, distance3_squared,
+    distance4, distance4_squared, dot2, dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3,
+    is_unit4, mul_add, mul_sub, norm2, norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide,
+    norm4, norm4_squared, norm4_wide, normalize2, normalize3, normalize4, wide_from, wide_mul,
 };
 use fixed::{Fixed, FixedTrait, ONE, ONE_RAW, ZERO};
 
@@ -363,6 +363,34 @@ fn test_recip_is_exact_on_representable_quotients() {
     assert_eq!(RecipTrait::new(TWO).mul(f(-1)).raw, 0);
 }
 
+/// `(x, d, round_half_even(x / d))` raw: ties of all four sign pairs with even and odd truncated
+/// quotients, exact quotients, the extremes.
+const DIV_NEAREST_CASES: [(i64, i64, i64); 14] = [
+    (1, 0x200000000, 0), (3, 0x200000000, 2), (-3, 0x200000000, -2), (5, -0x200000000, -2),
+    (-5, -0x200000000, 2), (9, 0x600000000, 2), (-15, 0x600000000, -2),
+    (I64_MAX, 0x200000000, 0x4000000000000000), (I64_MIN, 0x100000000, I64_MIN),
+    (I64_MIN, I64_MIN, ONE_RAW), (I64_MAX, I64_MIN, -ONE_RAW), (1, I64_MAX, 0), (1, 3, 0x55555555),
+    (2, 3, 0xaaaaaaab),
+];
+
+#[test]
+fn test_div_nearest_table_and_shared_divisor() {
+    for (x, d, q) in DIV_NEAREST_CASES.span() {
+        assert_eq!(f(*x).div_nearest(f(*d)).raw, *q);
+        assert_eq!(RecipNearestTrait::new(f(*d)).div_nearest(f(*x)).raw, *q);
+    }
+    // one divisor shared by 9 quotients gives the per-element bits (6.0: ties at odd multiples
+    // of 3 raw)
+    let d = int(6);
+    let r = RecipNearestTrait::new(d);
+    for x in array![3, -3, 9, -9, 15, I64_MAX, I64_MIN, 1, 0x7fffffffffff].span() {
+        assert_eq!(r.div_nearest(f(*x)), f(*x).div_nearest(d));
+    }
+    assert_eq!(int(3).recip_nearest().raw, 0x55555555);
+    assert_eq!(f(6).recip_nearest().raw, 0x2aaaaaaaaaaaaaab); // truncation gives ...aaaa
+    assert_eq!(f(-2).recip_nearest().raw, I64_MIN);
+}
+
 // ------------------------------------------------------------------ panics
 
 // panics: WideNarrow::narrow
@@ -675,7 +703,89 @@ fn test_recip_mul_negative_overflow_panics() {
     let _ = RecipTrait::new(f(-1)).mul(MAX);
 }
 
+// panics: Fixed::div_nearest
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_div_nearest_division_by_zero_panics() {
+    let _ = ONE.div_nearest(ZERO);
+}
+
+// panics: Fixed::div_nearest
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_div_nearest_overflow_panics() {
+    // MAX / (1 - 2^-32) = 2^31 exactly: one ULP above the range
+    let _ = f(I64_MAX - 0x7fffffff).div_nearest(f(0xffffffff));
+}
+
+// panics: Fixed::recip_nearest
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_recip_nearest_division_by_zero_panics() {
+    let _ = ZERO.recip_nearest();
+}
+
+// panics: Fixed::recip_nearest
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_recip_nearest_overflow_panics() {
+    let _ = f(2).recip_nearest();
+}
+
+// panics: RecipNearest::new
+#[test]
+#[should_panic(expected: 'Fixed: division by zero')]
+fn test_recip_nearest_new_division_by_zero_panics() {
+    let _ = RecipNearestTrait::new(ZERO);
+}
+
+// panics: RecipNearest::div_nearest
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_recip_nearest_div_nearest_overflow_panics() {
+    let _ = RecipNearestTrait::new(f(0xffffffff)).div_nearest(f(I64_MAX - 0x7fffffff));
+}
+
 // ------------------------------------------------------------------ properties (seeded fuzzing)
+
+/// `round_half_even(n / d)`, `d != 0`, with the corelib `i128` (truncating) division.
+fn div_half_even(n: i128, d: i128) -> i128 {
+    let (n, d) = if d < 0 {
+        (-n, -d)
+    } else {
+        (n, d)
+    };
+    let (mut q, mut r) = (n / d, n % d);
+    if r < 0 {
+        q -= 1;
+        r += d;
+    }
+    if 2 * r > d || (2 * r == d && q % 2 != 0) {
+        q + 1
+    } else {
+        q
+    }
+}
+
+#[test]
+#[fuzzer(runs: 128, seed: 209)]
+fn fuzz_div_nearest_is_round_half_even_of_exact_quotient(x: i64, d: i64, sel: u8) {
+    let moduli: [i64; 4] = [I64_MAX, 0x10000000000, 0x100000, 0x10];
+    let d = d % *moduli.span()[(sel % 4).into()];
+    if d == 0 {
+        return;
+    }
+    let (x_, d_): (i128, i128) = (x.into(), d.into());
+    let r = RecipNearestTrait::new(f(d));
+    if let Some(q) = TryInto::<i128, i64>::try_into(div_half_even(x_ * ONE_I128, d_)) {
+        assert_eq!(f(x).div_nearest(f(d)).raw, q);
+        assert_eq!(r.div_nearest(f(x)).raw, q);
+    }
+    if let Some(q) = TryInto::<i128, i64>::try_into(div_half_even(ONE_I128 * ONE_I128, d_)) {
+        assert_eq!(f(d).recip_nearest().raw, q);
+        assert_eq!(r.div_nearest(ONE).raw, q);
+    }
+}
 
 fn sq(v: i64) -> u128 {
     let w: i128 = v.into();

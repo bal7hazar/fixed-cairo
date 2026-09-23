@@ -24,7 +24,7 @@
 //!
 //! #### Numerics
 //! * `cot(fov / 2)` is one `sin_cos` and one division (`fixed::trig`, accurate to about 1 ULP).
-//! * The depth terms share **one** division: with `q = far / (far - near)` (truncated), the
+//! * The depth terms share **one** division: with `q = far / (far - near)` (rounded), the
 //!   `[0, 1]` matrices use `zz = +-q` and `tz = -near * q`; the `[-1, 1]` ones use
 //!   `zz = +-(2 q - 1)` and `tz = -2 near q`. The product `near * q` is one fused wide product with
 //!   a single floor rescale, so `near * far` is never formed as a `Fixed` (it would overflow for

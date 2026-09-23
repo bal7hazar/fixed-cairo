@@ -67,7 +67,7 @@ pub fn quadform_two_stage(s: SdpMatrix3, m: Mat3) -> SdpMatrix3 {
 }
 
 /// Alternative to `SdpMatrix3::inverse`. The literal rapier `AngularInertiaOps::inverse`: plain
-/// `Fixed` products (one rescale each) for the cofactors and the determinant, one truncated `Fixed
+/// `Fixed` products (one rescale each) for the cofactors and the determinant, one rounded `Fixed
 /// / Fixed` per output (6 divisions) instead of the shared `Recip`.
 #[inline(always)]
 pub fn inverse_plain(s: SdpMatrix3) -> SdpMatrix3 {

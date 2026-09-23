@@ -724,10 +724,11 @@ def methods(t):
                   "otherwise returns infinity or NaN).",
                   "`'Fixed: overflow'` if a quotient does not fit the scalar range."]
     hom_dev = ["One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one "
-               "fused product per component, instead of three truncated `Fixed / Fixed`: it "
+               "fused product per component, instead of three correctly rounded "
+               "`Fixed / Fixed`: it "
                "pays off from two divisions on (`alt_" + ("from_homogeneous" if n == 3 else "project")
                + "_div` in `gas/" + t.mod + ".snap`). A result may differ by 1 ULP from the "
-               "truncated division."]
+               "correctly rounded division (ties toward +infinity, `|x| / 2^64` term)."]
     if n == 3:
         add("from_homogeneous", f"(v: Vec4) -> {T}",
             "Creates a 3D vector from `v` divided by its `w` component: the perspective divide "
@@ -986,7 +987,8 @@ def methods(t):
         fz("length_recip"),
         ["`'Fixed: division by zero'` if `self` is zero.",
          "`'Fixed: overflow'` if the length or its reciprocal does not fit the scalar range."],
-        ["The length is floored, then the division truncates: at most 2 ULP off the exact value "
+        ["The length is floored, then the reciprocal rounds to nearest: under 1.5 ULP off the "
+         "exact value "
          f"for `|self| >= 1`. For valid results `self` must not be of length zero: it panics "
          "instead of returning infinity."])
     add("distance", f"(self: {T}, rhs: {T}) -> Fixed",
@@ -1075,7 +1077,7 @@ def methods(t):
         fz("project_onto"),
         ["`'Fixed: division by zero'` if `rhs.dot(rhs)` is zero, i.e. if `rhs` is zero or "
          "shorter than `2^-16` (its squared length then rounds to zero).", OVF],
-        ["A single division `dot(self, rhs) / dot(rhs, rhs)` (truncated toward zero), then one "
+        ["A single division `dot(self, rhs) / dot(rhs, rhs)` (rounded to nearest), then one "
          "floor rescale per component. A shared `Recip` is measurably more expensive for one "
          "division: it is kept in `benches::alt`."])
     add("reject_from", f"(self: {T}, rhs: {T}) -> {T}",
@@ -1259,7 +1261,8 @@ def methods(t):
              "range; here `angle_between - PI <= angle_between` always holds."], inline=False)
 
     if n == 3:
-        ortho_dev = ("`a = -1 / (sign + z)` is one truncated division; every other term is a "
+        ortho_dev = ("`a = -1 / (sign + z)` is one correctly rounded division; every other term "
+                     "is a "
                      "triple product rescaled once. The inputs are unit vectors, so `|sign + z| "
                      ">= 1` and the division is always defined.")
         add("any_orthogonal_vector", f"(self: {T}) -> {T}",
@@ -1416,7 +1419,7 @@ def methods(t):
         [DIV0, OVF], [SCALAR_DEV.replace("{Op}", "Div").replace("{T}", T),
                       "One division shared by the components (`Recip`) and one fused "
                       "multiplication each, rounded to nearest: cheaper than, and up to 1 ULP "
-                      "away from, the component-wise truncated `Fixed / Fixed` kept in "
+                      "away from, the component-wise correctly rounded `Fixed / Fixed` kept in "
                       "`benches::alt`."],
         mirrors=f"impl Div<f32> for glam::{T}")
     add("rem_scalar", f"(self: {T}, rhs: Fixed) -> {T}",
@@ -1527,7 +1530,7 @@ def operators(t):
         "Add": "Exact. Panics with the `i64_add` overflow messages.",
         "Sub": "Exact. Panics with the `i64_sub` overflow messages.",
         "Mul": "One floor rescale per component. Panics with `'Fixed: overflow'`.",
-        "Div": "Truncated toward zero. Panics with `'Fixed: division by zero'` or "
+        "Div": "Rounded to nearest, ties to even. Panics with `'Fixed: division by zero'` or "
                "`'Fixed: overflow'`.",
         "Rem": "The remainder has the sign of `lhs` (exact). Panics with "
                "`'Fixed: division by zero'`.",
@@ -2079,14 +2082,14 @@ def alts(t):
         "mul_add": "The unfused `self * a + b`: two rescales per component.",
         "midpoint": "The literal glam-rs `(self + rhs) * 0.5`.",
         "lerp": "The literal glam-rs `self * (1 - s) + rhs * s`: three rescales per component.",
-        "div_scalar": "One truncated `Fixed / Fixed` per component, as glam-rs spells it.",
+        "div_scalar": "One correctly rounded `Fixed / Fixed` per component, as glam-rs spells it.",
         "normalize": "The `normalize<n>` kernel of `fixed::wide` behind an explicit zero test "
                      "(two passes over the components).",
         "distance": "`(self - rhs).length()`: the subtraction is range-checked and can overflow.",
         "length_recip": "The wide reciprocal of the shared `Norm` instead of "
                         "`length().recip()`.",
         "project_onto": "One shared `Recip` (rounded to nearest) instead of the single "
-                        "truncated `Fixed / Fixed`: a reciprocal only pays off from two "
+                        "correctly rounded `Fixed / Fixed`: a reciprocal only pays off from two "
                         "divisions on.",
         "reject_from": "The literal `self - self.project_onto(rhs)`: two rescales per component.",
         "reject_from_normalized": "The literal `self - self.project_onto_normalized(rhs)`: two "
@@ -2111,9 +2114,10 @@ def alts(t):
                    "`sin_cos`.",
         "from_bvec": "The `bool -> felt252 -> i64` cast instead of a jump per element.",
         "smoothstep": "The literal glam-rs vector expression `t * t * (3 - 2 * t)`: one rescale "
-                      "per vector operation, and a truncated division per element.",
-        "from_homogeneous": "Three truncated `Fixed / Fixed` instead of one shared `Recip`.",
-        "project": "Three truncated `Fixed / Fixed` instead of one shared `Recip`.",
+                      "per vector operation, and a correctly rounded division per element.",
+        "from_homogeneous": "Three correctly rounded `Fixed / Fixed` instead of one shared "
+                            "`Recip`.",
+        "project": "Three correctly rounded `Fixed / Fixed` instead of one shared `Recip`.",
     }
     for op in fused_ops(t):
         body = to_free(t, FUSED_BODIES[op](t, not is_fused(t, op)))

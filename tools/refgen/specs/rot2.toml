@@ -226,7 +226,7 @@ args = [{ type = "Vec2", constraint = "normalized" }, { type = "Vec2", constrain
 ret = "Vec2"
 cases = 10
 tolerance = 16
-justification = "the non-target branch is `slerp(max_angle / angle)` with one truncated division added to the slerp error; branch-boundary cases are skipped."
+justification = "the non-target branch is `slerp(max_angle / angle)` with one rounded division added to the slerp error; branch-boundary cases are skipped."
 edges = [[ [1, 0], [0, 1], 0 ], [ [1, 0], [0, 1], 0.5 ], [ [1, 0], [0, 1], 1 ]]
 
 [[function]]

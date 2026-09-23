@@ -5,7 +5,7 @@ Three layers, as in docs/DESIGN.md section 5:
   * tables over pools of matrices (identity, diagonal, singular, fractional, edge magnitudes):
     the expected values are computed here, in Python, by the exact Q32.32 oracle of
     `RAW SEMANTICS` below, which mirrors `fixed::wide` kernel by kernel (floor rescales,
-    truncated divisions, the round-to-nearest shared reciprocal);
+    divisions rounded half to even, the round-to-nearest shared reciprocal);
   * seeded fuzz properties (relations, not values) and one `#[should_panic]` per panic path with
     the exact message.
 

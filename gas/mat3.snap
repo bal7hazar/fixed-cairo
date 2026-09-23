@@ -7,11 +7,11 @@ bench_mat3::add_assign: 8480 71 18 0 0
 bench_mat3::add_mat3: 8480 71 18 0 0
 bench_mat3::alt_determinant_cross_determinant: 8640 74 16 0 0
 bench_mat3::alt_determinant_cross_determinant_singular: 8640 74 16 0 0
-bench_mat3::alt_div_scalar_plain_div_scalar: 26300 221 54 0 0
+bench_mat3::alt_div_scalar_plain_div_scalar: 30530 257 54 0 0
 bench_mat3::alt_from_quat_unfused_from_quat: 43460 362 102 0 0
-bench_mat3::alt_inverse_plain_inverse: 49770 411 94 0 0
-bench_mat3::alt_inverse_plain_try_inverse_none: 49770 63 4 0 0
-bench_mat3::alt_inverse_plain_try_inverse_some: 49770 411 94 0 0
+bench_mat3::alt_inverse_plain_inverse: 63360 456 94 0 0
+bench_mat3::alt_inverse_plain_try_inverse_none: 63360 63 4 0 0
+bench_mat3::alt_inverse_plain_try_inverse_some: 63360 456 94 0 0
 bench_mat3::alt_mul_mat_transpose_mul_mat3: 19640 170 36 0 0
 bench_mat3::alt_mul_vec_unfused_mul_vec3: 20780 173 48 0 0
 bench_mat3::col_first: 720 7 0 0 0
@@ -53,7 +53,7 @@ bench_mat3::mul_scalar: 16040 134 36 0 0
 bench_mat3::mul_transpose_vec3: 7160 62 12 0 0
 bench_mat3::mul_vec3: 7160 62 12 0 0
 bench_mat3::neg: 3620 35 0 0 0
-bench_mat3::recip: 22680 192 45 0 0
+bench_mat3::recip: 26210 221 45 0 0
 bench_mat3::row_first: 1020 10 0 0 0
 bench_mat3::row_last: 1200 12 0 0 0
 bench_mat3::sub: 8480 71 18 0 0

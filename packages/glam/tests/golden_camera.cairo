@@ -80,7 +80,7 @@ fn check_affine3(actual: Affine3, ref d: Span<i64>, tol: i128, name: @ByteArray,
     check_vec3(actual.translation, ref d, tol, name, case);
 }
 // camera::lh_opengl_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
-// half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
+// half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
 // >= 0.5; depth terms <= 17 (header).
 #[cairofmt::skip]
 const LH_OPENGL_PERSPECTIVE_CASES: [i64; 100] = [
@@ -198,7 +198,7 @@ fn golden_camera_lh_opengl_frustum() {
     }
 }
 // camera::lh_vulkan_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
-// half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
+// half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
 // >= 0.5; depth terms <= 17 (header).
 #[cairofmt::skip]
 const LH_VULKAN_PERSPECTIVE_CASES: [i64; 100] = [
@@ -372,7 +372,7 @@ fn golden_camera_lh_vulkan_frustum() {
     }
 }
 // camera::lh_directx_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
-// half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
+// half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
 // >= 0.5; depth terms <= 17 (header).
 #[cairofmt::skip]
 const LH_DIRECTX_PERSPECTIVE_CASES: [i64; 100] = [
@@ -895,7 +895,7 @@ fn golden_camera_rh_view_look_at_quat() {
     }
 }
 // camera::rh_opengl_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
-// half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
+// half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
 // >= 0.5; depth terms <= 17 (header).
 #[cairofmt::skip]
 const RH_OPENGL_PERSPECTIVE_CASES: [i64; 100] = [
@@ -1013,7 +1013,7 @@ fn golden_camera_rh_opengl_frustum() {
     }
 }
 // camera::rh_vulkan_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
-// half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
+// half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
 // >= 0.5; depth terms <= 17 (header).
 #[cairofmt::skip]
 const RH_VULKAN_PERSPECTIVE_CASES: [i64; 100] = [
@@ -1185,7 +1185,7 @@ fn golden_camera_rh_vulkan_frustum() {
     }
 }
 // camera::rh_directx_perspective: 5 cases, tolerance 26 ULP - `cot(fov / 2)` (sin_cos, floored
-// half angle, truncated division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
+// half angle, rounded division) and `xx = cot / aspect`: <= 24 ULP on `fov` in [1, 2.6], aspect
 // >= 0.5; depth terms <= 17 (header).
 #[cairofmt::skip]
 const RH_DIRECTX_PERSPECTIVE_CASES: [i64; 100] = [

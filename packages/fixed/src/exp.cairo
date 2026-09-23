@@ -896,7 +896,7 @@ fn normalize(x: u64) -> (u64, i64) {
 /// | `ln` | [2^-32, 2^31) | 0.66 |
 /// | `log10` | [2^-32, 2^31) | 0.57 |
 /// | `ln_1p` | [-1/2, 1] | 0.64 |
-/// | `log` | bases 2, 10, 1.5, 1/3, 1000 | 1.88 |
+/// | `log` | bases 2, 10, 1.5, 1/3, 1000 | 1.35 |
 /// | `powf` | x in [2^-8, 2^8], n in [-4, 4], result < 1 | 2.05 |
 /// | `powf` | x in [2^-8, 2^8], n in [-4, 4], result >= 1 | 4.32e-01 x 2^-30 |
 // GENERATED-END exp
@@ -987,9 +987,9 @@ pub trait ExpTrait {
     /// * `'Fixed: overflow'` if the quotient does not fit the scalar range (`base` within
     ///   `2^-31`-ish of 1).
     /// #### Deviations
-    /// * The division truncates, like every `/` of the crate: 1.88 ULP for the bases 2, 10,
-    ///   1.5, 1/3 and 1000. A base close to 1 amplifies the error of the numerator by
-    ///   `1 / |log2(base)|`.
+    /// * The division rounds to nearest (ties to even), like every `/` of the crate: 1.35 ULP
+    ///   for the bases 2, 10, 1.5, 1/3 and 1000. A base close to 1 amplifies the error of the
+    ///   numerator by `1 / |log2(base)|`.
     fn log(self: Fixed, base: Fixed) -> Fixed;
     /// Raises `self` to the power `n`: `exp2(n * log2(self))`, the product being kept at 88
     /// fractional bits (never rounded to 32).

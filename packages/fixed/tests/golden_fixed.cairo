@@ -93,8 +93,8 @@ fn golden_fixed_from_int() {
         case += 1;
     }
 }
-// fixed::from_ratio: 13 cases, tolerance 0 ULP - exact: trunc(num * 2^32 / den) on plain
-// integers; results outside the scalar range are panic cases.
+// fixed::from_ratio: 13 cases, tolerance 0 ULP - exact: round_half_even(num * 2^32 / den) on
+// plain integers; results outside the scalar range are panic cases.
 #[cairofmt::skip]
 const FROM_RATIO_CASES: [i64; 39] = [
     1, 3, 1431655765,
@@ -105,7 +105,7 @@ const FROM_RATIO_CASES: [i64; 39] = [
     2147483647, 1, 9223372032559808512,
     -2147483648, 1, -9223372036854775808,
     2622845057, -864, -13038233498021129,
-    1937043629, 912, 9122301576184382,
+    1937043629, 912, 9122301576184383,
     -5616089503, -941, 25633284534318697,
     9077721298, 21, 1856596004624412867,
     -7329977647, 64, -491906473035563008,
@@ -425,8 +425,9 @@ fn golden_fixed_mul_panics_overflow() {
     let a1 = next_fixed(ref d);
     let _: Fixed = a0 * a1;
 }
-// fixed::div_rem: 12 cases, tolerance 0 ULP - exact: (trunc(a * 2^32 / b), a % b): toward zero,
-// the remainder has the sign of the dividend; quotients outside the scalar range are panic cases.
+// fixed::div_rem: 12 cases, tolerance 0 ULP - exact: (round_half_even(a * 2^32 / b), a % b): the
+// quotient to nearest, ties to even; the remainder is that of the truncated division (sign of the
+// dividend); quotients outside the scalar range are panic cases.
 #[cairofmt::skip]
 const DIV_REM_CASES: [i64; 48] = [
     32212254720, -10737418240, -12884901888, 0,
@@ -435,12 +436,12 @@ const DIV_REM_CASES: [i64; 48] = [
     -1, 8589934592, 0, -1,
     -9223372036854775808, 9223372036854775807, -4294967296, -1,
     -9223372036854775808, -9223372036854775808, 4294967296, 0,
-    -2734652165167052084, -3159312938255567073, 3717656922, -2734652165167052084,
-    646139144346324608, -7479190302353156152, -371049054, 646139144346324608,
-    8016815991444805202, 96366770864, 357301196175787780, 46632478914,
-    -675497621497839616, 6863063117757982089, -422732552, -675497621497839616,
+    -2734652165167052084, -3159312938255567073, 3717656923, -2734652165167052084,
+    646139144346324608, -7479190302353156152, -371049055, 646139144346324608,
+    8016815991444805202, 96366770864, 357301196175787781, 46632478914,
+    -675497621497839616, 6863063117757982089, -422732553, -675497621497839616,
     2264069878563326800, -852126360544477184, -11411577595, 559817157474372432,
-    147057641732945773, -7250081662401249280, -87117330, 147057641732945773,
+    147057641732945773, -7250081662401249280, -87117331, 147057641732945773,
 ];
 
 #[test]
@@ -485,8 +486,8 @@ fn golden_fixed_div_rem_panics_overflow() {
     let a1 = next_fixed(ref d);
     let _: (Fixed, Fixed) = (a0 / a1, a0 % a1);
 }
-// fixed::recip: 10 cases, tolerance 0 ULP - exact: trunc(2^64 / raw), toward zero (raw in 0..=2
-// is a panic case).
+// fixed::recip: 10 cases, tolerance 0 ULP - exact: round_half_even(2^64 / raw) (raw -1, 0, 1 and
+// 2 are panic cases; never a tie).
 #[cairofmt::skip]
 const RECIP_CASES: [i64; 20] = [
     4294967296, 4294967296,
@@ -495,10 +496,10 @@ const RECIP_CASES: [i64; 20] = [
     3, 6148914691236517205,
     -2, -9223372036854775808,
     9223372036854775807, 2,
-    -2446078974237868032, -7,
-    -3315984759926030336, -5,
-    2670840406017890509, 6,
-    6673780208667382591, 2,
+    -2446078974237868032, -8,
+    -3315984759926030336, -6,
+    2670840406017890509, 7,
+    6673780208667382591, 3,
 ];
 
 #[test]
@@ -633,8 +634,8 @@ fn golden_fixed_lerp_panics_overflow() {
     let a2 = next_fixed(ref d);
     let _: Fixed = a0.lerp(a1, a2);
 }
-// fixed::inverse_lerp: 11 cases, tolerance 0 ULP - exact: trunc((v - a) * 2^32 / (b - a)); the
-// native subtractions and the quotient range are panic cases.
+// fixed::inverse_lerp: 11 cases, tolerance 0 ULP - exact: round_half_even((v - a) * 2^32 / (b -
+// a)); the native subtractions and the quotient range are panic cases.
 #[cairofmt::skip]
 const INVERSE_LERP_CASES: [i64; 44] = [
     0, 42949672960, 21474836480, 2147483648,
@@ -642,8 +643,8 @@ const INVERSE_LERP_CASES: [i64; 44] = [
     42949672960, 0, 10737418240, 3221225472,
     -4294967296, 4294967296, 0, 2147483648,
     4294967296, 12884901888, 10737418240, 3221225472,
-    34395, -31317602948, -16777537164, 2300911794,
-    19610013, -27102191969, -755486439, 122743094,
+    34395, -31317602948, -16777537164, 2300911795,
+    19610013, -27102191969, -755486439, 122743095,
     -235337811, -24125055, -12884901888, -257226244514,
     -28641, -1743267422, 3537719786, -8716255031,
     -19570831976, 31164336073, 19095878809, 3273316412,
@@ -717,9 +718,9 @@ const REMAP_CASES: [i64; 48] = [
     2147483648, 0, 4294967296, -4294967296, 4294967296, 0,
     -8589934592, 0, 4294967296, 0, 4294967296, -8589934592,
     12884901888, 4294967296, 21474836480, 30064771072, 12884901888, 21474836480,
-    253371376, -6515279074, -84660, -17380407129, 1286436389, 2012619499,
+    253371376, -6515279074, -84660, -17380407129, 1286436389, 2012619504,
     -26656755480, -7208122984, 5647244483, 1878034081, 22830142839, -29819998999,
-    19703871240, -32556324665, -32673854840, -32212254720, 8848937096, -18290212197255,
+    19703871240, -32556324665, -32673854840, -32212254720, 8848937096, -18290212197265,
     17179869184, -12884901888, -19406485827, -13055391152, 523721487, -75655660759,
 ];
 
@@ -758,7 +759,7 @@ fn golden_fixed_remap_panics_division_by_zero() {
 }
 // fixed::powi: 15 cases, tolerance 0 ULP - exact: the documented algorithm, every product floored
 // (n = 2, 3 floor of the exact power, n = 4 floor(floor(x^2)^2), n >= 5 binary exponentiation LSB
-// first), negative n = recip (truncated) of the power.
+// first), negative n = recip (rounded half to even) of the power.
 #[cairofmt::skip]
 const POWI_CASES: [i64; 45] = [
     8589934592, 0, 4294967296,
@@ -772,9 +773,9 @@ const POWI_CASES: [i64; 45] = [
     1, 2, 0,
     -12107258344, 0, 4294967296,
     32154976097, -2, 76627243,
-    -10787299, -3, -267344117010283356,
+    -10787299, -3, -267344117010283357,
     252270987, 4, 51119,
-    -7510151669, -3, -803328771,
+    -7510151669, -3, -803328772,
     6505019702, -2, 1872329807,
 ];
 
@@ -819,8 +820,8 @@ fn golden_fixed_powi_panics_negative_of_zero() {
     let a1 = next_i32(ref d);
     let _: Fixed = a0.powi(a1);
 }
-// fixed::smoothstep: 13 cases, tolerance 0 ULP - exact: t = saturate(trunc((x - e0) / (e1 -
-// e0))), then floor(t^2 (3 - 2t)) evaluated at the Q96.96 scale.
+// fixed::smoothstep: 13 cases, tolerance 0 ULP - exact: t = saturate(round_half_even((x - e0) /
+// (e1 - e0))), then floor(t^2 (3 - 2t)) evaluated at the Q96.96 scale.
 #[cairofmt::skip]
 const SMOOTHSTEP_CASES: [i64; 52] = [
     2147483648, 0, 4294967296, 2147483648,

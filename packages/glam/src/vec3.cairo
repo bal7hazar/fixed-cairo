@@ -196,9 +196,10 @@ pub trait Vec3Trait {
     /// of a homogeneous coordinate.
     ///
     /// One shared `fixed::wide::Recip` of `w` (one division, rounded to nearest) and one
-    /// fused product per component, instead of three truncated `Fixed / Fixed`: it pays
-    /// off from two divisions on (`alt_from_homogeneous_div` in `gas/vec3.snap`). A result
-    /// may differ by 1 ULP from the truncated division.
+    /// fused product per component, instead of three correctly rounded `Fixed / Fixed`: it
+    /// pays off from two divisions on (`alt_from_homogeneous_div` in `gas/vec3.snap`). A
+    /// result may differ by 1 ULP from the correctly rounded division (ties toward
+    /// +infinity, `|x| / 2^64` term).
     ///
     /// Mirrors `glam::Vec3::from_homogeneous`.
     /// #### Panics
@@ -728,9 +729,9 @@ pub trait Vec3Trait {
     /// * `'Fixed: overflow'` if the length or its reciprocal does not fit the scalar
     ///   range.
     /// #### Deviations
-    /// * The length is floored, then the division truncates: at most 2 ULP off the exact
-    ///   value for `|self| >= 1`. For valid results `self` must not be of length zero: it
-    ///   panics instead of returning infinity.
+    /// * The length is floored, then the reciprocal rounds to nearest: under 1.5 ULP off
+    ///   the exact value for `|self| >= 1`. For valid results `self` must not be of length
+    ///   zero: it panics instead of returning infinity.
     fn length_recip(self: Vec3) -> Fixed;
     /// Computes the Euclidean distance between two points in space.
     ///
@@ -864,9 +865,9 @@ pub trait Vec3Trait {
     ///
     /// `rhs` must be of non-zero length.
     ///
-    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (truncated toward zero), then
-    /// one floor rescale per component. A shared `Recip` is measurably more expensive for
-    /// one division: it is kept in `benches::alt`.
+    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (rounded to nearest), then one
+    /// floor rescale per component. A shared `Recip` is measurably more expensive for one
+    /// division: it is kept in `benches::alt`.
     ///
     /// Mirrors `glam::Vec3::project_onto`.
     /// #### Panics
@@ -1093,9 +1094,9 @@ pub trait Vec3Trait {
     /// * `'i64_neg Underflow'` if a component is `MIN`.
     /// #### Deviations
     /// * The `self.is_normalized()` precondition is not checked (`glam_assert!`).
-    /// * `a = -1 / (sign + z)` is one truncated division; every other term is a triple
-    ///   product rescaled once. The inputs are unit vectors, so `|sign + z| >= 1` and the
-    ///   division is always defined.
+    /// * `a = -1 / (sign + z)` is one correctly rounded division; every other term is a
+    ///   triple product rescaled once. The inputs are unit vectors, so `|sign + z| >= 1`
+    ///   and the division is always defined.
     fn any_orthonormal_vector(self: Vec3) -> Vec3;
     /// Given a unit vector return two other vectors that together form a right-handed
     /// orthonormal basis. That is, all three vectors are orthogonal to each other and are
@@ -1109,9 +1110,9 @@ pub trait Vec3Trait {
     /// * `'i64_neg Underflow'` if a component is `MIN`.
     /// #### Deviations
     /// * The `self.is_normalized()` precondition is not checked (`glam_assert!`).
-    /// * `a = -1 / (sign + z)` is one truncated division; every other term is a triple
-    ///   product rescaled once. The inputs are unit vectors, so `|sign + z| >= 1` and the
-    ///   division is always defined.
+    /// * `a = -1 / (sign + z)` is one correctly rounded division; every other term is a
+    ///   triple product rescaled once. The inputs are unit vectors, so `|sign + z| >= 1`
+    ///   and the division is always defined.
     /// * The second vector is exactly `any_orthonormal_vector`.
     fn any_orthonormal_pair(self: Vec3) -> (Vec3, Vec3);
     /// Performs a spherical linear interpolation between `self` and `rhs` based on the
@@ -1293,7 +1294,7 @@ pub trait Vec3Trait {
     ///
     /// One division shared by the components (`Recip`) and one fused multiplication each,
     /// rounded to nearest: cheaper than, and up to 1 ULP away from, the component-wise
-    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    /// correctly rounded `Fixed / Fixed` kept in `benches::alt`.
     ///
     /// Mirrors `impl Div<f32> for glam::Vec3`.
     /// #### Panics
@@ -2193,8 +2194,8 @@ pub impl Vec3Mul of Mul<Vec3> {
     }
 }
 
-/// Component-wise `/`. Truncated toward zero. Panics with `'Fixed: division by zero'` or `'Fixed:
-/// overflow'`.
+/// Component-wise `/`. Rounded to nearest, ties to even. Panics with `'Fixed: division by zero'` or
+/// `'Fixed: overflow'`.
 ///
 /// Mirrors `impl Div for glam::Vec3`.
 pub impl Vec3Div of Div<Vec3> {

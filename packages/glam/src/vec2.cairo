@@ -697,9 +697,9 @@ pub trait Vec2Trait {
     /// * `'Fixed: overflow'` if the length or its reciprocal does not fit the scalar
     ///   range.
     /// #### Deviations
-    /// * The length is floored, then the division truncates: at most 2 ULP off the exact
-    ///   value for `|self| >= 1`. For valid results `self` must not be of length zero: it
-    ///   panics instead of returning infinity.
+    /// * The length is floored, then the reciprocal rounds to nearest: under 1.5 ULP off
+    ///   the exact value for `|self| >= 1`. For valid results `self` must not be of length
+    ///   zero: it panics instead of returning infinity.
     fn length_recip(self: Vec2) -> Fixed;
     /// Computes the Euclidean distance between two points in space.
     ///
@@ -833,9 +833,9 @@ pub trait Vec2Trait {
     ///
     /// `rhs` must be of non-zero length.
     ///
-    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (truncated toward zero), then
-    /// one floor rescale per component. A shared `Recip` is measurably more expensive for
-    /// one division: it is kept in `benches::alt`.
+    /// A single division `dot(self, rhs) / dot(rhs, rhs)` (rounded to nearest), then one
+    /// floor rescale per component. A shared `Recip` is measurably more expensive for one
+    /// division: it is kept in `benches::alt`.
     ///
     /// Mirrors `glam::Vec2::project_onto`.
     /// #### Panics
@@ -1147,7 +1147,7 @@ pub trait Vec2Trait {
     ///
     /// One division shared by the components (`Recip`) and one fused multiplication each,
     /// rounded to nearest: cheaper than, and up to 1 ULP away from, the component-wise
-    /// truncated `Fixed / Fixed` kept in `benches::alt`.
+    /// correctly rounded `Fixed / Fixed` kept in `benches::alt`.
     ///
     /// Mirrors `impl Div<f32> for glam::Vec2`.
     /// #### Panics
@@ -1831,8 +1831,8 @@ pub impl Vec2Mul of Mul<Vec2> {
     }
 }
 
-/// Component-wise `/`. Truncated toward zero. Panics with `'Fixed: division by zero'` or `'Fixed:
-/// overflow'`.
+/// Component-wise `/`. Rounded to nearest, ties to even. Panics with `'Fixed: division by zero'` or
+/// `'Fixed: overflow'`.
 ///
 /// Mirrors `impl Div for glam::Vec2`.
 pub impl Vec2Div of Div<Vec2> {

@@ -60,7 +60,7 @@ pub(crate) fn check_near(near: Fixed) {
 /// `(cot(fov / 2) / aspect, cot(fov / 2))`: `xx` and the unflipped `yy` of a perspective.
 ///
 /// `fov * 0.5` floors (measured 220 gas cheaper than `fov.raw / 2`, same value for a positive
-/// angle), `sin_cos` shares the range reduction, one truncated division gives the cotangent.
+/// angle), `sin_cos` shares the range reduction, one rounded division gives the cotangent.
 #[inline(always)]
 pub(crate) fn fov_scales(fov: Fixed, aspect: Fixed) -> (Fixed, Fixed) {
     assert(fov > ZERO && fov < PI, 'camera: fov out of range');
@@ -70,7 +70,7 @@ pub(crate) fn fov_scales(fov: Fixed, aspect: Fixed) -> (Fixed, Fixed) {
     (h / aspect, h)
 }
 
-/// `far / (far - near)`, truncated: the only division of the depth terms of a perspective and
+/// `far / (far - near)`, rounded: the only division of the depth terms of a perspective and
 /// of a frustum.
 #[inline(always)]
 pub(crate) fn depth_q(near: Fixed, far: Fixed) -> Fixed {

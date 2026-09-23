@@ -208,12 +208,22 @@ fn test_rounding_direction_of_mul_and_div() {
     // -1 ULP * 1/2 = -1/2 ULP: floor gives -1 ULP, truncation would give 0.
     assert_eq!((f(-1) * HALF).raw, -1);
     assert_eq!((f(1) * HALF).raw, 0);
-    // -1 ULP / 2 = -1/2 ULP: truncation gives 0 (floor would give -1 ULP).
-    assert_eq!((f(-1) / TWO).raw, 0);
-    assert_eq!((f(1) / TWO).raw, 0);
-    assert_eq!((f(-3) / TWO).raw, -1);
+    // `/` rounds to nearest, ties to even: +-1/2 -> 0, +-3/2 -> +-2, +-5/2 -> +-2, all four signs.
+    let ties: [(i64, i64, i64); 8] = [
+        (-1, 2, 0), (1, 2, 0), (3, 2, 2), (-3, 2, -2), (5, 2, 2), (5, -2, -2), (-5, -2, 2),
+        (-3, -2, 2),
+    ];
+    for (a, k, q) in ties.span() {
+        assert_eq!((f(*a) / f(*k * ONE_RAW)).raw, *q);
+        assert_eq!(f(*a).div_nearest(f(*k * ONE_RAW)).raw, *q);
+    }
+    // not a tie: to the nearest raw value, up or down
+    assert_eq!((ONE / f(3 * ONE_RAW)).raw, 0x55555555);
+    assert_eq!((TWO / f(3 * ONE_RAW)).raw, 0xaaaaaaab);
+    assert_eq!((TWO / f(-3 * ONE_RAW)).raw, -0xaaaaaaab);
+    assert_eq!(FixedTrait::from_ratio(2, 3).raw, 0xaaaaaaab);
     assert_eq!(f(-3 * ONE_RAW).recip().raw, -1431655765);
-    assert_eq!(f(3 * ONE_RAW).recip().raw, 1431655765);
+    assert_eq!(f(6).recip().raw, 3074457345618258603); // 2^64 / 6 = ...602.67
 }
 
 #[test]
@@ -522,11 +532,25 @@ fn fuzz_mul_is_floor_of_exact_product(x: i64, y: i64, sel: u8) {
 
 #[test]
 #[fuzzer(runs: 256, seed: 103)]
-fn fuzz_div_is_trunc_of_exact_quotient(x: i64, y: i64, sel: u8) {
+fn fuzz_div_is_round_half_even_of_exact_quotient(x: i64, y: i64, sel: u8) {
     let (a, b) = (scale(x, sel), scale(y, sel / 4));
     if b != 0 {
-        let num: i128 = a.into() * ONE_I128;
-        let exact: i128 = num / b.into(); // the corelib signed division truncates
+        // n = q d + r, 0 <= r < d (d > 0): the exact quotient is in [q, q + 1)
+        let (n, d): (i128, i128) = if b < 0 {
+            (-a.into() * ONE_I128, -b.into())
+        } else {
+            (a.into() * ONE_I128, b.into())
+        };
+        let (mut q, mut r) = (n / d, n % d);
+        if r < 0 {
+            q -= 1;
+            r += d;
+        }
+        let exact = if 2 * r > d || (2 * r == d && q % 2 != 0) {
+            q + 1
+        } else {
+            q
+        };
         let fits: Option<i64> = exact.try_into();
         if let Some(e) = fits {
             assert_eq!((f(a) / f(b)).raw, e);
@@ -757,14 +781,15 @@ fn test_mul_table() {
     }
 }
 
-/// `a`, `b`, `trunc(a 2^32 / b)`, `a - b trunc(a / b)`: both round toward zero.
+/// `a`, `b`, `round_half_even(a 2^32 / b)`, `a - b trunc(a / b)`: the quotient to nearest (ties to
+/// even), the remainder of the truncated division (exact, like Rust's float `%`).
 const DIV_REM: [(i64, i64, i64, i64); 13] = [
     (4294967296, 8589934592, 2147483648, 4294967296),
     (-4294967296, 12884901888, -1431655765, -4294967296),
     (9223372036854775807, 4294967296, 9223372036854775807, 4294967295),
     (-9223372036854775808, 4294967296, -9223372036854775808, 0), (1, 8589934592, 0, 1),
     (-1, 8589934592, 0, -1), (6442450944, -2147483648, -12884901888, 0),
-    (9223372036854775807, -9223372036854775808, -4294967295, 9223372036854775807),
+    (9223372036854775807, -9223372036854775808, -4294967296, 9223372036854775807),
     (-9223372036854775808, 9223372036854775807, -4294967296, -1), (12345, -7, -7574481609874, 4),
     (6442450944, 6442450944, 4294967296, 0), (0, -9223372036854775808, 0, 0),
     (-12345, 7, -7574481609874, -4),
@@ -882,12 +907,12 @@ fn test_rounding_table() {
     }
 }
 
-/// `a`, `trunc(2^64 / a)`: the reciprocal truncates toward zero like `/`.
+/// `a`, `round_half_even(2^64 / a)`: the reciprocal rounds like `/`.
 const RECIP: [(i64, i64); 14] = [
     (3, 6148914691236517205), (-3, -6148914691236517205), (12345, 1494268454735484),
     (-12345, -1494268454735484), (2147483647, 8589934596), (2147483648, 8589934592),
     (-2147483648, -8589934592), (4294967296, 4294967296), (-4294967296, -4294967296),
-    (6442450944, 2863311530), (-6442450944, -2863311530), (9223372036854775807, 2),
+    (6442450944, 2863311531), (-6442450944, -2863311531), (9223372036854775807, 2),
     (-9223372036854775808, -2), (4294967297, 4294967295),
 ];
 

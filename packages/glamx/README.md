@@ -45,10 +45,10 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `mul_vec2` | 4 680 | 40 | 8 |
 | `inverse` | 400 | 4 | 0 |
 | `from_angle` | 31 300 | 243 | 62 |
-| `angle` | 28 120 | 202 | 44 |
+| `angle` | 29 630 | 207 | 44 |
 | `normalize` | 8 940 | 75 | 18 |
 | `lerp` | 4 880 | 42 | 8 |
-| `slerp` | 70 450 | 531 | 126 |
+| `slerp` | 71 960 | 536 | 126 |
 
 ### `SdpMatrix3`
 

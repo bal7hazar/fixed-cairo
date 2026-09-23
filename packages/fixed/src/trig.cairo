@@ -16,7 +16,8 @@
 //! is the bias of [`bounded::narrow64_round`] instead of the bias of `narrow64`; where it leaves
 //! a plain `Fixed *` (`cos`, `atan`) half a unit of that rescale is baked into the constant term
 //! of the polynomial by the generator, so the floor of the biased polynomial *is* the
-//! round-to-nearest of the exact one. `tan` (a division, truncated like every `/` of the crate)
+//! round-to-nearest of the exact one. `tan` (a division, rounded half to even like every `/` of the
+//! crate)
 //! and `to_radians` / `to_degrees` (a plain multiplication, floored like every `*`) keep the
 //! house rounding: making them round as well would cost a second division and 570 gas
 //! respectively, for no measurable gain.
@@ -227,10 +228,10 @@ const RAD_TO_DEG_SCALED: Fixed = Fixed { raw: 0x394bb834c783f000 };
 /// | `cos` | 1000 turns | 1.07 |
 /// | `sin` | near MIN / MAX | 2.03 |
 /// | `cos` | near MIN / MAX | 1.71 |
-/// | `tan` | [-pi/4, pi/4] | 2.22 |
-/// | `tan` | whole branch, error / (1 + tan^2) | 1.55 |
-/// | `atan` | -16 to 16 | 2.67 |
-/// | `atan2` | unit circle | 3.22 |
+/// | `tan` | [-pi/4, pi/4] | 1.73 |
+/// | `tan` | whole branch, error / (1 + tan^2) | 1.18 |
+/// | `atan` | -16 to 16 | 2.75 |
+/// | `atan2` | unit circle | 2.78 |
 /// | `acos` | full | 2.96 |
 /// | `asin` | full | 2.25 |
 /// | `to_radians` | [-360, 360] deg | 1.00 |
@@ -284,11 +285,11 @@ pub trait TrigTrait {
     ///   `self` is within `4.7e-10` (2 ULP of `cos`) of an odd multiple of `pi / 2`, where
     ///   `f32::tan` returns a huge value or infinity.
     /// #### Deviations
-    /// * Maximum absolute error 2.22 ULP on `[-pi/4, pi/4]`, and `tan(FRAC_PI_4) = 1` exactly
+    /// * Maximum absolute error 1.73 ULP on `[-pi/4, pi/4]`, and `tan(FRAC_PI_4) = 1` exactly
     ///   (`sin` and `cos` agree there once rounded). `tan` is ill-conditioned near `pi / 2`: a
     ///   1 ULP perturbation of `self` moves the result by `1 + tan^2(self)` ULP, and the
-    ///   measured error stays within 1.56 ULP of that bound over the whole branch.
-    /// * The division itself truncates, like every `/` of the crate.
+    ///   measured error stays within 1.18 ULP of that bound over the whole branch.
+    /// * The division itself rounds to nearest (ties to even), like every `/` of the crate.
     fn tan(self: Fixed) -> Fixed;
     /// Computes the arcsine of `self`, in radians, in `[-pi/2, pi/2]`.
     ///
@@ -333,7 +334,7 @@ pub trait TrigTrait {
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Maximum absolute error 2.67 ULP. `atan(0) = 0`, `atan(+-1) = +-FRAC_PI_4` and
+    /// * Maximum absolute error 2.75 ULP. `atan(0) = 0`, `atan(+-1) = +-FRAC_PI_4` and
     ///   `atan(-x) = -atan(x)` are exact.
     /// * `|self| <= 1` costs no division; a larger magnitude is reflected through
     ///   `atan(x) = pi/2 - atan(1/x)` (one division).
@@ -345,7 +346,7 @@ pub trait TrigTrait {
     /// #### Panics
     /// * Never.
     /// #### Deviations
-    /// * Maximum absolute error 3.22 ULP. The axes are exact: `atan2(0, 0) = 0`,
+    /// * Maximum absolute error 2.78 ULP. The axes are exact: `atan2(0, 0) = 0`,
     ///   `atan2(y, 0) = +-FRAC_PI_2`, `atan2(0, x) = 0` or `PI`, `atan2(x, x) = FRAC_PI_4`.
     /// * `atan2(0, 0) = 0` as in Rust (no negative zero, so the `+-0.0` cases collapse).
     fn atan2(self: Fixed, x: Fixed) -> Fixed;
