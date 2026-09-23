@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 
 Nothing yet.
 
+## [0.3.0] - 2026-09-23
+
+Division follows the Rust reference (`f64 /`), requested by `nalgebra-cairo` (41 accuracy tests of
+its LU / LDLT / Cholesky / QR / SVD regressed with the truncating division). **Numeric change**:
+every result that goes through `/`, `recip` or `from_ratio` may move by 1 ULP (up to 7 raw in
+`project_onto`). `glam` and `glamx` are released at 0.3.0 with it.
+
+### Added
+- `FixedTrait::div_nearest`, `FixedTrait::recip_nearest`: the correctly rounded quotient (to
+  nearest, ties to even), exact when representable (#42).
+- `fixed::wide::RecipNearest` / `RecipNearestTrait::{new, div_nearest}`: a divisor prepared once,
+  bit-identical to `x.div_nearest(d)`; cheaper from 3 quotients on (-12 % at 9) (#42).
+
+### Changed
+- `Fixed / Fixed`, `FixedTrait::recip` and `FixedTrait::from_ratio` round to nearest, ties to
+  even, instead of truncating toward zero (`/` 3 740 -> 4 140 gas, `recip` 3 370 -> 3 670; 173
+  benches in 18 snapshots, at most +16.3 % on `Mat4::recip`). `rem`, `div_euclid`, `rem_euclid`
+  and `RecipTrait::mul` (`normalize*`, `inverse`) are unchanged. Measured accuracy: `tan` 2.22 ->
+  1.73 ULP, `atan2` 3.22 -> 2.78, `log` 1.88 -> 1.35, eigen3 eigenvalues 0.79 -> 0.64 ULP*|A|;
+  `atan` 2.67 -> 2.75, eigen3 residual 8.3 -> 9.6 (tolerance 16) (#42).
+
 ## [0.2.0] - 2026-09-23
 
 API addition to `fixed` requested by `nalgebra.cairo` (generic code over one accumulator type);
