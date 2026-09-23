@@ -3,7 +3,7 @@ version = 1
 
 [[package]]
 name = "benches"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "fixed",
  "glam",
@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "consumer"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "fixed",
  "glam",
@@ -22,14 +22,14 @@ dependencies = [
 
 [[package]]
 name = "fixed"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "snforge_std",
 ]
 
 [[package]]
 name = "glam"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "fixed",
  "snforge_std",
@@ -37,7 +37,7 @@ dependencies = [
 
 [[package]]
 name = "glamx"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "fixed",
  "glam",

@@ -52,8 +52,15 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
   documented alternative (report 05 section 3.4) should profiling of the physics step justify it.
 - **Rounding**: **floor** (toward negative infinity) for every rescale: `mul`, fused kernels,
   polynomial evaluation. It is what the branch-free bias trick `((p + 2^k) div 2^32) - 2^(k-32)`
-  yields for free. `div`, `rem`, `recip` and `from_ratio` truncate toward zero like the corelib
-  signed division (measured cheaper than floor: 3 740 vs 3 940 gas). One deliberate exception:
+  yields for free. Division follows the Rust reference (`f64 /`): `Fixed / Fixed`, `recip` and
+  `from_ratio` round to nearest, ties to even, and are exact whenever the quotient is
+  representable (since 0.3.0, #42; 4 140 gas vs 3 740 for the former truncation, which DESIGN
+  used to prefer for cost: the owner's rule "mirror the reference" wins). `div_nearest` /
+  `recip_nearest` are the same functions under explicit names, and `wide::RecipNearest` shares a
+  divisor with the same bits. `rem` is the exact truncated remainder (Rust's float `%`) and
+  `div_euclid` / `rem_euclid` are euclidean, as in Rust. Multiplication and the fused kernels
+  still floor: `f64 *` rounds to nearest, and aligning them is an open question (it would change
+  every result of the library). One deliberate exception:
   `wide::RecipTrait::mul` (the shared-division kernel behind `normalize*` and `inverse`) rounds
   to nearest, ties toward +infinity, at no extra cost, so that `x / d` is exact whenever the
   quotient is representable (`normalize` of an axis-aligned vector is exactly `+-1`). Second
