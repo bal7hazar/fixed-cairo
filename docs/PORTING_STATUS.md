@@ -51,4 +51,4 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | R1l | doc-only deviation fixes: stale camera module doc, `Deviations: None.` replaced on items that panic where upstream continues, non-semantic bullets moved out of `Deviations` | done | #38 |
 | R1i | bytecode size of a consumer contract (`packages/consumer`, `docs/audits/R1-bytecode-size.md`): kitchen-sink class at 61.5 % of the 81 920 CASM felt limit, keep the inlining; `gas/bytecode.size` checked in CI | done | #31 |
 | R1z | `v0.1.0`: tag `v0.1.0` (2ac9a82) and GitHub release cut 2026-09-22; `scarb publish` of `fixed`, `glam`, `glamx` by the owner | done | [release](https://github.com/bal7hazar/glam.cairo/releases/tag/v0.1.0) |
-| F5 | `fixed::wide::Acc` count-agnostic accumulator + `WideSqrt` for `W1..W16` (nalgebra.cairo escalation, 2026-09-23); release `v0.2.0` of the three packages | inreview | #40 |
+| F5 | `fixed::wide::Acc` count-agnostic accumulator + `WideSqrt` for `W1..W16` (nalgebra.cairo escalation, 2026-09-23); release `v0.2.0` of the three packages (tag on 69c2db7, published on scarbs.xyz 2026-09-23) | done | #40, [release](https://github.com/bal7hazar/glam.cairo/releases/tag/v0.2.0) |
