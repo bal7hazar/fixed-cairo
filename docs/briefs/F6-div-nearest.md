@@ -76,3 +76,23 @@ Gate green in the foreground; commits `feat(fixed): ...` / `feat(wide): ...` wit
 trailer; pull request `feat(fixed): correctly rounded div_nearest / recip_nearest` with the gas
 table and the measurement section; CI green; `REPORT.md` with the exact public symbols. Do not
 merge.
+
+## Part 2 (decided by the orchestrator on 2026-09-23, after the owner deferred to the Rust reference)
+
+Given after part 1 is done, in the same pull request, as separate commits
+(`feat(fixed)!: ...`). Rust's `f64 /` and `1.0 / x` round to nearest, ties to even; this port
+follows the reference:
+- `Fixed / Fixed` (`FixedDiv`, `FixedDivAssign`), `FixedTrait::recip` and `from_ratio` become the
+  nearest kernel (`div_nearest` / `recip_nearest` stay as named aliases, documented as such).
+- `rem` is unchanged: Rust's float `%` is the exact truncated remainder, which it already is.
+  `div_euclid` / `rem_euclid` are unchanged (integer-valued quotient, as in Rust).
+- `RecipTrait::mul` is unchanged (fused single rounding of `x / d`, DESIGN section 3
+  "reassociation").
+- Every golden file, unit test and snapshot that changes is regenerated or updated, across
+  `fixed`, `glam`, `glamx` (the allowlist extends to their tests, goldens, refgen specs /
+  oracles, `gas/*.snap`, `gas/bytecode.size`, the generated READMEs and `docs/API_PARITY.md`).
+  An expected value changes: regenerate from the oracle. A tolerance no longer holds: stop and
+  escalate with the case, never loosen it.
+- The `#### Deviations` of `div`, `recip`, `from_ratio` and every item that documented
+  "truncates" are updated (`python3 scripts/deviations.py` still parses; `panic_coverage.py
+  --check` green).
