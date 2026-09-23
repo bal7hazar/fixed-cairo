@@ -6,11 +6,11 @@ use benches::alt::{fixed as alt_fixed, wide as alt_wide};
 use benches::harness::{bb, sink};
 use fixed::Fixed;
 use fixed::wide::{
-    NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt, WideSub, det3,
-    distance2, distance2_squared, distance3, distance3_squared, distance4, distance4_squared, dot2,
-    dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add, mul_sub, norm2,
-    norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4, norm4_squared, norm4_wide,
-    normalize2, normalize3, normalize4, wide_from, wide_mul,
+    Acc, AccTrait, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt,
+    WideSub, det3, distance2, distance2_squared, distance3, distance3_squared, distance4,
+    distance4_squared, dot2, dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add,
+    mul_sub, norm2, norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4,
+    norm4_squared, norm4_wide, normalize2, normalize3, normalize4, wide_from, wide_mul,
 };
 
 #[derive(Copy, Drop)]
@@ -1422,4 +1422,406 @@ fn alt_normalize3_div__op() {
     let c = bb(Fixed { raw: 0x16a09e667 });
     let _r = bb((Fixed { raw: 1 }, Fixed { raw: 1 }, Fixed { raw: 1 }));
     sink(alt_wide::normalize3_div(a, b, c));
+}
+
+// ------------------------------------------------------------------ count-agnostic Acc
+
+#[test]
+fn acc_dot3__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_dot3__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(AccTrait::zero().add_prod(a, b).add_prod(c, d).add_prod(a, c).narrow());
+}
+
+#[test]
+fn acc_dot6__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_dot6__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(
+        AccTrait::zero()
+            .add_prod(a, b)
+            .add_prod(c, d)
+            .add_prod(a, c)
+            .add_prod(b, d)
+            .add_prod(a, d)
+            .add_prod(b, c)
+            .narrow(),
+    );
+}
+
+#[test]
+fn typed_dot6__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn typed_dot6__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(
+        wide_mul(a, b)
+            .add(wide_mul(c, d))
+            .add(wide_mul(a, c))
+            .add(wide_mul(b, d))
+            .add(wide_mul(a, d))
+            .add(wide_mul(b, c))
+            .narrow(),
+    );
+}
+
+#[test]
+fn alt_w16_dot6__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_w16_dot6__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(alt_wide::w16_dot6(a, b, c, d));
+}
+
+#[test]
+fn acc_dot16__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_dot16__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(
+        AccTrait::zero()
+            .add_prod(a, b)
+            .add_prod(c, d)
+            .add_prod(a, c)
+            .add_prod(b, d)
+            .add_prod(a, d)
+            .add_prod(b, c)
+            .add_prod(a, b)
+            .add_prod(c, d)
+            .add_prod(a, c)
+            .add_prod(b, d)
+            .add_prod(a, d)
+            .add_prod(b, c)
+            .add_prod(a, b)
+            .add_prod(c, d)
+            .add_prod(a, c)
+            .add_prod(b, d)
+            .narrow(),
+    );
+}
+
+#[test]
+fn typed_dot16__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn typed_dot16__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    let p = wide_mul(a, b).add(wide_mul(c, d)).add(wide_mul(a, c)).add(wide_mul(b, d));
+    let q = wide_mul(a, d).add(wide_mul(b, c)).add(wide_mul(a, b)).add(wide_mul(c, d));
+    let r = wide_mul(a, c).add(wide_mul(b, d)).add(wide_mul(a, d)).add(wide_mul(b, c));
+    let s = wide_mul(a, b).add(wide_mul(c, d)).add(wide_mul(a, c)).add(wide_mul(b, d));
+    sink(p.add(q).add(r.add(s)).narrow());
+}
+
+#[test]
+fn alt_w16_dot16__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_w16_dot16__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(alt_wide::w16_dot16(a, b, c, d));
+}
+
+#[test]
+fn acc_sqrt__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_sqrt__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(AccTrait::zero().add_prod(a, a).add_prod(c, c).sqrt());
+}
+
+#[test]
+fn acc_mul_narrow__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_mul_narrow__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(AccTrait::zero().add_prod(a, b).add_prod(a, c).mul_narrow(c));
+}
+
+#[test]
+fn typed_mul_narrow__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn typed_mul_narrow__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(wide_mul(a, b).add(wide_mul(a, c)).mul(c).narrow());
+}
+
+#[test]
+fn acc_add_fixed__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_add_fixed__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(AccTrait::zero().add_prod(a, b).add(c).narrow());
+}
+
+#[test]
+fn acc_misc__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_misc__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    let left = AccTrait::zero().add_prod(a, b).sub_prod(c, d).sub(a);
+    let right = AccTrait::zero().add_prod(a, c).add(d);
+    let from_w: Acc = wide_mul(b, d).into();
+    sink((-(left + right - from_w)).narrow());
+}
+
+#[test]
+fn alt_w16_dot3__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_w16_dot3__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(alt_wide::w16_dot3(a, b, c, d));
+}
+
+#[test]
+fn typed_acc_sqrt__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn typed_acc_sqrt__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(wide_mul(a, a).add(wide_mul(c, c)).sqrt());
+}
+
+#[test]
+fn typed_add_fixed__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn typed_add_fixed__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(wide_mul(a, b).add(wide_from(c)).narrow());
+}
+
+#[test]
+fn acc_sub_prod__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_sub_prod__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(AccTrait::zero().add_prod(a, b).sub_prod(c, d).narrow());
+}
+
+#[test]
+fn acc_sub_fixed__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_sub_fixed__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    sink(AccTrait::zero().add_prod(a, b).sub(c).narrow());
+}
+
+#[test]
+fn acc_add_partial__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_add_partial__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    let left = AccTrait::zero().add_prod(a, b);
+    let right = AccTrait::zero().add_prod(c, d);
+    sink((left + right).narrow());
+}
+
+#[test]
+fn acc_sub_partial__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    let _d = bb(Fixed { raw: 0x3243f6a88 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_sub_partial__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let d = bb(Fixed { raw: 0x3243f6a88 });
+    let left = AccTrait::zero().add_prod(a, b);
+    let right = AccTrait::zero().add_prod(c, d);
+    sink((left - right).narrow());
+}
+
+#[test]
+fn acc_neg_partial__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_neg_partial__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    sink((-AccTrait::zero().add_prod(a, b)).narrow());
+}
+
+#[test]
+fn acc_from_wide__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acc_from_wide__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let acc: Acc = wide_mul(a, b).into();
+    sink(acc.narrow());
 }

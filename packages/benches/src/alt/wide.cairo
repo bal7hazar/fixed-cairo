@@ -7,6 +7,73 @@
 //! plumbing.
 use fixed::{Fixed, FixedTrait, ONE};
 
+const TWO_POW_64: NonZero<u128> = 0x10000000000000000;
+const W16_BOUND: u256 = 0x400000000000000000000000000000000;
+const PRIME_MINUS_W16_BOUND: u256 =
+    0x800000000000010fffffffffffffffc00000000000000000000000000000001;
+
+#[derive(Copy, Drop)]
+struct AbsorbingW16 {
+    value: felt252,
+}
+
+#[inline(always)]
+fn w16_add_prod(acc: AbsorbingW16, a: Fixed, b: Fixed) -> AbsorbingW16 {
+    let value = acc.value + a.raw.into() * b.raw.into();
+    let canonical: u256 = value.into();
+    assert(canonical <= W16_BOUND || canonical >= PRIME_MINUS_W16_BOUND, 'alt W16: overflow');
+    AbsorbingW16 { value }
+}
+
+#[inline(always)]
+fn w16_narrow(acc: AbsorbingW16) -> Fixed {
+    let u: u128 = ((acc.value + 0x800000000000000000000000) * 0x100000000)
+        .try_into()
+        .expect('Fixed: overflow');
+    let (q, _r) = DivRem::div_rem(u, TWO_POW_64);
+    Fixed { raw: (Into::<u128, felt252>::into(q) - 0x8000000000000000).try_into().unwrap() }
+}
+
+/// Three products accumulated in an absorbing `W16`, with a dynamic `W16` range check per term.
+#[inline(always)]
+pub fn w16_dot3(a: Fixed, b: Fixed, c: Fixed, d: Fixed) -> Fixed {
+    let acc = w16_add_prod(AbsorbingW16 { value: 0 }, a, b);
+    let acc = w16_add_prod(acc, c, d);
+    w16_narrow(w16_add_prod(acc, a, c))
+}
+
+/// Six products accumulated in an absorbing `W16`, with a dynamic `W16` range check per term.
+#[inline(always)]
+pub fn w16_dot6(a: Fixed, b: Fixed, c: Fixed, d: Fixed) -> Fixed {
+    let acc = w16_add_prod(AbsorbingW16 { value: 0 }, a, b);
+    let acc = w16_add_prod(acc, c, d);
+    let acc = w16_add_prod(acc, a, c);
+    let acc = w16_add_prod(acc, b, d);
+    let acc = w16_add_prod(acc, a, d);
+    w16_narrow(w16_add_prod(acc, b, c))
+}
+
+/// Sixteen products accumulated in an absorbing `W16`, with a dynamic range check per term.
+#[inline(always)]
+pub fn w16_dot16(a: Fixed, b: Fixed, c: Fixed, d: Fixed) -> Fixed {
+    let acc = w16_add_prod(AbsorbingW16 { value: 0 }, a, b);
+    let acc = w16_add_prod(acc, c, d);
+    let acc = w16_add_prod(acc, a, c);
+    let acc = w16_add_prod(acc, b, d);
+    let acc = w16_add_prod(acc, a, d);
+    let acc = w16_add_prod(acc, b, c);
+    let acc = w16_add_prod(acc, a, b);
+    let acc = w16_add_prod(acc, c, d);
+    let acc = w16_add_prod(acc, a, c);
+    let acc = w16_add_prod(acc, b, d);
+    let acc = w16_add_prod(acc, a, d);
+    let acc = w16_add_prod(acc, b, c);
+    let acc = w16_add_prod(acc, a, b);
+    let acc = w16_add_prod(acc, c, d);
+    let acc = w16_add_prod(acc, a, c);
+    w16_narrow(w16_add_prod(acc, b, d))
+}
+
 /// `a0 * b0 + a1 * b1 + a2 * b2` with one rescale per product (3 rescales, 2 checked additions).
 #[inline(always)]
 pub fn dot3_unfused(a0: Fixed, b0: Fixed, a1: Fixed, b1: Fixed, a2: Fixed, b2: Fixed) -> Fixed {

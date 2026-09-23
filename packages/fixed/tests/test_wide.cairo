@@ -8,11 +8,11 @@
 //! `tools/refgen`, and are not duplicated here.
 use fixed::fixed::{EPSILON, HALF, MAX, MIN, NEG_ONE, TWO};
 use fixed::wide::{
-    NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt, WideSub, det3,
-    distance2, distance2_squared, distance3, distance3_squared, distance4, distance4_squared, dot2,
-    dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add, mul_sub, norm2,
-    norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4, norm4_squared, norm4_wide,
-    normalize2, normalize3, normalize4, wide_from, wide_mul,
+    Acc, AccTrait, NormTrait, RecipTrait, WideAdd, WideLift, WideMul, WideNarrow, WideNeg, WideSqrt,
+    WideSub, det3, distance2, distance2_squared, distance3, distance3_squared, distance4,
+    distance4_squared, dot2, dot2_add, dot3, dot3_add, dot4, is_unit2, is_unit3, is_unit4, mul_add,
+    mul_sub, norm2, norm2_squared, norm2_wide, norm3, norm3_squared, norm3_wide, norm4,
+    norm4_squared, norm4_wide, normalize2, normalize3, normalize4, wide_from, wide_mul,
 };
 use fixed::{Fixed, FixedTrait, ONE, ONE_RAW, ZERO};
 
@@ -155,6 +155,71 @@ fn test_wide_sqrt() {
     assert_eq!(wide_mul(f(1), f(1)).sqrt().raw, 1); // sqrt(2^-64) = 2^-32: no underflow
     assert_eq!(wide_mul(TWO, ONE).sqrt().raw, 6074000999); // floor(sqrt(2) * 2^32)
     assert_eq!(wide_mul(MAX, MAX).sqrt(), MAX);
+}
+
+#[test]
+fn test_acc_operations_match_typed_kernels() {
+    assert_eq!(AccTrait::zero().narrow(), ZERO);
+    let a = AccTrait::zero()
+        .add_prod(int(3), int(5))
+        .sub_prod(int(2), HALF)
+        .add(int(4))
+        .sub(int(1));
+    let w = wide_mul(int(3), int(5))
+        .sub(wide_mul(int(2), HALF))
+        .add(wide_from(int(4)))
+        .sub(wide_from(int(1)));
+    assert_eq!(a.narrow(), w.narrow());
+    assert_eq!(a.mul_narrow(HALF), w.mul(HALF).narrow());
+    assert_eq!(a.sqrt(), w.sqrt());
+
+    let left = AccTrait::zero().add_prod(int(7), int(9)).sub(int(3));
+    let right = AccTrait::zero().sub_prod(int(2), int(5)).add(int(1));
+    assert_eq!((left + right).narrow(), int(51));
+    assert_eq!((left - right).narrow(), int(69));
+    assert_eq!((-left).narrow(), int(-60));
+}
+
+#[test]
+fn test_acc_extreme_sums_cancel_exactly() {
+    let p = AccTrait::zero().add_prod(MIN, MIN);
+    let n = AccTrait::zero().add_prod(MIN, MAX);
+    let pair = p + n;
+    let eight_pairs = ((pair + pair) + (pair + pair)) + ((pair + pair) + (pair + pair));
+    assert_eq!(eight_pairs.narrow().raw, 0x400000000);
+    assert_eq!((eight_pairs - eight_pairs).narrow(), ZERO);
+    assert_eq!(AccTrait::zero().add_prod(MIN, MIN).sub_prod(MIN, MIN).narrow(), ZERO);
+}
+
+#[test]
+fn test_wide_sqrt_all_widths_at_extremes() {
+    let p = wide_mul(MIN, MIN);
+    let n = wide_mul(MIN, MAX);
+    let z = wide_mul(MIN, ZERO);
+    let x2 = p.add(n);
+    let x3 = x2.add(z);
+    let x4 = x2.add(x2);
+    let x5 = x4.add(z);
+    let x6 = x4.add(x2);
+    let x7 = x6.add(z);
+    let x8 = x4.add(x4);
+    let x9 = x8.add(z);
+    let x10 = x8.add(x2);
+    let x11 = x10.add(z);
+    let x12 = x8.add(x4);
+    let x13 = x12.add(z);
+    let x14 = x12.add(x2);
+    let x15 = x14.add(z);
+    let x16 = x8.add(x8);
+    assert_eq!(wide_mul(MAX, MAX).sqrt(), MAX);
+    assert_eq!((x2.sqrt().raw, x3.sqrt().raw), (3037000499, 3037000499));
+    assert_eq!((x4.sqrt().raw, x5.sqrt().raw), (ONE_RAW, ONE_RAW));
+    assert_eq!((x6.sqrt().raw, x7.sqrt().raw), (5260239168, 5260239168));
+    assert_eq!((x8.sqrt().raw, x9.sqrt().raw), (6074000999, 6074000999));
+    assert_eq!((x10.sqrt().raw, x11.sqrt().raw), (6790939565, 6790939565));
+    assert_eq!((x12.sqrt().raw, x13.sqrt().raw), (7439101573, 7439101573));
+    assert_eq!((x14.sqrt().raw, x15.sqrt().raw), (8035148054, 8035148054));
+    assert_eq!(x16.sqrt().raw, 8589934592);
 }
 
 // ------------------------------------------------------------------ named kernels
@@ -397,6 +462,34 @@ fn test_wide_sqrt_w3_negative_panics() {
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_wide_sqrt_overflow_panics() {
     let _ = wide_mul(MIN, MIN).sqrt(); // 2^63
+}
+
+// panics: Acc::narrow
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_acc_narrow_overflow_panics() {
+    let _ = AccTrait::zero().add_prod(MIN, MIN).narrow();
+}
+
+// panics: Acc::sqrt
+#[test]
+#[should_panic(expected: 'Fixed: sqrt negative')]
+fn test_acc_sqrt_negative_panics() {
+    let _ = AccTrait::zero().sub_prod(MIN, MIN).sqrt();
+}
+
+// panics: Acc::sqrt
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_acc_sqrt_overflow_panics() {
+    let _ = AccTrait::zero().add_prod(MIN, MIN).sqrt();
+}
+
+// panics: Acc::mul_narrow
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_acc_mul_narrow_overflow_panics() {
+    let _ = AccTrait::zero().add_prod(MAX, MAX).mul_narrow(TWO);
 }
 
 #[test]
@@ -748,6 +841,37 @@ fn fuzz_normalize_has_unit_length(x: i64, y: i64, z: i64, w: i64, sel: u8) {
     }
 }
 
+#[test]
+#[fuzzer(runs: 128, seed: 208)]
+fn fuzz_acc_chains_match_typed(
+    a: i64, b: i64, c: i64, d: i64, e: i64, g: i64, h: i64, i: i64, sel: u8,
+) {
+    let m = 0x10000000000_i64;
+    let (a, b, c, d) = (f(a % m), f(b % m), f(c % m), f(d % m));
+    let (e, g, h, i) = (f(e % m), f(g % m), f(h % m), f(i % m));
+    let p1 = wide_mul(a, b);
+    let p2 = wide_mul(c, d);
+    let p3 = wide_mul(e, g);
+    let p4 = wide_mul(h, i);
+    let w2 = p1.add(p2);
+    let w4 = w2.add(p3.add(p4));
+    let w8 = w4.add(w4);
+    let w16 = w8.add(w8);
+    let a1 = AccTrait::zero().add_prod(a, b);
+    let a2 = a1.add_prod(c, d);
+    let a4 = a2.add_prod(e, g).add_prod(h, i);
+    let a8 = a4 + a4;
+    let a16 = a8 + a8;
+    let (actual, expected) = match sel % 5 {
+        0 => (a1.narrow(), p1.narrow()),
+        1 => (a2.narrow(), w2.narrow()),
+        2 => (a4.narrow(), w4.narrow()),
+        3 => (a8.narrow(), w8.narrow()),
+        _ => (a16.narrow(), w16.narrow()),
+    };
+    assert_eq!(actual, expected);
+}
+
 // ------------------------------------------------------------- generated accumulator impls
 //
 // `scripts/gen_bounded.py` emits the `WideAdd` / `WideSub` impls of every pair `(Wn, Wm)` and
@@ -794,6 +918,38 @@ fn test_generated_w_ladder() {
     assert_eq!((x14.narrow(), x14.neg().narrow()), (int(14), int(-14)));
     assert_eq!((x15.narrow(), x15.neg().narrow()), (int(15), int(-15)));
     assert_eq!((x16.narrow(), x16.neg().narrow()), (int(16), int(-16)));
+    let a1: Acc = x1.into();
+    let a2: Acc = x2.into();
+    let a3: Acc = x3.into();
+    let a4: Acc = x4.into();
+    let a5: Acc = x5.into();
+    let a6: Acc = x6.into();
+    let a7: Acc = x7.into();
+    let a8: Acc = x8.into();
+    let a9: Acc = x9.into();
+    let a10: Acc = x10.into();
+    let a11: Acc = x11.into();
+    let a12: Acc = x12.into();
+    let a13: Acc = x13.into();
+    let a14: Acc = x14.into();
+    let a15: Acc = x15.into();
+    let a16: Acc = x16.into();
+    assert_eq!(a1.narrow(), int(1));
+    assert_eq!(a2.narrow(), int(2));
+    assert_eq!(a3.narrow(), int(3));
+    assert_eq!(a4.narrow(), int(4));
+    assert_eq!(a5.narrow(), int(5));
+    assert_eq!(a6.narrow(), int(6));
+    assert_eq!(a7.narrow(), int(7));
+    assert_eq!(a8.narrow(), int(8));
+    assert_eq!(a9.narrow(), int(9));
+    assert_eq!(a10.narrow(), int(10));
+    assert_eq!(a11.narrow(), int(11));
+    assert_eq!(a12.narrow(), int(12));
+    assert_eq!(a13.narrow(), int(13));
+    assert_eq!(a14.narrow(), int(14));
+    assert_eq!(a15.narrow(), int(15));
+    assert_eq!(a16.narrow(), int(16));
     // the widest sums, reached from unbalanced and balanced pairs
     assert_eq!(x1.add(x15).narrow(), int(16));
     assert_eq!(x2.add(x14).narrow(), int(16));
@@ -804,8 +960,7 @@ fn test_generated_w_ladder() {
     assert_eq!(x4.sub(x12).narrow(), int(-8));
     assert_eq!(x12.sub(x4).narrow(), int(8));
     assert_eq!(x15.sub(x1).narrow(), int(14));
-    // `WideSqrt` is generated for `W1..W3` only (a sum of four squares goes through `norm4`);
-    // `test_wide_sqrt` covers its three widths.
+    // `test_wide_sqrt_all_widths_at_extremes` covers `WideSqrt` at every width.
     // `mul` and `lift` cross over to the Q96.96 ladder at both ends and in the middle
     assert_eq!(x1.mul(int(-3)).narrow(), int(-3));
     assert_eq!(x8.mul(int(2)).narrow(), int(16));

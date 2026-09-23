@@ -20,6 +20,8 @@
 //! [`wide_from`], `add`, `sub`, `neg` |
 //! | `T1..T16` | Q96.96 | an exact sum of up to `n` triple products `Fixed * Fixed * Fixed` |
 //! `Wn.mul(Fixed)`, `Wn.lift()`, `add`, `sub`, `neg` |
+//! | [`Acc`] | Q64.64 | a count-agnostic exact sum of products and aligned `Fixed` values |
+//! [`AccTrait::zero`], `add_prod`, `sub_prod`, `add`, `sub` |
 //! | [`Recip`] | Q32.96 | a reciprocal `1 / d` with 96 fractional bits | [`RecipTrait::new`] |
 //!
 //! The index is a static bound, not a count the caller must respect at run time:
@@ -36,9 +38,9 @@
 use core::internal::bounded_int::upcast;
 use crate::fixed::Fixed;
 pub use crate::internal::acc::{
-    T1, T10, T11, T12, T13, T14, T15, T16, T2, T3, T4, T5, T6, T7, T8, T9, W1, W10, W11, W12, W13,
-    W14, W15, W16, W2, W3, W4, W5, W6, W7, W8, W9, WideAdd, WideLift, WideMul, WideNarrow, WideNeg,
-    WideSqrt, WideSub,
+    Acc, AccTrait, T1, T10, T11, T12, T13, T14, T15, T16, T2, T3, T4, T5, T6, T7, T8, T9, W1, W10,
+    W11, W12, W13, W14, W15, W16, W2, W3, W4, W5, W6, W7, W8, W9, WideAdd, WideLift, WideMul,
+    WideNarrow, WideNeg, WideSqrt, WideSub,
 };
 use crate::internal::bounded::{self, BR};
 

@@ -58,6 +58,117 @@ pub trait WideSqrt<S> {
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     fn sqrt(self: S) -> Fixed;
 }
+/// Operations on the count-agnostic exact Q64.64 accumulator [`Acc`].
+pub trait AccTrait {
+    /// Returns the empty sum.
+    fn zero() -> Acc;
+    /// Adds the exact product `a * b`, without a range check.
+    fn add_prod(self: Acc, a: Fixed, b: Fixed) -> Acc;
+    /// Subtracts the exact product `a * b`, without a range check.
+    fn sub_prod(self: Acc, a: Fixed, b: Fixed) -> Acc;
+    /// Adds `c`, aligned exactly to the Q64.64 accumulator scale.
+    fn add(self: Acc, c: Fixed) -> Acc;
+    /// Subtracts `c`, aligned exactly to the Q64.64 accumulator scale.
+    fn sub(self: Acc, c: Fixed) -> Acc;
+    /// Returns `floor(self)` at the Q32.32 scale.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    fn narrow(self: Acc) -> Fixed;
+    /// Returns `floor(sqrt(self))` at the Q32.32 scale.
+    /// #### Panics
+    /// * `'Fixed: sqrt negative'` if `self` is negative.
+    /// * `'Fixed: overflow'` if the root does not fit the scalar range.
+    fn sqrt(self: Acc) -> Fixed;
+    /// Multiplies by `s` exactly, then returns the once-rounded Q32.32 result.
+    ///
+    /// The caller must keep the signed exact product in `(-P / 2, P / 2)`. Given the operation
+    /// bounds documented on [`Acc`], this holds for fewer than `2^61` accumulated operations.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    fn mul_narrow(self: Acc, s: Fixed) -> Fixed;
+}
+/// A count-agnostic exact Q64.64 accumulator backed by one opaque `felt252`.
+///
+/// Each `add_prod` / `sub_prod` changes the signed exact value by at most `2^126`; each `add` /
+/// `sub` changes it by at most `2^95`. After `k` operations, therefore, `|value| <= k * 2^126`.
+/// The field modulus is approximately `2^251`, so the signed representation cannot alias modulo
+/// P until approximately `2^124` operations, beyond any executable trace. `narrow`, `sqrt`, and
+/// `mul_narrow` range-check their exact result, so an out-of-range sum never wraps silently.
+/// `mul_narrow` additionally requires fewer than `2^61` accumulated operations, ensuring that
+/// multiplying by any `Fixed` (`|raw| <= 2^63`) remains in the signed half of the field.
+///
+/// Mirrors nothing in glam-rs: this is a fused-kernel building block for downstream libraries.
+/// #### Panics
+/// * Never on construction or accumulation; exit operations document their own panic paths.
+/// #### Deviations
+/// * None.
+#[derive(Copy, Drop)]
+pub struct Acc {
+    pub(crate) v: felt252,
+}
+
+pub impl AccImpl of AccTrait {
+    #[inline(always)]
+    fn zero() -> Acc {
+        Acc { v: 0 }
+    }
+
+    #[inline(always)]
+    fn add_prod(self: Acc, a: Fixed, b: Fixed) -> Acc {
+        Acc { v: self.v + upcast(wide(a.raw, b.raw)) }
+    }
+
+    #[inline(always)]
+    fn sub_prod(self: Acc, a: Fixed, b: Fixed) -> Acc {
+        Acc { v: self.v - upcast(wide(a.raw, b.raw)) }
+    }
+
+    #[inline(always)]
+    fn add(self: Acc, c: Fixed) -> Acc {
+        Acc { v: self.v + upcast(lift(c.raw)) }
+    }
+
+    #[inline(always)]
+    fn sub(self: Acc, c: Fixed) -> Acc {
+        Acc { v: self.v - upcast(lift(c.raw)) }
+    }
+
+    #[inline(always)]
+    fn narrow(self: Acc) -> Fixed {
+        Fixed { raw: narrow32(self.v) }
+    }
+
+    #[inline(always)]
+    fn sqrt(self: Acc) -> Fixed {
+        Fixed { raw: sqrt_acc(self.v) }
+    }
+
+    #[inline(always)]
+    fn mul_narrow(self: Acc, s: Fixed) -> Fixed {
+        Fixed { raw: narrow64(self.v * s.raw.into()) }
+    }
+}
+
+pub impl AccAdd of Add<Acc> {
+    #[inline(always)]
+    fn add(lhs: Acc, rhs: Acc) -> Acc {
+        Acc { v: lhs.v + rhs.v }
+    }
+}
+
+pub impl AccSub of Sub<Acc> {
+    #[inline(always)]
+    fn sub(lhs: Acc, rhs: Acc) -> Acc {
+        Acc { v: lhs.v - rhs.v }
+    }
+}
+
+pub impl AccNeg of Neg<Acc> {
+    #[inline(always)]
+    fn neg(a: Acc) -> Acc {
+        Acc { v: -a.v }
+    }
+}
 /// Exact sum of up to 1 raw Q64.64 product(s): `|value| <= 1 * 2^126`.
 /// Opaque: built and consumed by the functions and traits of `fixed::wide`.
 #[derive(Copy, Drop)]
@@ -4224,15 +4335,189 @@ pub impl W1Sqrt of WideSqrt<W1> {
         Fixed { raw: sqrt_w1(self.v) }
     }
 }
+pub impl W1IntoAcc of Into<W1, Acc> {
+    #[inline(always)]
+    fn into(self: W1) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
 pub impl W2Sqrt of WideSqrt<W2> {
     #[inline(always)]
     fn sqrt(self: W2) -> Fixed {
         Fixed { raw: sqrt_w2(self.v) }
     }
 }
+pub impl W2IntoAcc of Into<W2, Acc> {
+    #[inline(always)]
+    fn into(self: W2) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
 pub impl W3Sqrt of WideSqrt<W3> {
     #[inline(always)]
     fn sqrt(self: W3) -> Fixed {
         Fixed { raw: sqrt_w3(self.v) }
+    }
+}
+pub impl W3IntoAcc of Into<W3, Acc> {
+    #[inline(always)]
+    fn into(self: W3) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W4Sqrt of WideSqrt<W4> {
+    #[inline(always)]
+    fn sqrt(self: W4) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W4IntoAcc of Into<W4, Acc> {
+    #[inline(always)]
+    fn into(self: W4) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W5Sqrt of WideSqrt<W5> {
+    #[inline(always)]
+    fn sqrt(self: W5) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W5IntoAcc of Into<W5, Acc> {
+    #[inline(always)]
+    fn into(self: W5) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W6Sqrt of WideSqrt<W6> {
+    #[inline(always)]
+    fn sqrt(self: W6) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W6IntoAcc of Into<W6, Acc> {
+    #[inline(always)]
+    fn into(self: W6) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W7Sqrt of WideSqrt<W7> {
+    #[inline(always)]
+    fn sqrt(self: W7) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W7IntoAcc of Into<W7, Acc> {
+    #[inline(always)]
+    fn into(self: W7) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W8Sqrt of WideSqrt<W8> {
+    #[inline(always)]
+    fn sqrt(self: W8) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W8IntoAcc of Into<W8, Acc> {
+    #[inline(always)]
+    fn into(self: W8) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W9Sqrt of WideSqrt<W9> {
+    #[inline(always)]
+    fn sqrt(self: W9) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W9IntoAcc of Into<W9, Acc> {
+    #[inline(always)]
+    fn into(self: W9) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W10Sqrt of WideSqrt<W10> {
+    #[inline(always)]
+    fn sqrt(self: W10) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W10IntoAcc of Into<W10, Acc> {
+    #[inline(always)]
+    fn into(self: W10) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W11Sqrt of WideSqrt<W11> {
+    #[inline(always)]
+    fn sqrt(self: W11) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W11IntoAcc of Into<W11, Acc> {
+    #[inline(always)]
+    fn into(self: W11) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W12Sqrt of WideSqrt<W12> {
+    #[inline(always)]
+    fn sqrt(self: W12) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W12IntoAcc of Into<W12, Acc> {
+    #[inline(always)]
+    fn into(self: W12) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W13Sqrt of WideSqrt<W13> {
+    #[inline(always)]
+    fn sqrt(self: W13) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W13IntoAcc of Into<W13, Acc> {
+    #[inline(always)]
+    fn into(self: W13) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W14Sqrt of WideSqrt<W14> {
+    #[inline(always)]
+    fn sqrt(self: W14) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W14IntoAcc of Into<W14, Acc> {
+    #[inline(always)]
+    fn into(self: W14) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W15Sqrt of WideSqrt<W15> {
+    #[inline(always)]
+    fn sqrt(self: W15) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W15IntoAcc of Into<W15, Acc> {
+    #[inline(always)]
+    fn into(self: W15) -> Acc {
+        Acc { v: upcast(self.v) }
+    }
+}
+pub impl W16Sqrt of WideSqrt<W16> {
+    #[inline(always)]
+    fn sqrt(self: W16) -> Fixed {
+        Fixed { raw: sqrt_acc(upcast(self.v)) }
+    }
+}
+pub impl W16IntoAcc of Into<W16, Acc> {
+    #[inline(always)]
+    fn into(self: W16) -> Acc {
+        Acc { v: upcast(self.v) }
     }
 }

@@ -2212,6 +2212,19 @@ pub fn sqrt_w3(x: BW3) -> i64 {
         },
     }
 }
+/// `floor(sqrt(f))` for a signed Q64.64 value held modulo P. Values above P/2 are the signed
+/// negative half of the field; non-negative values wider than `u128` cannot have a root that
+/// fits `Fixed`, so the conversion is also the final overflow check.
+#[inline(always)]
+pub fn sqrt_acc(f: felt252) -> i64 {
+    let canonical: u256 = f.into();
+    if canonical > 0x400000000000008800000000000000000000000000000000000000000000000 {
+        core::panic_with_const_felt252::<'Fixed: sqrt negative'>();
+    }
+    let s: u128 = or_overflow(f.try_into());
+    let r: u64 = Sqrt::sqrt(s);
+    or_overflow(downcast(r))
+}
 /// Integer square root of a sum of raw squares held in a felt252. The sum is known to be
 /// non-negative, which the type system cannot see: one checked `felt252 -> u128` conversion
 /// (it fails only for a sum >= 2^128, whose root does not fit the scalar range anyway).

@@ -1,4 +1,17 @@
 # bench: l2_gas steps range_check bitwise other_builtins
+bench_wide::acc_add_fixed: 1480 12 4 0 0
+bench_wide::acc_add_partial: 1480 12 4 0 0
+bench_wide::acc_dot16: 5200 48 4 0 0
+bench_wide::acc_dot3: 1680 14 4 0 0
+bench_wide::acc_dot6: 2280 20 4 0 0
+bench_wide::acc_from_wide: 1280 10 4 0 0
+bench_wide::acc_misc: 3300 29 4 0 0
+bench_wide::acc_mul_narrow: 1480 12 4 0 0
+bench_wide::acc_neg_partial: 1380 11 4 0 0
+bench_wide::acc_sqrt: 4860 41 8 0 0
+bench_wide::acc_sub_fixed: 1480 12 4 0 0
+bench_wide::acc_sub_partial: 1480 12 4 0 0
+bench_wide::acc_sub_prod: 1480 12 4 0 0
 bench_wide::alt_det3_cross_dot: 8640 74 16 0 0
 bench_wide::alt_dot3_unfused: 7540 63 16 0 0
 bench_wide::alt_is_unit3_narrowed: 4240 37 6 0 0
@@ -8,6 +21,9 @@ bench_wide::alt_normalize3_div: 11790 99 24 0 0
 bench_wide::alt_normalize3_recip_mul: 10560 88 23 0 0
 bench_wide::alt_triple_single_downcast: 2350 20 5 0 0
 bench_wide::alt_triple_two_stage: 4380 37 8 0 0
+bench_wide::alt_w16_dot16: 57610 501 69 0 0
+bench_wide::alt_w16_dot3: 15210 130 22 0 0
+bench_wide::alt_w16_dot6: 24010 207 31 0 0
 bench_wide::composite_cross: 8270 64 12 0 0
 bench_wide::composite_distance3: 5320 38 6 0 0
 bench_wide::composite_dot3: 4410 33 4 0 0
@@ -57,6 +73,11 @@ bench_wide::normalize4: 10500 87 24 0 0
 bench_wide::recip_mul: 6820 57 14 0 0
 bench_wide::recip_new: 4400 37 8 0 0
 bench_wide::triple_sum16: 2180 19 4 0 0
+bench_wide::typed_acc_sqrt: 1920 15 6 0 0
+bench_wide::typed_add_fixed: 1480 12 4 0 0
+bench_wide::typed_dot16: 5200 48 4 0 0
+bench_wide::typed_dot6: 2280 20 4 0 0
+bench_wide::typed_mul_narrow: 1480 12 4 0 0
 bench_wide::wide_add: 1880 16 4 0 0
 bench_wide::wide_from: 1880 16 4 0 0
 bench_wide::wide_lift: 1980 17 4 0 0

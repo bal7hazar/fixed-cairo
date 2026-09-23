@@ -7,7 +7,8 @@
   packages/fixed/src/internal/acc.cairo       the public wide accumulator types `W1..W16`
                                               (Q64.64), `T1..T16` (Q96.96), their typed
                                               `add` / `sub` / `neg` / `mul` / `lift` / `narrow` /
-                                              `sqrt` impls (re-exported by `fixed::wide`)
+                                              `sqrt` impls and the count-agnostic `Acc`
+                                              (re-exported by `fixed::wide`)
   packages/benches/src/alt/fixed.cairo        the losing formulations (prototype rescale, floor
                                               division, flat sign split, ...) and the stable-API
                                               fallback of `mul` / `div`, benchmarked by
@@ -305,6 +306,19 @@ for n in (1, 2, 3):  # `constrain` needs each side of the boundary to be at most
         "            let r: u64 = Sqrt::sqrt(s);\n"
         f"            or_overflow(downcast(r))\n        }},\n    }}",
     )
+fn(
+    "`floor(sqrt(f))` for a signed Q64.64 value held modulo P. Values above P/2 are the signed\n"
+    "negative half of the field; non-negative values wider than `u128` cannot have a root that\n"
+    "fits `Fixed`, so the conversion is also the final overflow check.",
+    "sqrt_acc(f: felt252) -> i64",
+    "    let canonical: u256 = f.into();\n"
+    f"    if canonical > {h(PRIME // 2)} {{\n"
+    f"        core::panic_with_const_felt252::<{SQRT_NEG}>();\n"
+    "    }\n"
+    "    let s: u128 = or_overflow(f.try_into());\n"
+    "    let r: u64 = Sqrt::sqrt(s);\n"
+    "    or_overflow(downcast(r))",
+)
 fn(
     "Integer square root of a sum of raw squares held in a felt252. The sum is known to be\n"
     "non-negative, which the type system cannot see: one checked `felt252 -> u128` conversion\n"
@@ -1032,6 +1046,35 @@ pub trait WideSqrt<S> {
     /// * `'Fixed: sqrt negative'` if `self` is negative.
     /// * `'Fixed: overflow'` if the result does not fit the scalar range.
     fn sqrt(self: S) -> Fixed;
+}
+/// Operations on the count-agnostic exact Q64.64 accumulator [`Acc`].
+pub trait AccTrait {
+    /// Returns the empty sum.
+    fn zero() -> Acc;
+    /// Adds the exact product `a * b`, without a range check.
+    fn add_prod(self: Acc, a: Fixed, b: Fixed) -> Acc;
+    /// Subtracts the exact product `a * b`, without a range check.
+    fn sub_prod(self: Acc, a: Fixed, b: Fixed) -> Acc;
+    /// Adds `c`, aligned exactly to the Q64.64 accumulator scale.
+    fn add(self: Acc, c: Fixed) -> Acc;
+    /// Subtracts `c`, aligned exactly to the Q64.64 accumulator scale.
+    fn sub(self: Acc, c: Fixed) -> Acc;
+    /// Returns `floor(self)` at the Q32.32 scale.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    fn narrow(self: Acc) -> Fixed;
+    /// Returns `floor(sqrt(self))` at the Q32.32 scale.
+    /// #### Panics
+    /// * `'Fixed: sqrt negative'` if `self` is negative.
+    /// * `'Fixed: overflow'` if the root does not fit the scalar range.
+    fn sqrt(self: Acc) -> Fixed;
+    /// Multiplies by `s` exactly, then returns the once-rounded Q32.32 result.
+    ///
+    /// The caller must keep the signed exact product in `(-P / 2, P / 2)`. Given the operation
+    /// bounds documented on [`Acc`], this holds for fewer than `2^61` accumulated operations.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if the result does not fit the scalar range.
+    fn mul_narrow(self: Acc, s: Fixed) -> Fixed;
 }"""
 
 
@@ -1043,6 +1086,88 @@ def acc_file():
         + "use core::internal::bounded_int::{self, NegateHelper, upcast};\n"
         "use crate::fixed::Fixed;\nuse super::bounded::*;\n",
         TRAITS,
+        """/// A count-agnostic exact Q64.64 accumulator backed by one opaque `felt252`.
+///
+/// Each `add_prod` / `sub_prod` changes the signed exact value by at most `2^126`; each `add` /
+/// `sub` changes it by at most `2^95`. After `k` operations, therefore, `|value| <= k * 2^126`.
+/// The field modulus is approximately `2^251`, so the signed representation cannot alias modulo
+/// P until approximately `2^124` operations, beyond any executable trace. `narrow`, `sqrt`, and
+/// `mul_narrow` range-check their exact result, so an out-of-range sum never wraps silently.
+/// `mul_narrow` additionally requires fewer than `2^61` accumulated operations, ensuring that
+/// multiplying by any `Fixed` (`|raw| <= 2^63`) remains in the signed half of the field.
+///
+/// Mirrors nothing in glam-rs: this is a fused-kernel building block for downstream libraries.
+/// #### Panics
+/// * Never on construction or accumulation; exit operations document their own panic paths.
+/// #### Deviations
+/// * None.
+#[derive(Copy, Drop)]
+pub struct Acc {
+    pub(crate) v: felt252,
+}
+
+pub impl AccImpl of AccTrait {
+    #[inline(always)]
+    fn zero() -> Acc {
+        Acc { v: 0 }
+    }
+
+    #[inline(always)]
+    fn add_prod(self: Acc, a: Fixed, b: Fixed) -> Acc {
+        Acc { v: self.v + upcast(wide(a.raw, b.raw)) }
+    }
+
+    #[inline(always)]
+    fn sub_prod(self: Acc, a: Fixed, b: Fixed) -> Acc {
+        Acc { v: self.v - upcast(wide(a.raw, b.raw)) }
+    }
+
+    #[inline(always)]
+    fn add(self: Acc, c: Fixed) -> Acc {
+        Acc { v: self.v + upcast(lift(c.raw)) }
+    }
+
+    #[inline(always)]
+    fn sub(self: Acc, c: Fixed) -> Acc {
+        Acc { v: self.v - upcast(lift(c.raw)) }
+    }
+
+    #[inline(always)]
+    fn narrow(self: Acc) -> Fixed {
+        Fixed { raw: narrow32(self.v) }
+    }
+
+    #[inline(always)]
+    fn sqrt(self: Acc) -> Fixed {
+        Fixed { raw: sqrt_acc(self.v) }
+    }
+
+    #[inline(always)]
+    fn mul_narrow(self: Acc, s: Fixed) -> Fixed {
+        Fixed { raw: narrow64(self.v * s.raw.into()) }
+    }
+}
+
+pub impl AccAdd of Add<Acc> {
+    #[inline(always)]
+    fn add(lhs: Acc, rhs: Acc) -> Acc {
+        Acc { v: lhs.v + rhs.v }
+    }
+}
+
+pub impl AccSub of Sub<Acc> {
+    #[inline(always)]
+    fn sub(lhs: Acc, rhs: Acc) -> Acc {
+        Acc { v: lhs.v - rhs.v }
+    }
+}
+
+pub impl AccNeg of Neg<Acc> {
+    #[inline(always)]
+    fn neg(a: Acc) -> Acc {
+        Acc { v: -a.v }
+    }
+}""",
     ]
     fams = (
         ("W", "BW", "Q64.64", "product", "2^126", NW, "narrow32"),
@@ -1085,11 +1210,17 @@ def acc_file():
             f"    fn lift(self: W{n}) -> T{n} {{\n        T{n} {{ v: upcast("
             f"bounded_int::mul::<_, UnitInt<{h(ONE)}>>(self.v, {h(ONE)})) }}\n    }}\n}}"
         )
-    for n in (1, 2, 3):
+    for n in range(1, NW + 1):
         o.append(
             f"pub impl W{n}Sqrt of WideSqrt<W{n}> {{\n    #[inline(always)]\n"
             f"    fn sqrt(self: W{n}) -> Fixed {{\n"
-            f"        Fixed {{ raw: sqrt_w{n}(self.v) }}\n    }}\n}}"
+            f"        Fixed {{ raw: "
+            + (f"sqrt_w{n}(self.v)" if n <= 3 else "sqrt_acc(upcast(self.v))")
+            + " }\n    }\n}"
+        )
+        o.append(
+            f"pub impl W{n}IntoAcc of Into<W{n}, Acc> {{\n    #[inline(always)]\n"
+            f"    fn into(self: W{n}) -> Acc {{\n        Acc {{ v: upcast(self.v) }}\n    }}\n}}"
         )
     return "\n".join(o) + "\n"
 
