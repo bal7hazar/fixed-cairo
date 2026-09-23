@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 
 Nothing yet.
 
+## [0.2.0] - 2026-09-23
+
+API addition to `fixed` requested by `nalgebra.cairo` (generic code over one accumulator type);
+no numeric result changes. `glam` and `glamx` are re-released unchanged so that the three
+packages depend on the same `fixed` (pre-1.0, `^0.1.0` excludes `0.2.0`).
+
+### Added
+- `fixed::wide::Acc` (`AccTrait::{zero, add_prod, sub_prod, add, sub, narrow, sqrt, mul_narrow}`,
+  `Add` / `Sub` / `Neg`, `Into<W1..W16, Acc>`): an exact Q64.64 accumulator whose type does not
+  depend on the number of terms, bit-exact with the typed `W1..W16` chains (`add_prod` +200 gas
+  per product as `Wn.add(wide_mul(..))`; `sqrt` 4 860 vs 1 920 for `W2.sqrt` to keep its two
+  panic messages distinct). The absorbing-`W16` alternative (10x the cost) stays in
+  `benches::alt::wide` (#40).
+- `WideSqrt` for every `W1..W16` (was `W1..W3`) (#40).
+
 ## [0.1.0] - 2026-09-22
 
 First release: `fixed` (Q32.32 scalar, fused kernels, transcendentals), `glam` (glam-rs 0.33.8
