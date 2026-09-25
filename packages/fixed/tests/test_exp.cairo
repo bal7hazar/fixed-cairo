@@ -11,6 +11,11 @@
 //! therefore pin the **bit-exact** results - they are API, a change of any of them is a breaking
 //! change - while the sweep is what proves them correct. The tolerances used by the property
 //! tests below are derived from those figures.
+//!
+//! The hyperbolic functions (`sinh`, `cosh`, `tanh`, `sinhc`, `coshc`) follow the same scheme:
+//! mirror tables, exact identities and edges, every panic path, and dense grids for the exact
+//! symmetries and the monotonicity around the junctions of the implementation (the module keeps
+//! its six fuzz properties, the budget of `docs/briefs/COMMON.md`).
 use fixed::exp::ExpTrait;
 use fixed::fixed::{E, EPSILON, LN_2, MAX, MIN};
 use fixed::{Fixed, FixedTrait, HALF, ONE, TWO, ZERO};
@@ -481,4 +486,209 @@ fn fuzz_ln_1p_and_scales(x: i64) {
     // ln and log10 are log2 rescaled: all three are rounded once from the same accumulator.
     let w = v + ONE;
     assert!(diff(w.ln(), w.log2() * LN_2) <= 21, "ln vs log2 at {}", w.raw);
+}
+
+// ------------------------------------------------------------------ hyperbolic functions
+
+/// The generated thresholds of the hyperbolic functions (see `fixed::exp`): the first input
+/// whose `sinh` / `cosh` overflows (`asinh(2^31)` rounded up), the first input whose `tanh`
+/// rounds to 1, and the largest input with `sinh(x) = x`.
+const SINH_MAX_RAW: i64 = 0x162e42fefb;
+const TANH_SAT_RAW: i64 = 0xbc8939775;
+const SINH_ID_RAW: i64 = 3810778;
+
+/// `(x, sinh(x), cosh(x), sinhc(x))`, raw values (`scripts/gen_exp.py tables`).
+const SINH: [(i64, i64, i64, i64); 23] = [
+    (0x0, 0x0, 0x100000000, 0x100000000), (0x1, 0x1, 0x100000000, 0x100000000),
+    (-0x1, -0x1, 0x100000000, 0x100000000), (0x3039, 0x3039, 0x100000000, 0x100000000),
+    (0x80000000, 0x8566807f, 0x120ac1862, 0x10acd00fe),
+    (-0x80000000, -0x8566807f, 0x120ac1862, 0x10acd00fe),
+    (0x100000000, 0x12cd9fc45, 0x18b07551d, 0x12cd9fc45),
+    (-0x100000000, -0x12cd9fc45, 0x18b07551d, 0x12cd9fc45),
+    (0x1ffffffff, 0x3a079ec73, 0x3c31f41ba, 0x1d03cf63a),
+    (0x200000000, 0x3a079ec76, 0x3c31f41be, 0x1d03cf63b),
+    (-0x200000000, -0x3a079ec76, 0x3c31f41be, 0x1d03cf63b),
+    (0x300000000, 0xa04937384, 0xa11524beb, 0x356dbd12c),
+    (0x555555555, 0x678fab7d23, 0x6790e7e4b3, 0x136af02778),
+    (0xa00000000, 0x2b053b9dad32, 0x2b053ba0a6e2, 0x44d52c2f7b8),
+    (-0xa00000000, -0x2b053b9dad32, 0x2b053ba0a6e2, 0x44d52c2f7b8),
+    (0x1400000000, 0xe758445b4740196, 0xe758445b474019f, 0xb91369e29f667b),
+    (0x14ffffffff, 0x274dc3fb168c3556, 0x274dc3fb168c355a, 0x1df21b69fa3966e),
+    (0x1500000000, 0x274dc3fb3dd9f964, 0x274dc3fb3dd9f968, 0x1df21b6a16be74e),
+    (0x1600000000, 0x6ad6b6e710d7fac9, 0x6ad6b6e710d7facb, 0x4db36dbf5211709),
+    (0x162e42fefa, 0x7fffffffe3086085, 0x7fffffffe3086087, 0x5c551d949a17e51),
+    (-0x162e42fefa, -0x7fffffffe3086085, 0x7fffffffe3086087, 0x5c551d949a17e51),
+    (0x75bcd15, 0x75c0f7f, 0x1001b138b, 0x100090674),
+    (-0x3ade68b1, -0x3b6394ab, 0x106cc6a85, 0x102431e38),
+];
+
+#[test]
+fn test_sinh_cosh_sinhc_table() {
+    for case in SINH.span() {
+        let (x, s, c, sc) = *case;
+        assert_eq!(f(x).sinh(), f(s), "sinh({})", x);
+        assert_eq!(f(x).cosh(), f(c), "cosh({})", x);
+        assert_eq!(f(x).sinhc(), f(sc), "sinhc({})", x);
+    }
+}
+
+/// `(x, tanh(x))`, raw values.
+const TANH: [(i64, i64); 21] = [
+    (0x0, 0x0), (0x1, 0x0), (-0x1, 0x0), (0x2, 0x1), (0x3039, 0x3039), (0x80000000, 0x764d4f5d),
+    (0x100000000, 0xc2f7d5a9), (-0x100000000, -0xc2f7d5a9), (0x300000000, 0xfebbe889),
+    (0x57fffffff, 0xfffdcf98), (0x580000000, 0xfffdcf98), (0x800000000, 0xfffffc39),
+    (-0x800000000, -0xfffffc39), (0xbc8939774, 0xffffffff), (0xbc8939775, 0x100000000),
+    (-0xbc8939775, -0x100000000), (-0xbc8939774, -0xffffffff), (0x1400000000, 0x100000000),
+    (0x7fffffffffffffff, 0x100000000), (-0x8000000000000000, -0x100000000), (0x75bcd15, 0x75b484e),
+];
+
+#[test]
+fn test_tanh_table() {
+    for case in TANH.span() {
+        let (x, t) = *case;
+        assert_eq!(f(x).tanh(), f(t), "tanh({})", x);
+    }
+}
+
+/// `(x, coshc(x))`, raw values.
+const COSHC: [(i64, i64); 11] = [
+    (0x3, 0x5555555555555555), (-0x3, -0x5555555555555555), (0x3039, 0x54f077c718e7c),
+    (0x80000000, 0x2415830c4), (0x100000000, 0x18b07551d), (-0x100000000, -0x18b07551d),
+    (0x200000000, 0x1e18fa0df), (0x500000000, 0xed78ca326), (-0x500000000, -0xed78ca326),
+    (0x1400000000, 0xb91369e29f667b), (0x162e42fefa, 0x5c551d949a17e51),
+];
+
+#[test]
+fn test_coshc_table() {
+    for case in COSHC.span() {
+        let (x, c) = *case;
+        assert_eq!(f(x).coshc(), f(c), "coshc({})", x);
+    }
+}
+
+#[test]
+fn test_hyperbolic_identities_and_edges() {
+    assert_eq!(ZERO.sinh(), ZERO);
+    assert_eq!(ZERO.cosh(), ONE);
+    assert_eq!(ZERO.tanh(), ZERO);
+    assert_eq!(ZERO.sinhc(), ONE);
+    assert_eq!(ZERO.coshc(), ONE);
+    assert_eq!(f(-2).coshc(), MIN); // -2^31: the only tiny input whose quotient fits
+    // sinh(x) = x while the cubic term stays below half an ULP, and not one ULP further.
+    assert_eq!(EPSILON.sinh(), EPSILON);
+    assert_eq!(f(SINH_ID_RAW).sinh(), f(SINH_ID_RAW));
+    assert_eq!(f(-SINH_ID_RAW).sinh(), f(-SINH_ID_RAW));
+    assert_eq!(f(SINH_ID_RAW + 1).sinh(), f(SINH_ID_RAW + 2));
+    // tanh saturates exactly at the first input where 1 - tanh is at most half an ULP, and never
+    // panics.
+    assert_eq!(f(TANH_SAT_RAW - 1).tanh(), f(ONE_RAW - 1));
+    assert_eq!(f(TANH_SAT_RAW).tanh(), ONE);
+    assert_eq!(MAX.tanh(), ONE);
+    assert_eq!(MIN.tanh(), -ONE);
+    // The largest inputs that still fit.
+    assert_eq!(f(SINH_MAX_RAW - 1).sinh(), f(0x7fffffffe3086085));
+    assert_eq!(f(-SINH_MAX_RAW + 1).cosh(), f(0x7fffffffe3086087));
+    // The tails agree with exp: sinh and cosh approach e^x / 2 (0.5 ULP apart at x = 20).
+    let x = f(10 * ONE_RAW);
+    assert!(diff(x.cosh() - x.sinh(), (-x).exp()) <= 3, "cosh - sinh = e^-x at 10");
+    assert!(diff(x.cosh() + x.sinh(), x.exp()) <= mag(x.exp()) / TWO_POW_40 + 3, "e^x at 10");
+}
+
+/// Exact symmetries and monotonicity on dense grids: around the junctions of the implementation
+/// (the polynomial / exponential seam of `sinh` at 2, the `E` / `E / 2` switch of the core at 21,
+/// the two scales of `tanh` at 5.5, its saturation, zero) and on a coarse sweep of the domain.
+/// The generator checks the same on windows of 4 000 inputs around each junction.
+#[test]
+fn test_hyperbolic_symmetry_and_monotonicity() {
+    let seams = [
+        0_i64, 3, SINH_ID_RAW, HALF.raw, 2 * ONE_RAW - 3, 0x57ffffffc, 0xbc8939772,
+        21 * ONE_RAW - 3,
+    ];
+    for seam in seams.span() {
+        let mut d: i64 = 0;
+        let mut prev_s = f(*seam - 1).sinh();
+        let mut prev_c = f(*seam - 1).cosh();
+        let mut prev_t = f(*seam - 1).tanh();
+        while d <= 6 {
+            let x = f(*seam + d);
+            let (s, c, t) = (x.sinh(), x.cosh(), x.tanh());
+            assert_eq!((-x).sinh(), -s);
+            assert_eq!((-x).cosh(), c);
+            assert_eq!((-x).tanh(), -t);
+            assert_eq!((-x).sinhc(), x.sinhc());
+            assert!(s >= prev_s && t >= prev_t, "sinh / tanh at {} + {}", seam, d);
+            assert!(x.raw <= 0 || c >= prev_c, "cosh at {} + {}", seam, d);
+            prev_s = s;
+            prev_c = c;
+            prev_t = t;
+            d += 1;
+        }
+    }
+    // A coarse sweep of [0, 22.18) by a step of ~0.07 that is no multiple of a segment.
+    let mut x = f(0x1234567);
+    let (mut prev_s, mut prev_c, mut prev_t) = (ZERO, ONE, ZERO);
+    while x.raw < SINH_MAX_RAW {
+        let (s, c, t) = (x.sinh(), x.cosh(), x.tanh());
+        assert!(s >= prev_s && c >= prev_c && t >= prev_t, "monotone at {}", x.raw);
+        assert_eq!((-x).sinh(), -s);
+        assert!(c > s && t <= ONE, "cosh > sinh at {}", x.raw);
+        prev_s = s;
+        prev_c = c;
+        prev_t = t;
+        x = x + f(0x12345678);
+    }
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_sinh_overflow_panics() {
+    f(SINH_MAX_RAW).sinh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_sinh_negative_overflow_panics() {
+    f(-SINH_MAX_RAW).sinh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_sinh_min_panics() {
+    MIN.sinh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_cosh_overflow_panics() {
+    f(SINH_MAX_RAW).cosh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_cosh_min_panics() {
+    MIN.cosh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_sinhc_overflow_panics() {
+    f(-SINH_MAX_RAW).sinhc();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_coshc_overflow_panics() {
+    MAX.coshc();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_coshc_tiny_panics() {
+    f(2).coshc();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_coshc_tiny_negative_panics() {
+    f(-1).coshc();
 }

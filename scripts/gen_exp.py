@@ -13,6 +13,24 @@ bit-exact with the Cairo code, so the figures quoted in the doc comments are the
 returns, and the test tables of `packages/fixed/tests/test_exp.cairo` are generated from it. The
 references are computed by `mpmath` with 50 significant digits.
 
+The hyperbolic functions (`sinh`, `cosh`, `tanh`, `sinhc`, `coshc`) have their own generated
+block (`// GENERATED-BEGIN hyperbolic`): one polynomial of `sinh(x) / x`, fitted by `mpmath` alone
+(`chebyfit`, no numpy), so that it is reproducible on every platform, plus the thresholds derived
+from the mirror.
+
+Environment (pinned in `scripts/requirements.txt`):
+
+  python3 -m venv /tmp/fixed-venv && /tmp/fixed-venv/bin/pip install -r scripts/requirements.txt
+  /tmp/fixed-venv/bin/python scripts/gen_exp.py check
+
+The `exp` / `log2` fits go through `numpy.linalg.solve`, whose last bits depend on the BLAS of
+the platform, not only on the numpy version: on Linux x86-64 no numpy release reproduces the
+committed coefficients bit for bit (they differ by at most ~1e-6 ULP of the polynomial value).
+`reconcile` therefore keeps a committed polynomial whenever the fresh fit agrees with it to
+within `2^-48` of the polynomial value (platform noise), and replaces it otherwise (a deliberate
+change of the fit). The mirror always runs on the coefficients of the Cairo code, so every figure
+and every test table stays bit-exact.
+
 usage:
   scripts/gen_exp.py emit     rewrite the generated blocks of the two Cairo files
   scripts/gen_exp.py check    exit 1 if those blocks are not up to date
@@ -23,7 +41,9 @@ usage:
 import argparse
 import math
 import random
+import re
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 import mpmath as mp
@@ -117,6 +137,10 @@ def f_atanh(u):
     return float(2 / LN2 * mp.atanh(s) / s)
 
 
+def grid(lo, hi, points):
+    return [lo + ((hi - lo) * i) // (points - 1) for i in range(points)]
+
+
 def scale(coeffs, bits):
     out = [int(round(c * (1 << bits))) for c in coeffs]
     for c in out:
@@ -175,6 +199,36 @@ LOG_SEALED = [
          LOG_C[j + 1][-1] if j + 1 < LOG_SEGS else 1 << LOG_ACC)
     for j in range(LOG_SEGS)
 ]
+
+
+def committed(path, name):
+    """The coefficients of the Horner function `name` as committed in `path`, or None."""
+    found = re.search(rf"fn {name}\(u: W\d\) -> Fixed \{{(.*?)\n\}}", path.read_text(), re.S)
+    if not found:
+        return None
+    return [int(v, 16) for v in re.findall(r"raw: (-?0x[0-9a-f]+)", found.group(1))]
+
+
+def reconcile(fitted, path, name, u_max, bits):
+    """The committed coefficients of `name` if the fresh fit only differs from them by platform
+    noise (at most `2^-48` of the value of the polynomial, at the scale `2^bits`, on `[0, u_max]`),
+    the fresh fit otherwise. See the module docstring (debt D1)."""
+    old = committed(path, name)
+    if old is None or len(old) != len(fitted) or old == fitted:
+        return fitted
+    noise = max(abs(horner_w(fitted, u) - horner_w(old, u)) for u in grid(0, u_max, 257))
+    return old if noise <= 1 << (bits - 48) else fitted
+
+
+EXP2_C = reconcile(EXP2_C, LIB, "exp2_poly", (Q_SEG - 1) << (64 - QB), EXP_ACC)
+LOG_C = [reconcile(LOG_C[j], LIB, f"log2_seg{j}", (LOG_SEG_RAW - 1) << (64 - M_BITS), LOG_ACC)
+         for j in range(LOG_SEGS)]
+# A committed polynomial must be sealed as well as a fresh one.
+assert seal(list(EXP2_C), (Q_SEG - 1) << (64 - QB),
+            int(mp.floor(mp.power(2, mp.mpf(1) / SEGS) * (1 << EXP_ACC)))) == 0
+assert all(seal(list(LOG_C[j]), (LOG_SEG_RAW - 1) << (64 - M_BITS),
+                LOG_C[j + 1][-1] if j + 1 < LOG_SEGS else 1 << LOG_ACC) == 0
+           for j in range(LOG_SEGS))
 
 # ----------------------------------------------------------------- the mirror
 
@@ -356,6 +410,179 @@ def powf(x, n):
     r = pow_pos(i64(-x), n)
     return -r if (n >> FRAC) % 2 else r
 
+# ----------------------------------------------------------------- hyperbolic functions
+#
+# sinh / cosh from one exponential: `E = e^|x|` from the wide exponent, then (exact integer
+# identities, see `hyp_core`) `sinh = round(E / 2 - 1 / (2E))`, `cosh = round(E / 2 + 1 / (2E))`
+# with a single u64 division `floor((2^64 - 1) / E)`. From `|x| = 21` on, `E` would leave the
+# range: the core computes `E / 2 = 2^(t - 1)` instead (`sinh = round(E' - 1 / (4E'))`), which
+# reaches `asinh(2^31)`. Below `|x| = 2`, `sinh(x) = x * S(x^2)` with `S(u) = sinh(sqrt(u)) /
+# sqrt(u)`: no exponential, an error of half an ULP, `sinh(x) = x` for tiny `x`; `sinhc` is `S`
+# itself there. `tanh = (T - c) / (T + c)` with `T = e^(2|x|) * c`, `c = 1` or `2^-16` (from
+# `|x| = 5.5` on, so that `T` keeps fitting), one division.
+
+DEG_SINHC = 6  # S(u) = 1 + u * g(u), g of degree 5 on [0, 4]
+HYP_POLY = 2 * ONE  # |x| below it: the polynomial
+HYP_SPLIT = 21 * ONE  # |x| from it on: E / 2 instead of E
+TANH_SPLIT = 11 * ONE // 2  # |x| from it on: T = e^(2|x|) * 2^-16
+TANH_SHIFT = 16
+U64_MAX = (1 << 64) - 1
+
+
+def build_sinhc_poly():
+    """`S(u) = sinh(sqrt(u)) / sqrt(u)` on `[0, 4]` at the scale `2^60`, constant term pinned to 1
+    (`S = 1 + u * g(u)`, `g` by `mpmath.chebyfit`: deterministic, no numpy)."""
+    def g(u):
+        if u == 0:
+            return mp.mpf(1) / 6
+        r = mp.sqrt(u)
+        return (mp.sinh(r) / r - 1) / u
+    c, err = mp.chebyfit(g, [0, mp.mpf(HYP_POLY * HYP_POLY) / ONE / ONE], DEG_SINHC, error=True)
+    out = [int(mp.nint(v * (1 << EXP_ACC))) for v in c] + [1 << EXP_ACC]
+    # Non-negative coefficients make every Horner step non-decreasing in `u`: `S` is monotone by
+    # construction, and so are `sinh = x * S` and `sinhc = S` on the polynomial range.
+    assert all(v >= 0 for v in out), out
+    return out, float(err)
+
+
+SINHC_C, SINHC_FIT_ERR = build_sinhc_poly()
+
+
+def sinhc_s(a):
+    """`S(a^2)` at the scale `2^60`, `0 <= a < 2`."""
+    return horner_w(SINHC_C, a * a)
+
+
+def hyp_core(a):
+    """`(sinh(a), cosh(a))` raw from one exponential, `a >= 0` (not overflow-checked)."""
+    big = a >= HYP_SPLIT
+    e = exp_from_q(exp_q(a) - (1 << QB if big else 0))  # e^a, or e^a / 2 from 21 on
+    r = U64_MAX // e  # ceil(2^64 / e) - 1, e >= 2^32
+    if big:
+        g = (r + 2) // 4  # round(2^62 / e) = round(1 / (4 E')), exactly
+        return e - g, e + g
+    # round(e / 2 -+ 2^63 / e) = (e - r) // 2 and (e + r + 1) // 2, exactly.
+    return (e - r) // 2, (e + r + 1) // 2
+
+
+def hyp_core_exact(a):
+    """`hyp_core` from the rational values, for the check of its integer identities."""
+    q = exp_q(a)
+    if a < HYP_SPLIT:
+        e = exp_from_q(q)
+        s, c = Fraction(e, 2) - Fraction(1 << 63, e), Fraction(e, 2) + Fraction(1 << 63, e)
+    else:
+        e = exp_from_q(q - (1 << QB))
+        s, c = e - Fraction(1 << 62, e), e + Fraction(1 << 62, e)
+    return math.floor(s + Fraction(1, 2)), math.floor(c + Fraction(1, 2))
+
+
+def sinh_raw(x):
+    a = abs(x)
+    if a < HYP_POLY:
+        r = narrow64_round(a * sinhc_s(a) * 16)
+    else:
+        r = hyp_core(a)[0]
+    i64(r)
+    return -r if x < 0 else r
+
+
+def cosh_raw(x):
+    return i64(hyp_core(abs(x))[1])
+
+
+SINH_MAX_RAW = first_overflow(sinh_raw, 22 * ONE, 23 * ONE)
+COSH_MAX_RAW = first_overflow(cosh_raw, 22 * ONE, 23 * ONE)
+
+
+def sinh(x):
+    if not -SINH_MAX_RAW < x < SINH_MAX_RAW:
+        raise OverflowError("Fixed: overflow")
+    return sinh_raw(x)
+
+
+def cosh(x):
+    if not -COSH_MAX_RAW < x < COSH_MAX_RAW:
+        raise OverflowError("Fixed: overflow")
+    return cosh_raw(x)
+
+
+def last_identity():
+    """The largest raw `x` with `sinh(x) = x` (the cubic term stays below half an ULP)."""
+    lo, hi = 1, 1 << 23
+    assert sinh(lo) == lo and sinh(hi) != hi
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if sinh(mid) == mid:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+SINH_ID_RAW = last_identity()
+
+
+def tanh_raw(x):
+    a = abs(x)
+    q = exp_q(2 * a)
+    if a < TANH_SPLIT:
+        t, c = exp_from_q(q), ONE
+    else:
+        t, c = exp_from_q(q - (TANH_SHIFT << QB)), ONE >> TANH_SHIFT
+    r = div(t - c, t + c)
+    return -r if x < 0 else r
+
+
+def tanh_recip(x):
+    """alt: `1 - 2^65 / D` with `D = e^(2|x|) + 1` raw from one reciprocal `floor((2^64 - 1) /
+    D)`, for `|x| < 5.5` (`benches::alt::exp::tanh_recip`): bit-identical to `tanh`."""
+    a = abs(x)
+    d = exp(2 * a) + ONE
+    r, rem = divmod(U64_MAX, d)
+    w = 4 * (rem + 1)
+    m = 2 * r + (w >= d) + (w >= 3 * d)
+    return m - ONE if x < 0 else ONE - m
+
+
+def first_one(fn, lo, hi):
+    """Smallest raw in (lo, hi] with `fn = ONE` (fn(lo) < ONE, fn non-decreasing)."""
+    assert fn(lo) < ONE and fn(hi) == ONE
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if fn(mid) == ONE:
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+# From TANH_SAT_RAW on the formula returns exactly ONE: tanh returns it without computing.
+TANH_SAT_RAW = first_one(tanh_raw, 11 * ONE, 12 * ONE)
+# The first input whose exact tanh rounds to ONE: 1 - tanh(x) = 2 / (e^(2x) + 1) <= 2^-33.
+TANH_SAT_EXACT = int(mp.ceil(mp.log(mp.power(2, 34) - 1) / 2 * ONE))
+
+
+def tanh(x):
+    if x >= TANH_SAT_RAW:
+        return ONE
+    if x <= -TANH_SAT_RAW:
+        return -ONE
+    return tanh_raw(x)
+
+
+def sinhc(x):
+    a = abs(x)
+    if a < HYP_POLY:
+        return (sinhc_s(a) + (1 << 27)) >> 28
+    return div(sinh(a), a)
+
+
+def coshc(x):
+    if x == 0:
+        return ONE
+    return div(cosh(x), x)
+
 # ----------------------------------------------------------------- alternative variants
 
 P2_TABLE = [1 << (k + 32) for k in range(-32, 31)]  # alt: 2^k at Q32.32, k in [-32, 30]
@@ -365,6 +592,9 @@ def build_alt():
     single = scale(fit_shifted(f_exp2, 0.0, 1.0, DEG_EXP2_SINGLE, 1.0), EXP_ACC)
     cw = scale(fit_shifted(f_exp, 0.0, float(LN2) / SEGS, DEG_EXP_CW, 1.0), EXP_ACC)
     atanh = scale(remez(f_atanh, 0.0, 1 / 9, DEG_ATANH), LOG_ACC)
+    single = reconcile(single, ALT, "exp2_poly_single", 1 << 64, EXP_ACC)
+    cw = reconcile(cw, ALT, "exp_poly_cw", int(LN2 / SEGS * (1 << 64)), EXP_ACC)
+    atanh = reconcile(atanh, ALT, "atanh_poly", (1 << 64) // 9, LOG_ACC)
     return single, cw, atanh
 
 
@@ -427,10 +657,6 @@ def check_alt(single, cw, atanh):
 def err_exp(got, ref):
     """Absolute error in ULP below 2^16, relative error in units of 2^-30 above."""
     return abs(got - ref) if ref < 1 << 48 else abs(got - ref) / ref * (1 << 30)
-
-
-def grid(lo, hi, points):
-    return [lo + ((hi - lo) * i) // (points - 1) for i in range(points)]
 
 
 def sweep(points=40001):
@@ -518,6 +744,74 @@ def check_identities():
             raw = (1 << e) + ((j << e) >> 5)
             vals = [log2(r) for r in range(max(1, raw - 3), raw + 4) if r <= I64_MAX]
             assert vals == sorted(vals), raw
+
+
+def sweep_hyp(points=20001):
+    """Max error of the hyperbolic mirror: {row: (value, unit)}, like `sweep`."""
+    rnd = random.Random(20260925)
+    out = {}
+
+    def run(name, xs, fn, ref, unit):
+        worst = 0.0
+        for x in xs:
+            r = ref(mp.mpf(x) / ONE) * ONE
+            e = abs(fn(x) - r)
+            worst = max(worst, float(e if unit == "ULP" else e / r * (1 << 30)))
+        out[name] = (worst, unit)
+
+    def xs_in(lo, hi):
+        return grid(lo, hi - 1, points) + [rnd.randrange(lo, hi) for _ in range(4000)]
+
+    big = SINH_MAX_RAW  # also COSH_MAX_RAW
+    split16 = int(mp.asinh(1 << 16) * ONE)  # sinh / cosh reach 2^16 there (to 1e-9)
+    run("sinh (-2 < x < 2)", xs_in(-HYP_POLY + 1, HYP_POLY), sinh, mp.sinh, "ULP")
+    run("sinh (x >= 2, result < 2^16)", xs_in(HYP_POLY, split16), sinh, mp.sinh, "ULP")
+    run("sinh (result >= 2^16)", xs_in(split16 + 1, big), sinh, mp.sinh, "2^-30 rel")
+    run("cosh (result < 2^16)", xs_in(0, split16), cosh, mp.cosh, "ULP")
+    run("cosh (result >= 2^16)", xs_in(split16 + 1, big), cosh, mp.cosh, "2^-30 rel")
+    run("tanh (whole range)", xs_in(-TANH_SAT_RAW - ONE, TANH_SAT_RAW + ONE), tanh, mp.tanh,
+        "ULP")
+    sref = lambda v: mp.sinh(v) / v if v else mp.mpf(1)  # noqa: E731
+    run("sinhc (-2 < x < 2)", xs_in(-HYP_POLY + 1, HYP_POLY), sinhc, sref, "ULP")
+    run("sinhc (2 <= x < 12)", xs_in(HYP_POLY, 12 * ONE), sinhc, sref, "ULP")
+    run("coshc (1 <= x < 12)", xs_in(ONE, 12 * ONE), coshc, lambda v: mp.cosh(v) / v, "ULP")
+    return out
+
+
+def check_hyp():
+    """The exact identities and symmetries the tests assert, the integer identities of
+    `hyp_core`, and the monotonicity: on dense windows around every junction (polynomial /
+    exponential at 2, `E` / `E / 2` at 21, the two scales of `tanh` at 5.5, saturation, overflow)
+    and at random points. Between the junctions it holds by construction: `hyp_core` rounds an
+    increasing function of a non-decreasing `E`, the polynomial has non-negative coefficients,
+    and `tanh` rounds `(T - c) / (T + c)`, increasing in a non-decreasing `T`."""
+    assert sinh(0) == 0 and cosh(0) == ONE and tanh(0) == 0 and sinhc(0) == ONE
+    assert coshc(0) == ONE
+    for x in list(range(1, 1 << 12)) + grid(1 << 12, SINH_ID_RAW, 4001):
+        assert sinh(x) == x, x  # the x^3 / 6 term is below half an ULP
+    assert sinh(SINH_ID_RAW + 1) == SINH_ID_RAW + 2
+    rnd = random.Random(20260926)
+    for x in [rnd.randrange(0, SINH_MAX_RAW) for _ in range(3000)] + list(range(0, 5000, 7)):
+        assert hyp_core(x) == hyp_core_exact(x), x
+        assert sinh(-x) == -sinh(x) and cosh(-x) == cosh(x) and sinhc(-x) == sinhc(x), x
+        assert tanh(-x) == -tanh(x), x
+    assert tanh(TANH_SAT_RAW - 1) == ONE - 1 and tanh(TANH_SAT_RAW) == ONE
+    assert TANH_SAT_RAW == TANH_SAT_EXACT
+    for lo, hi in ((TANH_SAT_RAW, 24 * ONE), (-(1 << 63), -TANH_SAT_RAW)):
+        for x in grid(lo, hi, 2001):
+            assert tanh(x) == (ONE if x > 0 else -ONE), x
+    # Nothing between the saturation and 16.29 (where T would leave the range) is reached.
+    assert exp_q(2 * TANH_SAT_RAW) - (TANH_SHIFT << QB) < (KHI << QB)
+    for x in [rnd.randrange(-TANH_SPLIT + 1, TANH_SPLIT) for _ in range(3000)] + list(range(3000)):
+        assert tanh_recip(x) == tanh(x), x
+    windows = [HYP_POLY, HYP_SPLIT, 0, ONE, SINH_MAX_RAW - 3000] + [
+        rnd.randrange(0, SINH_MAX_RAW - 3000) for _ in range(40)]
+    twin = [TANH_SPLIT, TANH_SAT_RAW, 0, ONE] + [rnd.randrange(0, TANH_SAT_RAW) for _ in range(40)]
+    for fn, centers in ((sinh, windows), (cosh, windows), (tanh, twin)):
+        for c in centers:
+            xs = range(max(c - 2000, -3000 if fn is not cosh else 0), min(c + 2000, SINH_MAX_RAW))
+            vals = [fn(x) for x in xs]
+            assert vals == sorted(vals), (fn.__name__, c)
 
 # ----------------------------------------------------------------- Cairo emission
 
@@ -707,6 +1001,52 @@ def emit_alt(single, cw, atanh):
     out += emit_tree("normalize_tree_scaled", "/// A copy of the library search tree.")
     return "\n".join(out)
 
+
+def emit_hyp(errors):
+    out = []
+    a = out.append
+    a("/// The smallest raw input whose `sinh` does not fit the scalar range: `asinh(2^31)`,")
+    a("/// rounded up.")
+    a(f"const SINH_MAX_RAW: i64 = {hexi(SINH_MAX_RAW)};")
+    a("/// The smallest raw input whose `cosh` does not fit (`acosh(2^31)`, rounded up; it agrees")
+    a("/// with `asinh(2^31)` to `1e-18`).")
+    a(f"const COSH_MAX_RAW: i64 = {hexi(COSH_MAX_RAW)};")
+    a("/// The smallest raw input whose `tanh` rounds to 1 (`1 - tanh(x) <= 2^-33`): `tanh` returns")
+    a("/// `ONE` from there on without computing.")
+    a(f"const TANH_SAT_RAW: i64 = {hexi(TANH_SAT_RAW)};")
+    a(f"/// `{HYP_POLY // ONE}` in raw units: below it `sinh` and `sinhc` evaluate the polynomial.")
+    a(f"const HYP_POLY_RAW: i64 = {hexi(HYP_POLY)};")
+    a(f"/// `{HYP_SPLIT // ONE}` in raw units: from it on the core computes `e^x / 2` (`e^x` leaves the")
+    a("/// range at 21.49).")
+    a(f"const HYP_SPLIT_RAW: i64 = {hexi(HYP_SPLIT)};")
+    a(f"/// `{TANH_SPLIT / ONE}` in raw units: from it on `tanh` computes `e^(2x) * 2^-{TANH_SHIFT}`.")
+    a(f"const TANH_SPLIT_RAW: i64 = {hexi(TANH_SPLIT)};")
+    a(f"/// `1` at the scale of the wide exponent (`2^{QB}`): `2^(t - 1) = e^x / 2`.")
+    a(f"const Q_ONE: i64 = {hexi(1 << QB)};")
+    a(f"/// `{TANH_SHIFT}` at the scale of the wide exponent.")
+    a(f"const TANH_SHIFT_Q: i64 = {hexi(TANH_SHIFT << QB)};")
+    a(f"/// `2^-{TANH_SHIFT}` in raw units.")
+    a(f"const TANH_C_LOW: i64 = {hexi(ONE >> TANH_SHIFT)};")
+    a("")
+    a(f"/// `sinh(x) / x` in `u = x^2` (Q64.64) on `[0, 4]`, degree {DEG_SINHC}, at the scale")
+    a(f"/// `2^{EXP_ACC}`. Constant term pinned to 1; all the coefficients are non-negative, so it is")
+    a("/// non-decreasing in `u` by construction.")
+    a("#[inline(always)]")
+    a("fn sinhc_poly(u: W1) -> Fixed {")
+    out += horner_body_wide(SINHC_C, "u")
+    a("}")
+    a("")
+    a("/// Measured maximum error of the mirrored hyperbolic functions (`scripts/gen_exp.py")
+    a("/// sweep`): absolute in ULP (`2^-32`), or relative in units of `2^-30` where marked.")
+    a("///")
+    a("/// | function | range | max error |")
+    a("/// |---|---|---:|")
+    for k, (v, unit) in errors.items():
+        name, _, rng = k.partition(" (")
+        rng = rng[:-1] if rng.endswith(")") else rng
+        a(f"/// | `{name}` | {rng} | {fmt_err(v, unit)} |")
+    return "\n".join(out)
+
 # ----------------------------------------------------------------- test tables
 
 EXP2_CASES = [0, 1, -1, ONE, -ONE, ONE // 2, -ONE // 2, 3 * ONE + ONE // 3, 10 * ONE,
@@ -722,6 +1062,15 @@ POWF_CASES = [(2 * ONE, ONE // 2), (2 * ONE, -ONE), (3 * ONE, 2 * ONE), (ONE // 
               (ONE // 4, -ONE // 2), (7 * ONE, 11 * ONE), (ONE // 1000, 5 * ONE)]
 LOG_BASE_CASES = [(8 * ONE, 2 * ONE), (1000 * ONE, 10 * ONE), (ONE // 8, 2 * ONE),
                   (5 * ONE, ONE // 2), (3 * ONE, 3 * ONE), (ONE, 7 * ONE), (100 * ONE, 11674931555)]
+
+SINH_CASES = [0, 1, -1, 12345, ONE // 2, -ONE // 2, ONE, -ONE, 2 * ONE - 1, 2 * ONE, -2 * ONE,
+              3 * ONE, 5 * ONE + ONE // 3, 10 * ONE, -10 * ONE, 20 * ONE, 21 * ONE - 1, 21 * ONE,
+              22 * ONE, SINH_MAX_RAW - 1, -(SINH_MAX_RAW - 1), 123456789, -987654321]
+TANH_CASES = [0, 1, -1, 2, 12345, ONE // 2, ONE, -ONE, 3 * ONE, TANH_SPLIT - 1, TANH_SPLIT,
+              8 * ONE, -8 * ONE, TANH_SAT_RAW - 1, TANH_SAT_RAW, -TANH_SAT_RAW, -TANH_SAT_RAW + 1,
+              20 * ONE, I64_MAX, I64_MIN, 123456789]
+COSHC_CASES = [3, -3, 12345, ONE // 2, ONE, -ONE, 2 * ONE, 5 * ONE, -5 * ONE, 20 * ONE,
+               COSH_MAX_RAW - 1]
 
 
 def print_tables():
@@ -745,6 +1094,17 @@ def print_tables():
         print(f"    ({hexi(x)}, {hexi(b)}, {hexi(log(x, b))}),")
     print(f"// thresholds: EXP2_MAX_RAW {hexi(EXP2_MAX_RAW)}, EXP_MAX_RAW {hexi(EXP_MAX_RAW)}, "
           f"EXP_MIN_RAW {hexi(EXP_MIN_RAW)}")
+    print("// sinh / cosh / sinhc (x, sinh, cosh, sinhc)")
+    for raw in SINH_CASES:
+        print(f"    ({hexi(raw)}, {hexi(sinh(raw))}, {hexi(cosh(raw))}, {hexi(sinhc(raw))}),")
+    print("// tanh (x, expected)")
+    for raw in TANH_CASES:
+        print(f"    ({hexi(raw)}, {hexi(tanh(raw))}),")
+    print("// coshc (x, expected)")
+    for raw in COSHC_CASES:
+        print(f"    ({hexi(raw)}, {hexi(coshc(raw))}),")
+    print(f"// thresholds: SINH_MAX_RAW {hexi(SINH_MAX_RAW)}, COSH_MAX_RAW {hexi(COSH_MAX_RAW)}, "
+          f"TANH_SAT_RAW {hexi(TANH_SAT_RAW)}")
 
 
 # Maximum error tolerated per row. The brief budgets 4 ULP (absolute) for exp2 / exp below 2^16
@@ -756,6 +1116,11 @@ BUDGET = {
     "exp_m1": 2.5, "log2": 0.9, "ln": 0.8, "log10": 0.7, "ln_1p": 0.8, "log": 2.3,
     "powf (x in [2^-8, 2^8], n in [-4, 4], result < 1)": 2.5,
     "powf (x in [2^-8, 2^8], n in [-4, 4], result >= 1)": 0.6,
+    # The brief of the hyperbolic functions targets the order of exp (~2 ULP); the budgets lock
+    # the measured figures in, like above.
+    "sinh (-2 < x < 2)": 0.65, "sinh (x >= 2, result < 2^16)": 1.8, "sinh (result >= 2^16)": 1e-5,
+    "cosh (result < 2^16)": 1.8, "cosh (result >= 2^16)": 1e-5, "tanh": 1.5,
+    "sinhc (-2 < x < 2)": 0.65, "sinhc (2 <= x < 12)": 1.35, "coshc": 1.6,
 }
 
 
@@ -768,17 +1133,19 @@ def main():
     ap.add_argument("cmd", choices=["emit", "check", "sweep", "tables"])
     args = ap.parse_args()
     check_identities()
+    check_hyp()
     if args.cmd == "tables":
         print_tables()
         return
     errors = sweep()
-    for name, (v, unit) in errors.items():
+    hyp_errors = sweep_hyp()
+    for name, (v, unit) in {**errors, **hyp_errors}.items():
         if v > budget(name):
             sys.exit(f"{name}: {fmt_err(v, unit)} exceeds the {budget(name)} budget")
     if args.cmd == "sweep":
         print(f"{'function':<58} max error")
-        for name, (v, unit) in errors.items():
-            print(f"{name:<58} {fmt_err(v, unit)} {'' if unit == 'ULP' else ''}")
+        for name, (v, unit) in {**errors, **hyp_errors}.items():
+            print(f"{name:<58} {fmt_err(v, unit)}")
         alt = build_alt()
         print("alt (exp2 single poly / exp Cody-Waite / log2 atanh):",
               ", ".join(f"{e:.2f}" for e in check_alt(*alt)))
@@ -788,6 +1155,7 @@ def main():
     write = args.cmd == "emit"
     ok = splice(LIB, "exp", emit_lib(errors), write)
     ok &= splice(ALT, "exp", emit_alt(*alt), write)
+    ok &= splice(LIB, "hyperbolic", emit_hyp(hyp_errors), write)
     if args.cmd == "check" and not ok:
         sys.exit("the generated blocks are stale: run `scripts/gen_exp.py emit`")
 

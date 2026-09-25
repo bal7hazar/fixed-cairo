@@ -1,5 +1,5 @@
-//! Loop-free exponentials, logarithms and powers (exp, exp2, exp_m1, ln, log2, log10, ln_1p, log,
-//! powf).
+//! Loop-free exponentials, logarithms, powers and hyperbolic functions (exp, exp2, exp_m1, ln,
+//! log2, log10, ln_1p, log, powf, sinh, cosh, tanh, sinhc, coshc).
 //!
 //! Every function is straight-line code, with no loop and no bitwise operation:
 //!
@@ -18,6 +18,14 @@
 //!   as `log2`.
 //! * `powf(x, n) = exp2(n * log2(x))` on the wide accumulators: the product `n * log2(x)` is
 //!   never rounded to 32 bits.
+//! * `sinh` / `cosh`: one exponential `E = e^|x|` (the wide exponent of `exp`), then
+//!   `round(E / 2 -+ 1 / (2E))` exactly, from one `u64` division `floor((2^64 - 1) / E)`; from
+//!   `|x| = 21` on the core computes `e^|x| / 2` instead, which reaches `asinh(2^31) = 22.18`.
+//!   Below `|x| = 2`, `sinh(x) = x * S(x^2)` with one degree-6 polynomial `S(u) = sinh(sqrt(u)) /
+//!   sqrt(u)`: no exponential, no cancellation, `sinh(x) = x` for `|x| <= 2^-10.1`. `sinhc` is
+//!   `S` there and `sinh(x) / x` beyond. `tanh = (T - c) / (T + c)` with `T = e^(2|x|) * c` (`c =
+//!   1`, or `2^-16` from `|x| = 5.5` on so that `T` fits), one division. Every odd or even
+//!   function is computed on `|x|`: the symmetries are exact.
 //!
 //! Polynomials run on the Q96.96 accumulators of `fixed::wide` (one rescale per Horner step)
 //! with 24 to 28 extra fractional bits, so the error is dominated by the final rescale.
@@ -28,7 +36,10 @@
 //! `2^(1/16)` at the end of a segment, this makes them **non-decreasing by construction** across
 //! every seam (rounding to nearest would let a seam step down by 1 ULP where the table entries
 //! are small). The segments of `log2` are sealed the same way (each one ends at or below the
-//! start of the next), so every function of this module is monotone.
+//! start of the next), so every function of this module is monotone. The hyperbolic functions
+//! round their final rescale to nearest: they stay monotone by construction (the core rounds an
+//! increasing function of a non-decreasing `E`, the polynomial has non-negative coefficients),
+//! which the generator checks around every junction.
 //!
 //! The coefficients, the table, the search tree, the thresholds and the measured errors come
 //! from [`scripts/gen_exp.py`](../../../../scripts/gen_exp.py), which also mirrors every
@@ -906,6 +917,68 @@ fn normalize(x: u64) -> (u64, i64) {
 const POW_T_MAX: i64 = 0x1f000000;
 /// `-33 * 2^24`: below it `x^n < 2^-33` rounds to zero.
 const POW_T_MIN: i64 = -0x21000000;
+/// `2^64 - 1`: `floor((2^64 - 1) / E) = ceil(2^64 / E) - 1` is the reciprocal of the hyperbolic
+/// core (`E >= 2^32` raw, so it fits 32 bits).
+const U64_MAX: u64 = 0xffffffffffffffff;
+const TWO_NZ: NonZero<u64> = 2;
+const FOUR_NZ: NonZero<u64> = 4;
+/// `2^28` and `2^27`: round `S` (at the scale `2^60`) to Q32.32.
+const SINHC_NZ: NonZero<u64> = 0x10000000;
+const SINHC_HALF: u64 = 0x8000000;
+
+// GENERATED-BEGIN hyperbolic
+/// The smallest raw input whose `sinh` does not fit the scalar range: `asinh(2^31)`,
+/// rounded up.
+const SINH_MAX_RAW: i64 = 0x162e42fefb;
+/// The smallest raw input whose `cosh` does not fit (`acosh(2^31)`, rounded up; it agrees
+/// with `asinh(2^31)` to `1e-18`).
+const COSH_MAX_RAW: i64 = 0x162e42fefb;
+/// The smallest raw input whose `tanh` rounds to 1 (`1 - tanh(x) <= 2^-33`): `tanh` returns
+/// `ONE` from there on without computing.
+const TANH_SAT_RAW: i64 = 0xbc8939775;
+/// `2` in raw units: below it `sinh` and `sinhc` evaluate the polynomial.
+const HYP_POLY_RAW: i64 = 0x200000000;
+/// `21` in raw units: from it on the core computes `e^x / 2` (`e^x` leaves the
+/// range at 21.49).
+const HYP_SPLIT_RAW: i64 = 0x1500000000;
+/// `5.5` in raw units: from it on `tanh` computes `e^(2x) * 2^-16`.
+const TANH_SPLIT_RAW: i64 = 0x580000000;
+/// `1` at the scale of the wide exponent (`2^56`): `2^(t - 1) = e^x / 2`.
+const Q_ONE: i64 = 0x100000000000000;
+/// `16` at the scale of the wide exponent.
+const TANH_SHIFT_Q: i64 = 0x1000000000000000;
+/// `2^-16` in raw units.
+const TANH_C_LOW: i64 = 0x10000;
+
+/// `sinh(x) / x` in `u = x^2` (Q64.64) on `[0, 4]`, degree 6, at the scale
+/// `2^60`. Constant term pinned to 1; all the coefficients are non-negative, so it is
+/// non-decreasing in `u` by construction.
+#[inline(always)]
+fn sinhc_poly(u: W1) -> Fixed {
+    let acc = Fixed { raw: 0xbaf1ab4 };
+    let acc = step(u, acc, Fixed { raw: 0x6b69fd8b8 });
+    let acc = step(u, acc, Fixed { raw: 0x2e3c295fc84 });
+    let acc = step(u, acc, Fixed { raw: 0xd00cfb0d9ed9 });
+    let acc = step(u, acc, Fixed { raw: 0x222222241c2e99 });
+    let acc = step(u, acc, Fixed { raw: 0x2aaaaaaaa8e8c13 });
+    step(u, acc, Fixed { raw: 0x1000000000000000 })
+}
+
+/// Measured maximum error of the mirrored hyperbolic functions (`scripts/gen_exp.py
+/// sweep`): absolute in ULP (`2^-32`), or relative in units of `2^-30` where marked.
+///
+/// | function | range | max error |
+/// |---|---|---:|
+/// | `sinh` | -2 < x < 2 | 0.55 |
+/// | `sinh` | x >= 2, result < 2^16 | 1.47 |
+/// | `sinh` | result >= 2^16 | 5.27e-06 x 2^-30 |
+/// | `cosh` | result < 2^16 | 1.48 |
+/// | `cosh` | result >= 2^16 | 4.69e-06 x 2^-30 |
+/// | `tanh` | whole range | 1.26 |
+/// | `sinhc` | -2 < x < 2 | 0.52 |
+/// | `sinhc` | 2 <= x < 12 | 1.10 |
+/// | `coshc` | 1 <= x < 12 | 1.31 |
+// GENERATED-END hyperbolic
 
 pub trait ExpTrait {
     /// Computes `e^self`.
@@ -1010,6 +1083,63 @@ pub trait ExpTrait {
     ///   `powf(x, 1)` is therefore not bit-identical to `x`; use `powi` for integer exponents.
     /// * Returns `ZERO` when the exact result is below `2^-33`.
     fn powf(self: Fixed, n: Fixed) -> Fixed;
+    /// Computes the hyperbolic sine of `self`.
+    ///
+    /// Mirrors `f32::sinh`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self| >= 22.1807` (`asinh(2^31)`, raw `0x162e42fefb`), where
+    ///   the result does not fit the scalar range (`f32::sinh` returns a large value or infinity).
+    /// #### Deviations
+    /// * Rounds to nearest: within 0.55 ULP for `|self| < 2` (a polynomial, so `sinh(x) = x`
+    ///   exactly up to `|x| = 2^-10.1`, raw 3 810 778), within 1.47 ULP beyond for results below
+    ///   `2^16`, within `5.3e-6 * 2^-30` relative above. Odd bit for bit (`sinh(-x) ==
+    ///   -sinh(x)`) and non-decreasing.
+    fn sinh(self: Fixed) -> Fixed;
+    /// Computes the hyperbolic cosine of `self`.
+    ///
+    /// Mirrors `f32::cosh`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self| >= 22.1807` (`acosh(2^31)`, raw `0x162e42fefb`).
+    /// #### Deviations
+    /// * Rounds to nearest: within 1.48 ULP for results below `2^16`, within `4.7e-6 * 2^-30`
+    ///   relative above; `cosh(0) = 1` exactly. Even bit for bit and non-decreasing on
+    ///   `self >= 0`.
+    fn cosh(self: Fixed) -> Fixed;
+    /// Computes the hyperbolic tangent of `self`.
+    ///
+    /// Mirrors `f32::tanh`.
+    /// #### Panics
+    /// * Never.
+    /// #### Deviations
+    /// * Rounds to nearest: within 1.26 ULP over the whole range (the error of `e^(2|x|)` near
+    ///   zero, so `tanh(x)` may be one ULP below `x` for tiny `x`). Odd bit for bit and
+    ///   non-decreasing; exactly `+-1` for `|self| >= 11.7835` (raw `0xbc8939775`), the first
+    ///   input where `1 - tanh` is at most half an ULP.
+    fn tanh(self: Fixed) -> Fixed;
+    /// Computes the cardinal hyperbolic sine `sinh(self) / self`, with `sinhc(0) = 1`.
+    ///
+    /// Mirrors `simba::scalar::ComplexField::sinhc`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self| >= 22.1807`, as [`ExpTrait::sinh`].
+    /// #### Deviations
+    /// * Panics from `asinh(2^31)` on, where `sinh` overflows, although the quotient itself would
+    ///   fit up to `|self| ~= 25.4`.
+    /// * Within 0.52 ULP for `|self| < 2` (the polynomial of `sinh` itself, no division), within
+    ///   1.10 ULP on `[2, 12)` (`sinh(|x|) / |x|`, the division rounds to nearest, ties to even).
+    ///   Even bit for bit.
+    fn sinhc(self: Fixed) -> Fixed;
+    /// Computes `cosh(self) / self`, with `coshc(0) = 1`, like simba (the function is odd and
+    /// unbounded near zero; the value at zero is simba's convention).
+    ///
+    /// Mirrors `simba::scalar::ComplexField::coshc`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self| >= 22.1807`, as [`ExpTrait::cosh`], or if the quotient
+    ///   does not fit: `self` is raw `1`, `2` or `-1` (raw `-2` gives exactly `MIN`).
+    /// #### Deviations
+    /// * The division rounds to nearest (ties to even): within 1.31 ULP on `[1, 12)`, and
+    ///   within `1.48 / |self| + 0.5` ULP below 1, where the quotient amplifies the error of
+    ///   `cosh`.
+    fn coshc(self: Fixed) -> Fixed;
 }
 
 pub impl ExpImpl of ExpTrait {
@@ -1079,6 +1209,78 @@ pub impl ExpImpl of ExpTrait {
             -r
         }
     }
+
+    fn sinh(self: Fixed) -> Fixed {
+        assert(self.raw < SINH_MAX_RAW && self.raw > -SINH_MAX_RAW, 'Fixed: overflow');
+        // |self| < 22.19: the magnitude cannot overflow.
+        let a = FixedTrait::abs(self);
+        let r = if a.raw < HYP_POLY_RAW {
+            sinh_poly(a)
+        } else {
+            sinh_core(a)
+        };
+        if self.raw < 0 {
+            Fixed { raw: -r }
+        } else {
+            Fixed { raw: r }
+        }
+    }
+
+    fn cosh(self: Fixed) -> Fixed {
+        assert(self.raw < COSH_MAX_RAW && self.raw > -COSH_MAX_RAW, 'Fixed: overflow');
+        let (e, r, big) = hyp_core(FixedTrait::abs(self));
+        let c = if big {
+            let (g, _) = DivRem::div_rem(r + 2, FOUR_NZ);
+            e + g
+        } else {
+            let (c, _) = DivRem::div_rem(e + r + 1, TWO_NZ);
+            c
+        };
+        Fixed { raw: c.try_into().unwrap() }
+    }
+
+    fn tanh(self: Fixed) -> Fixed {
+        if self.raw >= TANH_SAT_RAW {
+            return ONE;
+        }
+        if self.raw <= -TANH_SAT_RAW {
+            return -ONE;
+        }
+        let a = FixedTrait::abs(self);
+        // floor(2|x| * log2(e) * 2^56), below 34 * 2^56.
+        let q = wide_mul(a + a, LOG2_E_Q).narrow();
+        let (q, c) = if a.raw < TANH_SPLIT_RAW {
+            (q, ONE)
+        } else {
+            (Fixed { raw: q.raw - TANH_SHIFT_Q }, Fixed { raw: TANH_C_LOW })
+        };
+        let t = exp_from_q(q);
+        let r = (t - c) / (t + c);
+        if self.raw < 0 {
+            -r
+        } else {
+            r
+        }
+    }
+
+    fn sinhc(self: Fixed) -> Fixed {
+        assert(self.raw < SINH_MAX_RAW && self.raw > -SINH_MAX_RAW, 'Fixed: overflow');
+        let a = FixedTrait::abs(self);
+        if a.raw < HYP_POLY_RAW {
+            // S is in [2^60, 1.82 * 2^60]: the conversions cannot fail.
+            let s: u64 = sinhc_poly(wide_mul(a, a)).raw.try_into().unwrap();
+            let (r, _) = DivRem::div_rem(s + SINHC_HALF, SINHC_NZ);
+            return Fixed { raw: r.try_into().unwrap() };
+        }
+        Fixed { raw: sinh_core(a) } / a
+    }
+
+    fn coshc(self: Fixed) -> Fixed {
+        if self.raw == 0 {
+            return ONE;
+        }
+        Self::cosh(self) / self
+    }
 }
 
 /// One Horner step at the Q96.96 scale: `floor(acc * u + c)` where `u` is an exact Q64.64
@@ -1139,4 +1341,48 @@ fn pow_pos(x: Fixed, n: Fixed) -> Fixed {
         return ZERO;
     }
     exp_from_q(w.narrow())
+}
+
+/// `round(a * S(a^2))`, `0 <= a < 2`: the polynomial branch of `sinh`, one rounded rescale.
+#[inline(always)]
+fn sinh_poly(a: Fixed) -> i64 {
+    let s = sinhc_poly(wide_mul(a, a));
+    bounded::narrow64_round(upcast(wide_mul(a, s).mul(SIXTEEN).v))
+}
+
+/// The exponential of the hyperbolic core, for `0 <= a < asinh(2^31)`: `(E, R, big)` with one
+/// reciprocal `R = floor((2^64 - 1) / E) = ceil(2^64 / E) - 1`.
+///
+/// Below 21 (`big` false), `E = e^a` (at least `2^32` raw): `round(sinh(a)) = round(E / 2 - 2^63
+/// / E) = floor((E - R) / 2)` and `round(cosh(a)) = round(E / 2 + 2^63 / E) = floor((E + R + 1) /
+/// 2)`, exactly. From 21 on, `E = e^a / 2` (the wide exponent minus 1): `round(2^62 / E) =
+/// floor((R + 2) / 4)`, then `E -+` it. Below the overflow thresholds every result fits an `i64`
+/// (checked by the generator).
+#[inline(always)]
+fn hyp_core(a: Fixed) -> (u64, u64, bool) {
+    let big = a.raw >= HYP_SPLIT_RAW;
+    let q = wide_mul(a, LOG2_E_Q).narrow();
+    let q = if big {
+        Fixed { raw: q.raw - Q_ONE }
+    } else {
+        q
+    };
+    // e >= 2^32 raw (a >= 0), and e < 2^63: the conversions cannot fail.
+    let e: u64 = exp_from_q(q).raw.try_into().unwrap();
+    let (r, _) = DivRem::div_rem(U64_MAX, e.try_into().unwrap());
+    (e, r, big)
+}
+
+/// `round(sinh(a))` raw from the core, `2 <= a < asinh(2^31)`.
+#[inline(always)]
+fn sinh_core(a: Fixed) -> i64 {
+    let (e, r, big) = hyp_core(a);
+    let s = if big {
+        let (g, _) = DivRem::div_rem(r + 2, FOUR_NZ);
+        e - g
+    } else {
+        let (s, _) = DivRem::div_rem(e - r, TWO_NZ);
+        s
+    };
+    s.try_into().unwrap()
 }
