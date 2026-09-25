@@ -2,7 +2,9 @@
 //! inputs where the cost depends on the branch taken (overflow / underflow checks, the zero and
 //! negative bases of `powf`) or on the leaf of the exponent search of the logarithms. The losing
 //! variants of `benches::alt::exp` are the `alt_*` rows; `alt_normalize_*` isolate the exponent
-//! search of `log2` (the library uses the `tree` one).
+//! search of `log2` (the library uses the `tree` one). The hyperbolic functions have a row per
+//! branch: the polynomial below 2 (`__small`), the exponential core (`__mid`), its `e^x / 2` form
+//! from 21 on (`__large`), the two scales and the saturation of `tanh`.
 use benches::alt::exp as alt;
 use benches::harness::{bb, sink};
 use fixed::Fixed;
@@ -307,6 +309,188 @@ fn powf__underflow__op() {
 }
 
 #[test]
+fn sinh__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh());
+}
+
+#[test]
+fn sinh__negative__base() {
+    let _a = bb(Fixed { raw: -0x1b3333333 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh__negative__op() {
+    let a = bb(Fixed { raw: -0x1b3333333 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh());
+}
+
+#[test]
+fn sinh__mid__base() {
+    let _a = bb(Fixed { raw: 0x355555555 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh__mid__op() {
+    let a = bb(Fixed { raw: 0x355555555 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh());
+}
+
+#[test]
+fn sinh__large__base() {
+    let _a = bb(Fixed { raw: 0x1580000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh__large__op() {
+    let a = bb(Fixed { raw: 0x1580000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh());
+}
+
+#[test]
+fn cosh__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn cosh__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.cosh());
+}
+
+#[test]
+fn cosh__mid__base() {
+    let _a = bb(Fixed { raw: 0x355555555 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn cosh__mid__op() {
+    let a = bb(Fixed { raw: 0x355555555 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.cosh());
+}
+
+#[test]
+fn cosh__large__base() {
+    let _a = bb(Fixed { raw: 0x1580000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn cosh__large__op() {
+    let a = bb(Fixed { raw: 0x1580000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.cosh());
+}
+
+#[test]
+fn tanh__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn tanh__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.tanh());
+}
+
+#[test]
+fn tanh__large__base() {
+    let _a = bb(Fixed { raw: 0x800000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn tanh__large__op() {
+    let a = bb(Fixed { raw: 0x800000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.tanh());
+}
+
+#[test]
+fn tanh__saturated__base() {
+    let _a = bb(Fixed { raw: -0xf00000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn tanh__saturated__op() {
+    let a = bb(Fixed { raw: -0xf00000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.tanh());
+}
+
+#[test]
+fn sinhc__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinhc__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinhc());
+}
+
+#[test]
+fn sinhc__large__base() {
+    let _a = bb(Fixed { raw: 0x355555555 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinhc__large__op() {
+    let a = bb(Fixed { raw: 0x355555555 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinhc());
+}
+
+#[test]
+fn coshc__base() {
+    let _a = bb(Fixed { raw: 0x180000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn coshc__op() {
+    let a = bb(Fixed { raw: 0x180000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.coshc());
+}
+
+#[test]
+fn coshc__zero__base() {
+    let _a = bb(Fixed { raw: 0x0 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn coshc__zero__op() {
+    let a = bb(Fixed { raw: 0x0 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.coshc());
+}
+
+#[test]
 fn alt_exp2_single_poly__base() {
     let _a = bb(Fixed { raw: 0x55555555 });
     sink(bb(Fixed { raw: 1 }));
@@ -512,4 +696,95 @@ fn alt_normalize_msb_table__large__op() {
     let a = bb(0x1e24000000315_u64);
     let _r = bb((1_u64, 1_i64));
     sink(alt::normalize_msb_table(a));
+}
+
+#[test]
+fn alt_sinh_two_exp__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_two_exp__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_two_exp(a));
+}
+
+#[test]
+fn alt_sinh_exp_core__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_exp_core__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_exp_core(a));
+}
+
+#[test]
+fn alt_cosh_two_exp__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_cosh_two_exp__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::cosh_two_exp(a));
+}
+
+#[test]
+fn alt_tanh_two_exp__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_tanh_two_exp__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::tanh_two_exp(a));
+}
+
+#[test]
+fn alt_tanh_sinh_cosh__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_tanh_sinh_cosh__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::tanh_sinh_cosh(a));
+}
+
+#[test]
+fn alt_sinhc_div__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinhc_div__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinhc_div(a));
+}
+
+#[test]
+fn alt_tanh_recip__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_tanh_recip__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::tanh_recip(a));
 }

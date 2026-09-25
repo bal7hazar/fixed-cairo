@@ -1,4 +1,5 @@
 # bench: l2_gas steps range_check bitwise other_builtins
+bench_exp::alt_cosh_two_exp: 45930 366 92 0 0
 bench_exp::alt_exp2_single_poly: 29240 238 63 0 0
 bench_exp::alt_exp2_single_poly_large: 29240 238 63 0 0
 bench_exp::alt_exp_cody_waite: 21040 170 43 0 0
@@ -15,6 +16,17 @@ bench_exp::alt_normalize_msb_table__small: 12730 100 18 0 0
 bench_exp::alt_normalize_tree__large: 6790 52 7 0 0
 bench_exp::alt_normalize_tree__mid: 6790 50 7 0 0
 bench_exp::alt_normalize_tree__small: 6790 54 7 0 0
+bench_exp::alt_sinh_exp_core__small: 27410 211 54 0 0
+bench_exp::alt_sinh_two_exp: 45930 366 92 0 0
+bench_exp::alt_sinhc_div__small: 35680 175 39 0 0
+bench_exp::alt_tanh_recip: 31860 254 60 0 0
+bench_exp::alt_tanh_sinh_cosh: 63680 397 93 0 0
+bench_exp::alt_tanh_two_exp: 49400 384 96 0 0
+bench_exp::cosh__large: 28100 229 57 0 0
+bench_exp::cosh__mid: 28100 223 54 0 0
+bench_exp::cosh__small: 28100 223 54 0 0
+bench_exp::coshc: 34340 259 60 0 0
+bench_exp::coshc__zero: 34340 12 0 0 0
 bench_exp::exp2__large: 19160 154 39 0 0
 bench_exp::exp2__negative: 19160 154 39 0 0
 bench_exp::exp2__small: 19160 154 39 0 0
@@ -37,3 +49,12 @@ bench_exp::powf__negative_base: 47630 384 91 0 0
 bench_exp::powf__positive: 47630 341 81 0 0
 bench_exp::powf__underflow: 47630 194 40 0 0
 bench_exp::powf__zero_base: 47630 24 2 0 0
+bench_exp::sinh__large: 29540 239 59 0 0
+bench_exp::sinh__mid: 29540 230 56 0 0
+bench_exp::sinh__negative: 29540 147 33 0 0
+bench_exp::sinh__small: 29540 140 33 0 0
+bench_exp::sinhc__large: 32710 248 61 0 0
+bench_exp::sinhc__small: 32710 139 34 0 0
+bench_exp::tanh__large: 31020 241 60 0 0
+bench_exp::tanh__saturated: 31020 21 2 0 0
+bench_exp::tanh__small: 31020 235 58 0 0

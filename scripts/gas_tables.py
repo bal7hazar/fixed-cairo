@@ -96,6 +96,11 @@ FIXED = [
         ("`ln_1p`", "exp::ln_1p"),
         ("`log`", "exp::log"),
         ("`powf`", "exp::powf__positive"),
+        ("`sinh`", "exp::sinh__mid"),
+        ("`cosh`", "exp::cosh__mid"),
+        ("`tanh`", "exp::tanh__small"),
+        ("`sinhc`", "exp::sinhc__large"),
+        ("`coshc`", "exp::coshc"),
     ]),
 ]
 
