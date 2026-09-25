@@ -10,6 +10,21 @@ request numbers refer to `glam-cairo`. The next release is cut from this reposit
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.4.0] - 2026-09-25
+
+First release cut from `fixed-cairo`. Pure addition: no numeric result of 0.3.0 changes.
+`glam` / `glamx` 0.4.0 are re-released on it from their repositories.
+
+### Added
+- `ExpTrait::{sinh, cosh, tanh}` (Rust's `f64` names) and `sinhc` / `coshc` (simba 0.10's
+  `ComplexField`), requested by `nalgebra-cairo` (it composed them from two `exp`): about 35 %
+  cheaper than that (`sinh` 29 540, `cosh` 28 100, `tanh` 31 020 gas vs 45 930 / 49 400),
+  within 1.5 ULP, exactly odd / even, monotone, final rescale to nearest (#1).
+- `scripts/requirements.txt` and a platform-independent fit in `scripts/gen_exp.py` (the committed
+  coefficients are kept when a fresh fit differs by platform noise only, `< 2^-48`) (#1).
+
 ### Changed
 - Repository split: `fixed` moves from `glam-cairo` to `fixed-cairo`, with its full history, its
   benches (`fixed`, `wide`, `trig`, `exp`), gas snapshots, golden-vector generator (pruned to the

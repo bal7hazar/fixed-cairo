@@ -3,7 +3,7 @@ version = 1
 
 [[package]]
 name = "benches"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "fixed",
  "snforge_std",
@@ -11,14 +11,14 @@ dependencies = [
 
 [[package]]
 name = "consumer"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "fixed",
 ]
 
 [[package]]
 name = "fixed"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "snforge_std",
 ]

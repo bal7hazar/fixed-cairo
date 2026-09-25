@@ -104,7 +104,8 @@ let r = TWO.powf(HALF);                       // sqrt(2) = exp2(0.5 * log2(2))
 let steps = x.log(TWO);                       // log(self, base), Rust argument order
 ```
 
-- `exp exp2 exp_m1 ln log2 log10 ln_1p log powf`, named after Rust's `f32` (`sqrt` and `powi`
+- `exp exp2 exp_m1 ln log2 log10 ln_1p log powf sinh cosh tanh`, named after Rust's `f32`, plus
+  simba's `sinhc` (`sinh(x) / x`) and `coshc` (`cosh(x) / x`) (`sqrt` and `powi`
   live in `FixedTrait`). `ExpTrait` is not re-exported at the crate root yet:
   `use fixed::exp::ExpTrait;`.
 - **Domain**: `exp` / `exp2` panic with `'Fixed: exp overflow'` from `31 ln 2` (21.487) / `31`
@@ -112,6 +113,12 @@ let steps = x.log(TWO);                       // log(self, base), Rust argument 
   panic with `'Fixed: ln domain'` for `x <= 0`; `powf` panics with `'Fixed: powf domain'` for a
   negative base and a non-integer exponent (Rust returns NaN), accepts `0^0 = 1` and `0^n = 0`
   like Rust, and computes a negative base with an integer exponent as `(-1)^n |x|^n`.
+- **Hyperbolic** (0.4.0): `sinh` / `sinhc` use one polynomial below `|x| = 2` (no cancellation,
+  `sinh(x) = x` exactly below about `2^-10`) and one `exp` above; `sinh` 0.55 / 1.47 ULP, `cosh`
+  1.48, `tanh` 1.26, `sinhc` 0.52 / 1.10, `coshc` 1.31 ULP; exact odd / even symmetry;
+  `sinh` / `cosh` / `sinhc` panic `'Fixed: overflow'` from raw `0x162e42fefb`
+  (`ceil(asinh(2^31) * 2^32)`); `tanh` saturates to exactly `+-1` from raw `0xbc8939775` and never
+  panics.
 - **Loop-free**: `exp2` is one `DivRem` (`x = k/16 + g`), one lookup in a 1 024-entry `const`
   table of `2^(k/16)` (the power of two and the segment together) and a degree-6 polynomial;
   `exp` multiplies by a 56-bit `log2(e)` and reuses it. `log2` finds the exponent with an

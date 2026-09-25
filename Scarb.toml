@@ -2,14 +2,14 @@
 members = ["packages/*"]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024_07"
 cairo-version = "2.19.4"
 license = "MIT"
 repository = "https://github.com/bal7hazar/fixed-cairo"
 
 [workspace.dependencies]
-fixed = { path = "packages/fixed", version = "0.3.0" }
+fixed = { path = "packages/fixed", version = "0.4.0" }
 snforge_std = "0.61.0"
 assert_macros = "2.19.4"
 

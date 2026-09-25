@@ -61,7 +61,9 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
   `[-2, 0]`, `cos(2^-32) = 1`, <= 300 gas); intermediate rescales still floor. `exp2` / `exp` /
   `powf` (`fixed::exp`) keep a floor final rescale: with round-to-nearest the generator found
   1 ULP descents at segment junctions, and monotonicity is worth more than the 1 ULP gained; the
-  logarithms round to nearest. (Consumers may round differently in their own kernels: the Jacobi
+  logarithms round to nearest. The hyperbolic functions `sinh`, `cosh`, `tanh`, `sinhc`, `coshc`
+  (0.4.0) round their final rescale to nearest and stay monotone (checked densely around every
+  internal switch point; floor would cost 1.98 instead of 1.47 ULP on `sinh`). (Consumers may round differently in their own kernels: the Jacobi
   rotations of `glamx::eigen3` round to nearest.) `sqrt` and `norm*` return the floor of the
   exact root. Rounding is part of the API: results are bit-exact and any change is a MINOR
   version bump.
