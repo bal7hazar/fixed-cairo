@@ -55,3 +55,7 @@ Status: `todo`, `inprogress`, `inreview`, `done`.
 | F6 | correctly rounded `div_nearest` / `recip_nearest` / `RecipTrait::div_nearest` (nalgebra-cairo escalation, 2026-09-23); `/`, `recip`, `from_ratio` switched to round-half-even (Rust reference; +10.7 % on `/`, 173 benches in 18 snapshots); released `v0.3.0` (tag on e30f7e6, published on scarbs.xyz 2026-09-23) | done | #42, [release](https://github.com/bal7hazar/glam-cairo/releases/tag/v0.3.0) |
 | D1 | reproducible environment for `scripts/gen_trig.py` / `gen_exp.py` (numpy / mpmath not pinned: `emit --check` depends on the numpy version; not in the gate) | todo | |
 | D2 | test files over the 1 200-line budget (camera, vec2/3/4, ivec3/4; `Test glam` ~23 min in CI) | todo | |
+| RN | repositories renamed `*.cairo` -> `*-cairo` (GitHub renames + live docs) | done | #41 |
+| S1 | split `fixed-cairo` out (history kept, standalone gate and CI), `docs/SPLIT.md` | inprogress | |
+| S2 | split `glamx-cairo` out (history kept, `fixed` / `glam` 0.3.0 from the registry) | inprogress | |
+| S3 | remove `fixed` and `glamx` from `glam-cairo`, `fixed` 0.3.0 from the registry | todo | after S1, S2 |
