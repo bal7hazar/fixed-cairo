@@ -309,7 +309,7 @@ pub trait TrigTrait {
     /// * Maximum absolute error 2.96 ULP. `acos(1) = 0`, `acos(0) = FRAC_PI_2` and
     ///   `acos(-1) = PI` are exact.
     /// * Replaces `glam::f32::math::acos_approx` (a degree-7 approximation): this one is exact
-    ///   to 3 ULP, which is why `glam.cairo` has no `*_approx` variant.
+    ///   to 3 ULP, which is why `glam-cairo` has no `*_approx` variant.
     fn acos(self: Fixed) -> Fixed;
     /// Computes the arcsine of `self` clamped to `[-1, 1]` first.
     ///

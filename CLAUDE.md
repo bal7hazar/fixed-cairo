@@ -1,4 +1,4 @@
-# glam.cairo
+# glam-cairo
 
 @AGENTS.md
 

@@ -36,7 +36,7 @@ use crate::vec4::Vec4Trait;
 /// * Not ported: `col_mut` / `set_row` (no `&mut`), `from_cols_slice` / `from_rows_slice` /
 ///   `write_cols_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait
 ///   to implement), the by-reference operator overloads, the scalar-on-the-left operators
-///   (`2.0 * m`) and the casts to types that do not exist in glam.cairo (`as_dmat3`, `Mat3A`).
+///   (`2.0 * m`) and the casts to types that do not exist in glam-cairo (`as_dmat3`, `Mat3A`).
 /// * `from_euler` / `to_euler` are the extension trait `glam::euler::Mat3EulerTrait`.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct Mat3 {

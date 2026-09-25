@@ -1,7 +1,7 @@
 # Sub-agent strategy (orchestrator)
 
 Instructions for the orchestrator session. This file is meant to be pasted verbatim into the
-prompt of an orchestrator of another repository (nalgebra.cairo, rapier.cairo). Porter-side rules
+prompt of an orchestrator of another repository (nalgebra-cairo, rapier-cairo). Porter-side rules
 live in `AGENTS.md`, design decisions in `docs/DESIGN.md`, sequencing in `docs/PLAN.md`.
 
 Role of the main session: orchestrate, split, brief, review, merge. Never implement anything

@@ -6,9 +6,11 @@ by the orchestrator, never by a porting sub-agent.
 
 ## 1. Scope
 
-`glam.cairo` ports [glam-rs](https://github.com/bitshifter/glam-rs) **0.33.8** to pure Cairo
+`glam-cairo` (named `glam.cairo` until 2026-09; the dated documents under `docs/research/`,
+`docs/audits/`, `docs/briefs/` and the past `CHANGELOG.md` entries keep that name) ports
+[glam-rs](https://github.com/bitshifter/glam-rs) **0.33.8** to pure Cairo
 (no `starknet` dependency). It is the base layer of a provable game physics stack; the sibling
-repositories `nalgebra.cairo` and `rapier.cairo` consume the published packages:
+repositories `nalgebra-cairo` and `rapier-cairo` consume the published packages:
 
 | package | role |
 |---|---|
@@ -19,7 +21,7 @@ repositories `nalgebra.cairo` and `rapier.cairo` consume the published packages:
 
 Type mapping from glam-rs (one scalar, so the f32/f64/SIMD/aligned variants collapse):
 
-| glam-rs | glam.cairo |
+| glam-rs | glam-cairo |
 |---|---|
 | `Vec2`, `DVec2` | `Vec2` |
 | `Vec3`, `Vec3A`, `DVec3` | `Vec3` |
@@ -123,7 +125,7 @@ Tiers: **A** arithmetic, comparisons, rounding, `sqrt`, fused kernels; **B** `si
 
 Every deviation is also documented on the item under `#### Deviations`.
 
-| topic | glam-rs (f32) | glam.cairo |
+| topic | glam-rs (f32) | glam-cairo |
 |---|---|---|
 | NaN / infinity | propagate | do not exist; the operation panics instead |
 | overflow | infinity | panic (`'Fixed: overflow'` or native i64 message) |
@@ -234,5 +236,5 @@ Doc template (every public item):
 
 Pre-1.0. PATCH: fixes/perf with identical API **and identical numeric results**. MINOR: any API
 change or any change of a numeric result (downstream determinism depends on bit-exact outputs).
-Siblings pin a tag: `{ git = "https://github.com/bal7hazar/glam.cairo", tag = "vX.Y.Z" }`, never
+Siblings pin a tag: `{ git = "https://github.com/bal7hazar/glam-cairo", tag = "vX.Y.Z" }`, never
 a branch. Compiler bumps are dedicated pull requests that regenerate every snapshot.

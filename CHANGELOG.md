@@ -5,7 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+- Repositories renamed `glam.cairo` -> `glam-cairo`, `nalgebra.cairo` -> `nalgebra-cairo`,
+  `rapier.cairo` -> `rapier-cairo` (`https://github.com/bal7hazar/glam-cairo`; GitHub redirects
+  the old URLs). Package names (`fixed`, `glam`, `glamx`) and the registry are unchanged.
 
 ## [0.3.0] - 2026-09-23
 

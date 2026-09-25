@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the glam-rs 0.33.8 versus glam.cairo public API inventory.
+"""Generate the glam-rs 0.33.8 versus glam-cairo public API inventory.
 
 The parser is intentionally dependency free.  It is not a Rust or Cairo parser: it masks
 comments, finds balanced brace blocks, and recognizes the small set of declarations used by the

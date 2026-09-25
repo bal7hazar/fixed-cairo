@@ -1,4 +1,4 @@
-# glam.cairo
+# glam-cairo
 
 A port of [glam-rs](https://github.com/bitshifter/glam-rs) to [Cairo](https://www.cairo-lang.org):
 deterministic, gas-efficient vector, matrix and quaternion math on a signed Q32.32 fixed-point
@@ -18,7 +18,7 @@ Every design choice is measured in Cairo steps and Sierra gas
 ([research synthesis](docs/research/00-synthesis.md)). The win over a cubit-style sign-magnitude
 scalar comes from fusing: a product is an exact raw `i64` multiplication, and each output scalar
 is rescaled once. The first table below compares the two on the same operations (cubit-style
-figures from the synthesis, `glam.cairo` figures measured); every number is regenerated from
+figures from the synthesis, `glam-cairo` figures measured); every number is regenerated from
 `gas/*.snap`.
 
 ## Gas at a glance
@@ -29,9 +29,9 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 
 ### Against a cubit-style scalar
 
-Same operations on a sign-magnitude `{mag, sign}` scalar (prototype figures of [`docs/research/00-synthesis.md`](docs/research/00-synthesis.md)) and on `glam.cairo`, in Sierra gas.
+Same operations on a sign-magnitude `{mag, sign}` scalar (prototype figures of [`docs/research/00-synthesis.md`](docs/research/00-synthesis.md)) and on `glam-cairo`, in Sierra gas.
 
-| op | cubit-style | glam.cairo | speed-up |
+| op | cubit-style | glam-cairo | speed-up |
 |---|---:|---:|---:|
 | `+` | 4 050 | 840 | 4.8x |
 | `*` | 2 970 | 1 680 | 1.8x |

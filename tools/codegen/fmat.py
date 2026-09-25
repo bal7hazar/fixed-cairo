@@ -1159,7 +1159,7 @@ fn inverse_checked(m: {T}) -> Option<{T}> {{
 /// * Not ported: `col_mut` / `set_row` (no `&mut`), `from_cols_slice` / `from_rows_slice` /
 ///   `write_cols_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait
 ///   to implement), the by-reference operator overloads, the scalar-on-the-left operators
-///   (`2.0 * m`) and the casts to types that do not exist in glam.cairo (`as_dmat{n}`, `Mat3A`).
+///   (`2.0 * m`) and the casts to types that do not exist in glam-cairo (`as_dmat{n}`, `Mat3A`).
 {TODO_NOTE[n]}#[derive(Copy, Drop, Serde, PartialEq, Debug, Hash)]
 pub struct {T} {{
 {chr(10).join(f"    pub {c}: {V}," for c in t.cols)}

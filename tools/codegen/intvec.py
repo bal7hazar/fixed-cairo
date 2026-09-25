@@ -1171,7 +1171,7 @@ def gen_module(t):
 ///   `write_to_slice` (no `Span` in fixed-size math), `Sum` / `Product`, `IndexMut`, the
 ///   by-reference operator overloads, the scalar-on-the-left operators (`2 * v`), the scalar
 ///   bit operators (use `v & {T}Trait::splat(s)`), shifts by a vector or by another integer
-///   width, and the casts to types that do not exist in glam.cairo (`as_i64vec{n}`, ...).
+///   width, and the casts to types that do not exist in glam-cairo (`as_i64vec{n}`, ...).
 /// * `as_vec{n}` (and `as_dvec{n}`) will land with the `Vec{n}` port.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct {T} {{

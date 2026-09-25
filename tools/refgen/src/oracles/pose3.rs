@@ -11,7 +11,7 @@ use crate::prelude::*;
 use glamx::DPose3;
 
 /// `acos` is ill-conditioned near one and the two ports switch to nlerp at different
-/// thresholds (`1 - f32::EPSILON` in glam-rs, `1 - 2^-20` in glam.cairo): as the `slerp` entry
+/// thresholds (`1 - f32::EPSILON` in glam-rs, `1 - 2^-20` in glam-cairo): as the `slerp` entry
 /// of `specs/quat.toml`, `lerp` keeps `|dot| <= 0.99`.
 const MAX_DOT: f64 = 0.99;
 

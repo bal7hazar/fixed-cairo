@@ -124,7 +124,7 @@ fn rotated_diagonal(r: &[Option<i128>], d: &[i128]) -> [Option<i128>; 6] {
     [q(0, 0), q(0, 1), q(0, 2), q(1, 1), q(1, 2), q(2, 2)]
 }
 
-/// `Mat3::from_quat` of glam.cairo: one fused floor rescale per element, from `x2 = x + x`...
+/// `Mat3::from_quat` of glam-cairo: one fused floor rescale per element, from `x2 = x + x`...
 fn from_quat(q: &[i128]) -> Vec<Option<i128>> {
     let (x, y, z, w) = (q[0], q[1], q[2], q[3]);
     let (x2, y2, z2) = (x + x, y + y, z + z);

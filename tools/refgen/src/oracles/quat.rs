@@ -16,7 +16,7 @@ use glam::{DMat3, DQuat, DVec3};
 const MIN_AXIS: f64 = 0.25;
 
 /// The singular bands of `from_rotation_arc` differ between glam-rs (`1 - 2 f32::EPSILON`) and
-/// glam.cairo (`1 - 2^-20`), and the general branch normalizes a vector of length
+/// glam-cairo (`1 - 2^-20`), and the general branch normalizes a vector of length
 /// `sqrt(2 (1 + dot))`: cases closer to a dot product of `+-1` than this are dropped.
 const ARC_BAND: f64 = 1.0e-3;
 

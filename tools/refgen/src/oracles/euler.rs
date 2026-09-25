@@ -10,7 +10,7 @@
 
 use crate::prelude::*;
 
-/// Below this residual, glam-rs (`sqrt(..) > 16 * f64::EPSILON`) and glam.cairo
+/// Below this residual, glam-rs (`sqrt(..) > 16 * f64::EPSILON`) and glam-cairo
 /// (`> 16 * 2^-32`) can pick different branches of `to_euler`. It is eleven orders of magnitude
 /// above the Cairo threshold, so both sides are always in the general branch.
 const BRANCH: f64 = 1.0e-6;

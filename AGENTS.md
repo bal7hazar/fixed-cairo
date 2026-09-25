@@ -4,7 +4,7 @@
 
 Port [glam-rs](https://github.com/bitshifter/glam-rs) 0.33.8 to pure Cairo as a deterministic,
 gas-efficient, provable math library: the base layer of a provable game physics engine.
-`nalgebra.cairo` and `rapier.cairo` depend on the `fixed` and `glam` packages of this repository.
+`nalgebra-cairo` and `rapier-cairo` depend on the `fixed` and `glam` packages of this repository.
 
 Read `docs/DESIGN.md` before writing any code. It is short and every rule in it is measured.
 

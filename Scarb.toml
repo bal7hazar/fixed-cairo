@@ -6,7 +6,7 @@ version = "0.3.0"
 edition = "2024_07"
 cairo-version = "2.19.4"
 license = "MIT"
-repository = "https://github.com/bal7hazar/glam.cairo"
+repository = "https://github.com/bal7hazar/glam-cairo"
 
 [workspace.dependencies]
 fixed = { path = "packages/fixed", version = "0.3.0" }

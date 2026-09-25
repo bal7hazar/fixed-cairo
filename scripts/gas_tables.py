@@ -379,8 +379,8 @@ def render_root(snaps, errors):
     out = [caption(""), "", "### Against a cubit-style scalar", ""]
     out += [
         f"Same operations on a sign-magnitude `{{mag, sign}}` scalar (prototype figures of "
-        f"[`{CUBIT_SOURCE}`]({CUBIT_SOURCE})) and on `glam.cairo`, in Sierra gas.", "",
-        "| op | cubit-style | glam.cairo | speed-up |", "|---|---:|---:|---:|",
+        f"[`{CUBIT_SOURCE}`]({CUBIT_SOURCE})) and on `glam-cairo`, in Sierra gas.", "",
+        "| op | cubit-style | glam-cairo | speed-up |", "|---|---:|---:|---:|",
     ]
     for label, key, cubit in CUBIT:
         r = snaps.get(key, errors)

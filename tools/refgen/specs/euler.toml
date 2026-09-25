@@ -24,7 +24,7 @@
 #
 # Domains and skips. The angles are the `angle` preset (|x| <= 2 pi): beyond it `sin_cos` loses
 # accuracy with the magnitude and the tolerance would have to grow. `to_euler` is skipped near
-# gimbal lock, where glam-rs (`16 * f64::EPSILON`) and glam.cairo (`16 * 2^-32`) choose
+# gimbal lock, where glam-rs (`16 * f64::EPSILON`) and glam-cairo (`16 * 2^-32`) choose
 # different branches, and `quat_to_euler` is skipped below `|cy| = 0.25`, where the 2 ULP of the
 # matrix entries are amplified by more than four.
 

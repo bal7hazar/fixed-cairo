@@ -93,7 +93,7 @@ definition of done of `AGENTS.md`; and the report format. Agents read `AGENTS.md
 | risk | mitigation |
 |---|---|
 | `core::internal::bounded_int` changes or breaks (unstable API; misuse = compiler panic) | isolated in `fixed::internal`, generated plumbing, pinned toolchain, stable fallback in `benches::alt` |
-| overflow panics make a physics step unprovable (liveness) | document ranges per kernel, `try_*` variants where glam has them, engine-level bounds belong to `rapier.cairo` |
+| overflow panics make a physics step unprovable (liveness) | document ranges per kernel, `try_*` variants where glam has them, engine-level bounds belong to `rapier-cairo` |
 | f32-tuned epsilons meaningless at 2^-32 resolution | re-derived per call site in ULPs (DESIGN section 3) |
 | bytecode growth from `inline(always)` + polynomial segments | track class size once a consumer contract exists (wave 5 audit) |
 | gas numbers shift with compiler releases | snapshots are per-toolchain; bumps are dedicated PRs |

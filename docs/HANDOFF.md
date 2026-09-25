@@ -63,7 +63,7 @@ this repository; nothing depends on a previous session's scratchpad, worktrees o
   snapshot of 2026-09-21 (not gated).
 - Next: whatever the sibling repositories escalate (missing `fixed` kernels get added here with
   their bench and snapshot; any numeric change is a MINOR bump, DESIGN section 6). Coordination
-  decision taken on 2026-09-22: `nalgebra.cairo` keeps its `simba` trait layer and drops its
+  decision taken on 2026-09-22: `nalgebra-cairo` keeps its `simba` trait layer and drops its
   duplicate Q32.32 scalar in favour of `fixed` pinned on `v0.1.0` (the Rust model: one primitive
   scalar, simba is traits only).
 - Operational lessons of the R1 session (all recorded in `docs/ORCHESTRATOR.md`): launch agents

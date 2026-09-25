@@ -37,7 +37,7 @@ use crate::vec3::{Vec3, Vec3Trait};
 /// * Not ported: `map` (a closure parameter cannot be force-inlined, E2143), `from_slice` /
 ///   `write_to_slice` (no `Span` in fixed-size math), `Sum` / `Product` (no iterator trait to
 ///   implement), `IndexMut`, the by-reference operator overloads, the scalar-on-the-left
-///   operators (`2.0 * v`) and the casts to types that do not exist in glam.cairo
+///   operators (`2.0 * v`) and the casts to types that do not exist in glam-cairo
 ///   (`as_dvec4`, `as_i8vec4`, ...).
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct Vec4 {

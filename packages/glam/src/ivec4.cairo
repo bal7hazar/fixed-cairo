@@ -30,7 +30,7 @@ use crate::uvec4::UVec4;
 ///   `write_to_slice` (no `Span` in fixed-size math), `Sum` / `Product`, `IndexMut`, the
 ///   by-reference operator overloads, the scalar-on-the-left operators (`2 * v`), the scalar
 ///   bit operators (use `v & IVec4Trait::splat(s)`), shifts by a vector or by another integer
-///   width, and the casts to types that do not exist in glam.cairo (`as_i64vec4`, ...).
+///   width, and the casts to types that do not exist in glam-cairo (`as_i64vec4`, ...).
 /// * `as_vec4` (and `as_dvec4`) will land with the `Vec4` port.
 #[derive(Copy, Drop, Serde, PartialEq, Debug, Default, Hash)]
 pub struct IVec4 {
