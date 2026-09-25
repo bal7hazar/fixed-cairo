@@ -5,7 +5,7 @@
 # service restarts, every process of the cgroup is killed, `setsid nohup` children included.
 # A `systemd-run --user` unit lives under user@<uid>.service (needs `loginctl enable-linger`) and
 # survives. Falls back to `setsid nohup` where there is no systemd user manager.
-# See docs/ORCHESTRATOR.md.
+# See docs/ORCHESTRATOR.md of glam-cairo (the orchestrator of the split repositories lives there).
 #
 # usage: scripts/agent.sh <task> <claude|codex> <model> <new|resume> <prompt> [codex-session-id] [effort]
 #        scripts/agent.sh status            # one line per known task
@@ -68,7 +68,7 @@ echo "--- $(date -u +%FT%TZ) $cli $model $mode" >> "$L/$task.log"
 inner='"$@" < /dev/null >> "$0" 2>&1; echo "exit=$? $(date -u +%FT%TZ)" >> "$0"'
 rm -f "$L/$task.unit" "$L/$task.pid"
 if systemctl --user is-system-running > /dev/null 2>&1 || systemctl --user list-units > /dev/null 2>&1; then
-  unit="glam-agent-$task-$(date -u +%H%M%S)"
+  unit="fixed-agent-$task-$(date -u +%H%M%S)"
   systemd-run --user --unit="$unit" --collect --quiet --working-directory="$wt" \
     --setenv=PATH="$PATH" bash -c "$inner" "$L/$task.log" "${cmd[@]}"
   echo "$unit" > "$L/$task.unit"

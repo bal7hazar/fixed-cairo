@@ -99,189 +99,16 @@ FIXED = [
     ]),
 ]
 
-GLAM = [
-    Table("`Vec2`", [
-        ("`add`", "vec2::add"),
-        ("`mul_scalar`", "vec2::mul_scalar"),
-        ("`dot`", "vec2::dot"),
-        ("`perp_dot`", "vec2::perp_dot"),
-        ("`length`", "vec2::length"),
-        ("`normalize`", "vec2::normalize"),
-        ("`rotate`", "vec2::rotate"),
-        ("`from_angle`", "vec2::from_angle"),
-        ("`to_angle`", "vec2::to_angle"),
-    ]),
-    Table("`Vec3`", [
-        ("`add`", "vec3::add"),
-        ("`mul_scalar`", "vec3::mul_scalar"),
-        ("`dot`", "vec3::dot"),
-        ("`cross`", "vec3::cross"),
-        ("`length`", "vec3::length"),
-        ("`normalize`", "vec3::normalize"),
-        ("`distance`", "vec3::distance"),
-        ("`lerp`", "vec3::lerp"),
-        ("`reflect`", "vec3::reflect"),
-        ("`angle_between`", "vec3::angle_between"),
-    ]),
-    Table("`Vec4`", [
-        ("`add`", "vec4::add"),
-        ("`mul_scalar`", "vec4::mul_scalar"),
-        ("`dot`", "vec4::dot"),
-        ("`length`", "vec4::length"),
-        ("`normalize`", "vec4::normalize"),
-        ("`lerp`", "vec4::lerp"),
-    ]),
-    Table("`Mat2`", [
-        ("`mul_vec2`", "mat2::mul_vec2"),
-        ("`mul_mat2`", "mat2::mul_mat2"),
-        ("`determinant`", "mat2::determinant"),
-        ("`inverse`", "mat2::inverse"),
-        ("`transpose`", "mat2::transpose"),
-        ("`from_angle`", "mat2::from_angle"),
-    ]),
-    Table("`Mat3`", [
-        ("`mul_vec3`", "mat3::mul_vec3"),
-        ("`mul_mat3`", "mat3::mul_mat3"),
-        ("`determinant`", "mat3::determinant"),
-        ("`inverse`", "mat3::inverse"),
-        ("`transpose`", "mat3::transpose"),
-        ("`from_quat`", "mat3::from_quat"),
-        ("`from_axis_angle`", "mat3::from_axis_angle"),
-        ("`from_rotation_z`", "mat3::from_rotation_z"),
-    ]),
-    Table("`Mat4`", [
-        ("`mul_vec4`", "mat4::mul_vec4"),
-        ("`mul_mat4`", "mat4::mul_mat4"),
-        ("`transform_point3`", "mat4::transform_point3"),
-        ("`project_point3`", "mat4::project_point3"),
-        ("`determinant`", "mat4::determinant"),
-        ("`inverse`", "mat4::inverse"),
-        ("`transpose`", "mat4::transpose"),
-        ("`from_quat`", "mat4::from_quat"),
-        ("`from_rotation_translation`", "mat4::from_rotation_translation"),
-        ("`look_at_rh`", "mat4::look_at_rh"),
-    ]),
-    Table("`Quat`", [
-        ("`mul_quat`", "quat::mul_quat"),
-        ("`mul_vec3`", "quat::mul_vec3"),
-        ("`conjugate`", "quat::conjugate"),
-        ("`normalize`", "quat::normalize"),
-        ("`slerp`", "quat::slerp"),
-        ("`lerp`", "quat::lerp"),
-        ("`from_axis_angle`", "quat::from_axis_angle"),
-        ("`from_rotation_arc`", "quat::from_rotation_arc"),
-        ("`from_mat3`", "quat::from_mat3"),
-        ("`to_axis_angle`", "quat::to_axis_angle"),
-    ]),
-    Table("`Affine2`", [
-        ("`transform_point2`", "affine2::transform_point2"),
-        ("`transform_vector2`", "affine2::transform_vector2"),
-        ("`mul_affine2`", "affine2::mul_affine2"),
-        ("`inverse`", "affine2::inverse"),
-        ("`from_angle_translation`", "affine2::from_angle_translation"),
-    ]),
-    Table("`Affine3`", [
-        ("`transform_point3`", "affine3::transform_point3"),
-        ("`transform_vector3`", "affine3::transform_vector3"),
-        ("`mul_affine3`", "affine3::mul_affine3"),
-        ("`inverse`", "affine3::inverse"),
-        ("`inverse_rigid`", "affine3::inverse_rigid"),
-        ("`from_rotation_translation`", "affine3::from_rotation_translation"),
-        ("`look_to_rh`", "affine3::look_to_rh"),
-    ]),
-    Table("Euler angles (`EulerRot`, worst case: generic order)", [
-        ("`Quat::from_euler`", "euler::quat_from_euler"),
-        ("`Quat::to_euler`", "euler::quat_to_euler"),
-        ("`Mat3::from_euler`", "euler::mat3_from_euler"),
-        ("`Mat3::to_euler`", "euler::mat3_to_euler"),
-        ("`Mat4::from_euler`", "euler::mat4_from_euler"),
-    ]),
-    Table("Camera (`glam::camera`)", [
-        ("`rh::proj::opengl::perspective`", "camera::rh_opengl_perspective"),
-        ("`rh::proj::vulkan::perspective`", "camera::rh_vulkan_perspective"),
-        ("`rh::proj::vulkan::perspective_infinite_reverse`",
-         "camera::rh_vulkan_perspective_infinite_reverse"),
-        ("`rh::proj::opengl::orthographic`", "camera::rh_opengl_orthographic"),
-        ("`rh::proj::opengl::frustum`", "camera::rh_opengl_frustum"),
-        ("`rh::view::look_at_mat4`", "camera::rh_view_look_at_mat4"),
-        ("`rh::view::look_to_mat4`", "camera::rh_view_look_to_mat4"),
-    ]),
-]
-
-# A module without a snapshot yet (still being ported) is skipped without error.
-GLAMX = [
-    Table("`Pose3`", [
-        ("`mul_pose3`", "pose3::mul_pose3"),
-        ("`inv_mul`", "pose3::inv_mul"),
-        ("`inverse`", "pose3::inverse"),
-        ("`transform_point`", "pose3::transform_point"),
-        ("`transform_vector`", "pose3::transform_vector"),
-        ("`inverse_transform_point`", "pose3::inverse_transform_point"),
-        ("`nlerp`", "pose3::nlerp"),
-        ("`to_mat4`", "pose3::to_mat4"),
-    ], optional=True),
-    Table("`Pose2`", [
-        ("`mul`", "pose2::mul"),
-        ("`inv_mul`", "pose2::inv_mul"),
-        ("`inverse`", "pose2::inverse"),
-        ("`transform_point`", "pose2::transform_point"),
-        ("`transform_vector`", "pose2::transform_vector"),
-    ], optional=True),
-    Table("`Rot2`", [
-        ("`mul`", "rot2::mul"),
-        ("`mul_vec2`", "rot2::mul_vec2"),
-        ("`inverse`", "rot2::inverse"),
-        ("`from_angle`", "rot2::from_angle"),
-        ("`angle`", "rot2::angle"),
-        ("`normalize`", "rot2::normalize"),
-        ("`lerp`", "rot2::lerp"),
-        ("`slerp`", "rot2::slerp"),
-    ], optional=True),
-    Table("`SdpMatrix3`", [
-        ("`mul_vec`", "sdp::mul_vec"),
-        ("`mul_mat`", "sdp::mul_mat"),
-        ("`add`", "sdp::add"),
-        ("`quadform`", "sdp::quadform"),
-        ("`inverse_regular`", "sdp::inverse_regular"),
-        ("`from_rotated_diagonal`", "sdp::from_rotated_diagonal"),
-    ], optional=True),
-]
-
-# Root README.  Figures of the cubit-style sign-magnitude scalar: docs/research/00-synthesis.md
-# section 2 (prototype measurements, same operations).
-CUBIT_SOURCE = "docs/research/00-synthesis.md"
-CUBIT = [
-    ("`+`", "fixed::add", 4050),
-    ("`*`", "fixed::mul", 2970),
-    ("`/`", "fixed::div", 2970),
-    ("`Vec3::dot`", "vec3::dot", 15750),
-    ("`Mat3 * Mat3`", "mat3::mul_mat3", 134250),
-    ("`Mat4 * Mat4`", "mat4::mul_mat4", 335800),
-    ("`Quat * Quat`", "quat::mul_quat", 87780),
-    ("`Quat * Vec3`", "quat::mul_vec3", 115910),
-    ("`sin`", "trig::sin__small", 128670),
-    ("`sin_cos`", "trig::sin_cos__small", 263610),
-]
-
 GLANCE = [
-    ("`fixed`", "`+`", "fixed::add"),
-    ("`fixed`", "`*`", "fixed::mul"),
-    ("`fixed`", "`/`", "fixed::div"),
-    ("`fixed`", "`sqrt`", "fixed::sqrt"),
-    ("`fixed`", "`dot3`", "wide::dot3"),
-    ("`fixed`", "`sin_cos`", "trig::sin_cos__small"),
-    ("`fixed`", "`atan2`", "trig::atan2__quadrant1"),
-    ("`fixed`", "`exp`", "exp::exp__small"),
-    ("`fixed`", "`ln`", "exp::ln__large"),
-    ("`glam`", "`Vec3::normalize`", "vec3::normalize"),
-    ("`glam`", "`Vec3::cross`", "vec3::cross"),
-    ("`glam`", "`Mat3 * Vec3`", "mat3::mul_vec3"),
-    ("`glam`", "`Mat4 * Mat4`", "mat4::mul_mat4"),
-    ("`glam`", "`Mat4::inverse`", "mat4::inverse"),
-    ("`glam`", "`Quat * Quat`", "quat::mul_quat"),
-    ("`glam`", "`Quat::slerp`", "quat::slerp"),
-    ("`glam`", "`Affine3::transform_point3`", "affine3::transform_point3"),
-    ("`glamx`", "`Pose3::transform_point`", "pose3::transform_point"),
+    ("`+`", "fixed::add"),
+    ("`*`", "fixed::mul"),
+    ("`/`", "fixed::div"),
+    ("`sqrt`", "fixed::sqrt"),
+    ("`dot3`", "wide::dot3"),
+    ("`sin_cos`", "trig::sin_cos__small"),
+    ("`atan2`", "trig::atan2__quadrant1"),
+    ("`exp`", "exp::exp__small"),
+    ("`ln`", "exp::ln__large"),
 ]
 
 
@@ -367,40 +194,21 @@ def op_table(tables, snaps, errors, heading):
     return out
 
 
-def ratio(a, b):
-    return f"{a / b:.1f}x"
-
-
 def render_package(tables, snaps, errors):
     return "\n".join([caption("../../"), ""] + op_table(tables, snaps, errors, "###")).rstrip()
 
 
 def render_root(snaps, errors):
-    out = [caption(""), "", "### Against a cubit-style scalar", ""]
-    out += [
-        f"Same operations on a sign-magnitude `{{mag, sign}}` scalar (prototype figures of "
-        f"[`{CUBIT_SOURCE}`]({CUBIT_SOURCE})) and on `glam-cairo`, in Sierra gas.", "",
-        "| op | cubit-style | glam-cairo | speed-up |", "|---|---:|---:|---:|",
-    ]
-    for label, key, cubit in CUBIT:
+    out = [caption(""), "", "### Headline operations", "", "| op | l2 gas | steps | range checks |",
+           "|---|---:|---:|---:|"]
+    for label, key in GLANCE:
         r = snaps.get(key, errors)
         if r is not None:
             out.append(
-                f"| {label} | {group(cubit)} | {group(r['l2_gas'])} | {ratio(cubit, r['l2_gas'])} |"
-            )
-    out += ["", "### Headline operations", "", "| package | op | l2 gas | steps | range checks |",
-            "|---|---|---:|---:|---:|"]
-    for pkg, label, key in GLANCE:
-        if pkg == "`glamx`" and not snaps.has(key):
-            continue
-        r = snaps.get(key, errors)
-        if r is not None:
-            out.append(
-                f"| {pkg} | {label} | {group(r['l2_gas'])} | {group(r['steps'])} | "
+                f"| {label} | {group(r['l2_gas'])} | {group(r['steps'])} | "
                 f"{group(r['range_check'])} |"
             )
-    out += ["", "Full tables: [`fixed`](packages/fixed#gas), [`glam`](packages/glam#gas), "
-            "[`glamx`](packages/glamx#gas)."]
+    out += ["", "Full tables: [`packages/fixed`](packages/fixed#gas)."]
     return "\n".join(out)
 
 
@@ -421,8 +229,6 @@ def main():
     outputs = {
         "README.md": render_root(snaps, errors),
         "packages/fixed/README.md": render_package(FIXED, snaps, errors),
-        "packages/glam/README.md": render_package(GLAM, snaps, errors),
-        "packages/glamx/README.md": render_package(GLAMX, snaps, errors),
     }
     if errors:
         sys.exit("gas_tables.py: the curated lists do not match gas/*.snap:\n  " +

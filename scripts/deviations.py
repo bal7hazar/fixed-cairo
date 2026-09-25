@@ -2,14 +2,13 @@
 """Extract the public-item deviation documentation from the Cairo packages.
 
 The parser is deliberately dependency-free.  It recognizes the repository's doc-comment
-template rather than attempting to parse arbitrary Cairo.  The Markdown form is embedded in
-docs/audits/R1-deviations.md; ``--check`` makes that appendix a generated, reviewable inventory.
+template rather than attempting to parse arbitrary Cairo.  It prints the inventory (TSV or
+Markdown) and is the doc-template parser reused by ``scripts/panic_coverage.py``.
 """
 
 from __future__ import annotations
 
 import argparse
-import difflib
 import re
 import sys
 from dataclasses import dataclass
@@ -17,14 +16,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT / "docs" / "audits" / "R1-deviations.md"
 SOURCE_GLOBS = (
     "packages/fixed/src/**/*.cairo",
-    "packages/glam/src/**/*.cairo",
-    "packages/glamx/src/**/*.cairo",
 )
-INVENTORY_START = "<!-- deviations-inventory:start -->"
-INVENTORY_END = "<!-- deviations-inventory:end -->"
 
 DOC_RE = re.compile(r"^\s*///(?: ?(.*))?$")
 DECL_RE = re.compile(
@@ -62,18 +56,7 @@ def module_owner(path: Path) -> str:
         "trig": "Fixed",
         "exp": "Fixed",
         "wide": "fixed::wide",
-        "camera": "camera",
-        "swizzles": "swizzles",
-        "euler": "EulerRot",
-        "eigen3": "SymmetricEigen3",
-        "sdp": "SdpMatrix",
     }
-    relative = path.relative_to(ROOT).as_posix()
-    if "/camera/" in relative:
-        namespace = Path(relative).relative_to("packages/glam/src").with_suffix("")
-        return "::".join(namespace.parts)
-    if "/swizzles/" in relative:
-        return "".join(part.capitalize() for part in path.stem.split("_"))
     if path.stem in special:
         return special[path.stem]
     return "".join(part.capitalize() for part in path.stem.split("_"))
@@ -254,35 +237,8 @@ def render_tsv(items: list[Item]) -> str:
     return "\n".join(lines)
 
 
-def check_report(items: list[Item]) -> int:
-    if not REPORT.exists():
-        print(f"missing report: {REPORT.relative_to(ROOT)}", file=sys.stderr)
-        return 1
-    report = REPORT.read_text()
-    start = report.find(INVENTORY_START)
-    end = report.find(INVENTORY_END)
-    if start < 0 or end < 0 or end < start:
-        print("report is missing the deviation inventory markers", file=sys.stderr)
-        return 1
-    actual = report[start + len(INVENTORY_START):end].strip("\n")
-    expected = render_markdown(items)
-    if actual == expected:
-        print(f"deviation inventory is current ({len(items)} items)")
-        return 0
-    diff = difflib.unified_diff(
-        actual.splitlines(),
-        expected.splitlines(),
-        fromfile=str(REPORT.relative_to(ROOT)),
-        tofile="generated inventory",
-        lineterm="",
-    )
-    print("\n".join(diff), file=sys.stderr)
-    return 1
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="check the report appendix")
     parser.add_argument(
         "--format", choices=("tsv", "markdown"), default="tsv", help="inventory output format"
     )
@@ -292,8 +248,6 @@ def main() -> int:
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1
-    if args.check:
-        return check_report(items)
     renderer = render_markdown if args.format == "markdown" else render_tsv
     print(renderer(items))
     return 0

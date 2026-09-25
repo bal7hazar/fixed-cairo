@@ -15,7 +15,6 @@ done
 python3 scripts/bench.py check
 # Class size of the packages/consumer contract fixtures (gas/bytecode.size, release build).
 python3 scripts/bytecode_size.py check
-python3 scripts/api_parity.py --check
 python3 scripts/panic_coverage.py --check
 python3 scripts/gas_tables.py --check
 # Golden vectors are up to date with tools/refgen (skipped when the Rust toolchain is absent; CI
@@ -26,5 +25,4 @@ else
   echo "cargo not found: skipping the golden vector check"
 fi
 scarb doc --workspace --disable-remote-linking >/dev/null
-python3 scripts/gen_eigen3.py emit --check
 echo "all checks passed"

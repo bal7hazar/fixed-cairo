@@ -1,4 +1,4 @@
-//! `refgen`: golden-vector generator. glam-rs (f64) is the oracle of the Cairo port.
+//! `refgen`: golden-vector generator of the `fixed` package: f64 and exact integer oracles.
 //!
 //! ```text
 //! cargo run --manifest-path tools/refgen/Cargo.toml -- gen [module...]    # write the files
@@ -24,10 +24,6 @@ pub mod prelude {
     pub use crate::rng::Rng;
     pub use crate::types::Ty;
     pub use crate::value::{quantize, raw_to_f64, skip, Out, Value, FRAC_BITS, ONE_F64, ONE_RAW};
-    pub use glam::{
-        BVec2, BVec3, BVec4, DAffine2, DAffine3, DMat2, DMat3, DMat4, DQuat, DVec2, DVec3, DVec4,
-        EulerRot, IVec2, IVec3, IVec4, UVec2, UVec3, UVec4,
-    };
 }
 
 use std::path::{Path, PathBuf};

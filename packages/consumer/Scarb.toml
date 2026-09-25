@@ -1,6 +1,6 @@
 [package]
 name = "consumer"
-description = "Starknet contract fixtures measuring the compiled class size of the fixed, glam and glamx packages (not published)"
+description = "Starknet contract fixtures measuring the compiled class size of the fixed package (not published)"
 version.workspace = true
 edition.workspace = true
 cairo-version.workspace = true
@@ -11,8 +11,6 @@ publish = false
 
 [dependencies]
 fixed.workspace = true
-glam.workspace = true
-glamx.workspace = true
 starknet = "2.19.4"
 
 [[target.starknet-contract]]

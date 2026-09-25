@@ -1,12 +1,11 @@
 //! The per-module spec files (`specs/<module>.toml`). See `README.md` for the format.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::types::{LayoutOverride, Leaf, Ty};
+use crate::types::{Leaf, Ty};
 use crate::value::{quantize, Value};
 
 fn yes() -> bool {
@@ -19,7 +18,7 @@ pub struct Spec {
     /// Module name: the spec is `specs/<module>.toml`, the oracles `src/oracles/<module>.rs`,
     /// the output `packages/<package>/tests/golden_<module>.cairo`.
     pub module: String,
-    /// `fixed` or `glam`.
+    /// Always `fixed` in this repository.
     pub package: String,
     /// Master switch: `false` emits the bare stub whatever the functions say.
     #[serde(default = "yes")]
@@ -28,9 +27,6 @@ pub struct Spec {
     /// entry, e.g. `fixed::FixedTrait`. The types are imported automatically.
     #[serde(default)]
     pub imports: Vec<String>,
-    /// Layout overrides, e.g. `[types.Mat3] fields = ["c0", "c1", "c2"]`.
-    #[serde(default)]
-    pub types: BTreeMap<String, LayoutOverride>,
     #[serde(default, rename = "function")]
     pub functions: Vec<FunctionSpec>,
 }
@@ -78,7 +74,7 @@ pub struct PanicSpec {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ArgSpec {
-    /// `"Vec3"`: the type with its default domain.
+    /// `"Fixed"`: the type with its default domain.
     Short(String),
     Full(Box<ArgFull>),
 }
@@ -98,15 +94,6 @@ pub struct ArgFull {
     pub nonzero: bool,
     /// Leaves satisfy `|x| >= min_abs`.
     pub min_abs: Option<f64>,
-    /// Whole-value constraint: `normalized`, `nonzero`, `invertible`, `rotation`, `trs`.
-    pub constraint: Option<String>,
-    /// `constraint = "nonzero"`: minimum length (default 0.001).
-    pub min_len: Option<f64>,
-    /// `constraint = "invertible"`: minimum `|det|` (default 0.01).
-    pub min_det: Option<f64>,
-    /// `constraint = "trs"`: scale range (default `[0.25, 4]`).
-    pub scale_min: Option<f64>,
-    pub scale_max: Option<f64>,
     /// Name of a generator registered with `Registry::generator` (overrides everything else).
     pub custom: Option<String>,
     /// Per-element specs of a tuple argument.
@@ -157,11 +144,8 @@ impl Spec {
         if !is_ident(&self.module) {
             return Err(format!("invalid module name {:?}", self.module));
         }
-        if !matches!(self.package.as_str(), "fixed" | "glam" | "glamx") {
-            return Err(format!(
-                "package must be \"fixed\", \"glam\" or \"glamx\", got {:?}",
-                self.package
-            ));
+        if self.package != "fixed" {
+            return Err(format!("package must be \"fixed\", got {:?}", self.package));
         }
         let mut seen = std::collections::BTreeSet::new();
         for f in &self.functions {
@@ -248,7 +232,7 @@ fn flatten<'a>(v: &'a toml::Value, out: &mut Vec<&'a toml::Value>) {
 }
 
 /// Parses a hand-written argument: a leaf, or a (possibly nested) array of leaves in the
-/// flattened column-major order of the type.
+/// flattened order of the tuple type.
 pub fn parse_value(ty: &Ty, v: &toml::Value) -> Result<Value, String> {
     let leaves = ty.leaves();
     let mut flat = Vec::new();
@@ -274,12 +258,12 @@ mod tests {
 
     #[test]
     fn parses_hand_written_values() {
+        let fff = Ty::parse("(Fixed, Fixed, Fixed)").unwrap();
         let v: toml::Value = toml::from_str("v = [1.5, \"raw:-0x10\", 2]").unwrap();
-        let value = parse_value(&Ty::Vec3, &v["v"]).unwrap();
+        let value = parse_value(&fff, &v["v"]).unwrap();
         assert_eq!(value.leaves, vec![3 << 31, -16, 2 << 32]);
         let v: toml::Value = toml::from_str("v = [[1, 0], [0, 1]]").unwrap();
-        assert_eq!(parse_value(&Ty::Mat2, &v["v"]).unwrap().leaves.len(), 4);
-        assert!(parse_value(&Ty::Vec2, &v["v"]).is_err());
+        assert!(parse_value(&fff, &v["v"]).is_err());
         let v: toml::Value = toml::from_str("v = \"raw:0x7fffffffffffffff\"").unwrap();
         assert_eq!(
             parse_value(&Ty::Fixed, &v["v"]).unwrap().leaves,

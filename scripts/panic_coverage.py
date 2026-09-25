@@ -9,7 +9,7 @@ quoted message that refers to another item (`As [`QuatTrait::slerp`]`) is an inh
 requirement, covered by any panic test on the item or by the allowlist.
 
 The tested side is every `#[should_panic(expected: '<msg>')]` test of
-`packages/{fixed,glam,glamx}/tests/*.cairo`, attributed to the item it exercises by, in order:
+`packages/fixed/tests/*.cairo`, attributed to the item it exercises by, in order:
   (a) a marker comment in the lines above the test, `// panics: <Owner>::<item>` (for the
       generated golden files, which cannot carry one, the `MARKERS` table below);
   (b) its name, `test_<item>_<reason>` (or `golden_<module>_<item>_<reason>`), where `<item>` is
@@ -35,65 +35,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import deviations  # noqa: E402  (the doc-template parser; reused, not forked)
 
 ROOT = deviations.ROOT
-PACKAGES = ("fixed", "glam", "glamx")
+PACKAGES = ("fixed",)
 INHERITED = "(inherited)"
 
 # (owner, item, message) -> reason. `message` is one message of the requirement (any of its
 # `/` alternatives) or INHERITED. Every entry must still match an uncovered requirement.
-ALLOWED_MISSING: dict[tuple[str, str, str], str] = {
-    ("Affine3", "from_quat", "(inherited)"):
-        "inherited: panics as `Mat3Trait::from_quat`, exercised there",
-    ("Affine3", "from_axis_angle", "(inherited)"):
-        "inherited: panics as `Mat3Trait::from_axis_angle`, exercised there",
-    ("Affine3", "from_scale_rotation_translation", "(inherited)"):
-        "inherited: panics as `Mat4Trait::from_scale_rotation_translation`, exercised there",
-    ("Affine3", "from_rotation_translation", "(inherited)"):
-        "inherited: panics as `Mat3Trait::from_quat`, exercised there",
-    ("Affine3", "look_to_lh", "(inherited)"):
-        "inherited: panics as `look_to_rh`, exercised there",
-    ("Affine3", "quat_from_affine3", "(inherited)"):
-        "inherited: panics as `QuatTrait::from_rotation_axes`, exercised there",
-    ("camera::lh::view", "look_at_affine3", "(inherited)"):
-        "inherited: panics as `look_at_mat4`, exercised there",
-    ("camera::lh::view", "look_to_affine3", "(inherited)"):
-        "inherited: panics as `look_to_mat4`, exercised there",
-    ("camera::lh::view", "look_at_quat", "(inherited)"):
-        "inherited: panics as `look_at_mat3` and `QuatTrait::from_mat3`, exercised there",
-    ("camera::rh::view", "look_to_affine3", "(inherited)"):
-        "inherited: panics as `look_to_mat4`, exercised there",
-    ("camera::rh::view", "look_at_quat", "(inherited)"):
-        "inherited: panics as `look_at_mat3` and `QuatTrait::from_mat3`, exercised there",
-    ("camera::rh::view", "look_to_quat", "(inherited)"):
-        "inherited: panics as `look_to_mat3` and `QuatTrait::from_mat3`, exercised there",
-    ("Pose2", "lerp", "(inherited)"):
-        "inherited: panics as `Rot2Trait::slerp` and `Vec2Trait::lerp`, exercised there",
-    ("Pose2", "mul_vec2", "(inherited)"):
-        "inherited: panics as `Pose2Trait::transform_point`, exercised there",
-    ("Pose3", "new", "(inherited)"):
-        "inherited: panics as `QuatTrait::from_scaled_axis`, exercised there",
-    ("Pose3", "rotation", "(inherited)"):
-        "inherited: panics as `QuatTrait::from_scaled_axis`, exercised there",
-    ("Pose3", "lerp", "(inherited)"):
-        "inherited: panics as `QuatTrait::slerp` and `Vec3Trait::lerp`, exercised there",
-    ("Pose3", "from_mat4", "(inherited)"):
-        "inherited: panics as `QuatTrait::from_mat4`, exercised there",
-    ("Pose3", "mul_vec3", "(inherited)"):
-        "inherited: panics as `Pose3Trait::transform_point`, exercised there",
-    ("Rot2", "normalize_mut", "(inherited)"):
-        "inherited: panics as `Rot2Trait::normalize`, exercised there",
-    ("Rot2", "Rot2MulAssign", "(inherited)"):
-        "inherited: panics as `Rot2Mul`, exercised there",
-}
+ALLOWED_MISSING: dict[tuple[str, str, str], str] = {}
 
 # (test file relative to the repository, test function) -> reason.
-ALLOWED_UNATTRIBUTED: dict[tuple[str, str], str] = {
-    ("packages/glam/tests/test_swizzles.cairo", "fixed_vec::checker_detects_mismatch"):
-        "self-test of the ck2 test helper, not a library panic",
-    ("packages/glam/tests/test_swizzles.cairo", "ivec::checker_detects_mismatch"):
-        "self-test of the ck2 test helper, not a library panic",
-    ("packages/glam/tests/test_swizzles.cairo", "uvec::checker_detects_mismatch"):
-        "self-test of the ck2 test helper, not a library panic",
-}
+ALLOWED_UNATTRIBUTED: dict[tuple[str, str], str] = {}
 
 # Markers of the tests of generated files that cannot carry a comment (`tools/refgen` output):
 # (test file, test function) -> `<Owner>::<item>`, the same contract as a `// panics:` marker.
@@ -102,16 +52,12 @@ MARKERS: dict[tuple[str, str], str] = {
         "Fixed::div_euclid",
     ("packages/fixed/tests/golden_fixed.cairo", "golden_fixed_euclid_panics_overflow"):
         "Fixed::div_euclid",
-    ("packages/glam/tests/golden_quat.cairo", "golden_quat_mul_div_scalar_panics_div_scalar_zero"):
-        "Quat::div_scalar",
     ("packages/fixed/tests/golden_wide.cairo", "golden_wide_recip_mul_panics_overflow"):
         "Recip::mul",
-    ("packages/glamx/tests/golden_sdp.cairo", "golden_sdp_inverse_unchecked2_panics_singular"):
-        "SdpMatrix2::inverse_unchecked",
 }
 
 # (test file, test function) -> reason: the test panics with a message that the doc of its item
-# does not list (a documentation gap, escalated in docs/audits/R1-panic-coverage.md).
+# does not list (a documentation gap, to escalate).
 ALLOWED_UNDOCUMENTED: dict[tuple[str, str], str] = {}
 
 # Test module stem -> source modules whose items it tests (default: the same stem).
@@ -119,9 +65,6 @@ TEST_MODULES = {
     "fixed": ("fixed", "exp", "trig"),
     "exp": ("exp", "fixed"),
     "trig": ("trig", "fixed"),
-    "camera": ("camera/lh/proj", "camera/rh/proj", "camera/lh/view", "camera/rh/view"),
-    "swizzles": tuple(f"swizzles/{m}" for m in (
-        "vec2", "vec3", "vec4", "ivec2", "ivec3", "ivec4", "uvec2", "uvec3", "uvec4")),
 }
 
 MESSAGE_RE = re.compile(r"`'([^'`]+)'`")
@@ -174,7 +117,7 @@ def package_of(path: str) -> str:
 
 
 def source_module(path: str) -> str:
-    """`packages/glam/src/camera/rh/proj.cairo` -> `camera/rh/proj`."""
+    """`packages/fixed/src/internal/acc.cairo` -> `internal/acc`."""
     return path.split("/src/", 1)[1].removesuffix(".cairo")
 
 

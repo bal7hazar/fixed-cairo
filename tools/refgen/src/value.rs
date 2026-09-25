@@ -1,16 +1,9 @@
 //! Typed values exchanged between the generator and the oracle closures.
 //!
 //! A [`Value`] is a type plus its flattened `i64` leaves (`Fixed` -> raw Q32.32, integers ->
-//! value, `bool` -> 0/1). Oracles read their arguments through the accessors (`f`, `dvec3`,
-//! `dquat`, ...) and return anything that converts into an [`Out`] (`f64`, `DVec3`, `bool`,
-//! tuples, `Option<_>`, [`Out::raw`] for bit-exact integer oracles, [`skip`]).
-
-use glam::{
-    BVec2, BVec3, BVec4, DAffine2, DAffine3, DMat2, DMat3, DMat4, DQuat, DVec2, DVec3, DVec4,
-    IVec2, IVec3, IVec4, UVec2, UVec3, UVec4,
-};
-
-use glamx::{DPose2, DPose3};
+//! value, `bool` -> 0/1). Oracles read their arguments through the accessors (`f`, `raw`,
+//! `i64`, `bool`, `elems`, ...) and return anything that converts into an [`Out`] (`f64`,
+//! `bool`, integers, tuples, `Option<_>`, [`Out::raw`] for bit-exact integer oracles, [`skip`]).
 
 use crate::types::Ty;
 
@@ -86,15 +79,6 @@ impl Value {
         );
     }
 
-    fn floats<const N: usize>(&self, ty: Ty) -> [f64; N] {
-        self.expect(ty);
-        let mut out = [0.0; N];
-        for (o, raw) in out.iter_mut().zip(&self.leaves) {
-            *o = raw_to_f64(*raw);
-        }
-        out
-    }
-
     /// Raw Q32.32 representation of a `Fixed` argument (for bit-exact integer oracles).
     pub fn raw(&self) -> i64 {
         self.expect(Ty::Fixed);
@@ -103,7 +87,7 @@ impl Value {
 
     /// A `Fixed` argument as `f64` (exact).
     pub fn f(&self) -> f64 {
-        self.floats::<1>(Ty::Fixed)[0]
+        raw_to_f64(self.raw())
     }
 
     pub fn i64(&self) -> i64 {
@@ -124,122 +108,6 @@ impl Value {
     pub fn bool(&self) -> bool {
         self.expect(Ty::Bool);
         self.leaves[0] != 0
-    }
-
-    pub fn dvec2(&self) -> DVec2 {
-        DVec2::from_array(self.floats(Ty::Vec2))
-    }
-
-    pub fn dvec3(&self) -> DVec3 {
-        DVec3::from_array(self.floats(Ty::Vec3))
-    }
-
-    pub fn dvec4(&self) -> DVec4 {
-        DVec4::from_array(self.floats(Ty::Vec4))
-    }
-
-    pub fn dquat(&self) -> DQuat {
-        DQuat::from_array(self.floats(Ty::Quat))
-    }
-
-    pub fn dmat2(&self) -> DMat2 {
-        DMat2::from_cols_array(&self.floats(Ty::Mat2))
-    }
-
-    pub fn dmat3(&self) -> DMat3 {
-        DMat3::from_cols_array(&self.floats(Ty::Mat3))
-    }
-
-    pub fn dmat4(&self) -> DMat4 {
-        DMat4::from_cols_array(&self.floats(Ty::Mat4))
-    }
-
-    pub fn daffine2(&self) -> DAffine2 {
-        DAffine2::from_cols_array(&self.floats(Ty::Affine2))
-    }
-
-    pub fn daffine3(&self) -> DAffine3 {
-        DAffine3::from_cols_array(&self.floats(Ty::Affine3))
-    }
-
-    /// A `glamx::Pose2` argument: rotation leaves `[re, im]`, then the translation.
-    pub fn dpose2(&self) -> DPose2 {
-        let l = self.floats::<4>(Ty::Pose2);
-        DPose2::from_parts(
-            DVec2::new(l[2], l[3]),
-            glamx::DRot2::from_cos_sin_unchecked(l[0], l[1]),
-        )
-    }
-
-    /// A `glamx::Pose3` argument: the rotation leaves `[x, y, z, w]`, then the translation.
-    pub fn dpose3(&self) -> DPose3 {
-        let l = self.floats::<7>(Ty::Pose3);
-        DPose3::from_parts(
-            DVec3::new(l[4], l[5], l[6]),
-            DQuat::from_array([l[0], l[1], l[2], l[3]]),
-        )
-    }
-
-    fn bools(&self, ty: Ty) -> Vec<bool> {
-        self.expect(ty);
-        self.leaves.iter().map(|l| *l != 0).collect()
-    }
-
-    pub fn bvec2(&self) -> BVec2 {
-        let b = self.bools(Ty::BVec2);
-        BVec2::new(b[0], b[1])
-    }
-
-    pub fn bvec3(&self) -> BVec3 {
-        let b = self.bools(Ty::BVec3);
-        BVec3::new(b[0], b[1], b[2])
-    }
-
-    pub fn bvec4(&self) -> BVec4 {
-        let b = self.bools(Ty::BVec4);
-        BVec4::new(b[0], b[1], b[2], b[3])
-    }
-
-    fn i32s<const N: usize>(&self, ty: Ty) -> [i32; N] {
-        self.expect(ty);
-        let mut out = [0; N];
-        for (o, l) in out.iter_mut().zip(&self.leaves) {
-            *o = *l as i32;
-        }
-        out
-    }
-
-    fn u32s<const N: usize>(&self, ty: Ty) -> [u32; N] {
-        self.expect(ty);
-        let mut out = [0; N];
-        for (o, l) in out.iter_mut().zip(&self.leaves) {
-            *o = *l as u32;
-        }
-        out
-    }
-
-    pub fn ivec2(&self) -> IVec2 {
-        IVec2::from_array(self.i32s(Ty::IVec2))
-    }
-
-    pub fn ivec3(&self) -> IVec3 {
-        IVec3::from_array(self.i32s(Ty::IVec3))
-    }
-
-    pub fn ivec4(&self) -> IVec4 {
-        IVec4::from_array(self.i32s(Ty::IVec4))
-    }
-
-    pub fn uvec2(&self) -> UVec2 {
-        UVec2::from_array(self.u32s(Ty::UVec2))
-    }
-
-    pub fn uvec3(&self) -> UVec3 {
-        UVec3::from_array(self.u32s(Ty::UVec3))
-    }
-
-    pub fn uvec4(&self) -> UVec4 {
-        UVec4::from_array(self.u32s(Ty::UVec4))
     }
 
     /// The elements of a tuple argument.
@@ -300,10 +168,9 @@ impl Out {
         Out::raw_checked(i64::try_from(raw).ok())
     }
 
-    fn floats(ty: Ty, xs: &[f64]) -> Out {
-        let leaves: Result<Vec<i64>, Skip> = xs.iter().map(|x| quantize(*x)).collect();
+    fn float(x: f64) -> Out {
         Out {
-            res: leaves.map(|l| Value::new(ty, l)),
+            res: quantize(x).map(Value::fixed_raw),
             exact: false,
         }
     }
@@ -337,38 +204,8 @@ impl Out {
 
 impl From<f64> for Out {
     fn from(x: f64) -> Out {
-        Out::floats(Ty::Fixed, &[x])
+        Out::float(x)
     }
-}
-
-macro_rules! out_from_floats {
-    ($($src:ty => $ty:expr, $conv:expr;)*) => {$(
-        impl From<$src> for Out {
-            fn from(v: $src) -> Out {
-                #[allow(clippy::redundant_closure_call)]
-                Out::floats($ty, &($conv)(v))
-            }
-        }
-    )*};
-}
-
-out_from_floats! {
-    DVec2 => Ty::Vec2, |v: DVec2| v.to_array();
-    DVec3 => Ty::Vec3, |v: DVec3| v.to_array();
-    DVec4 => Ty::Vec4, |v: DVec4| v.to_array();
-    DQuat => Ty::Quat, |v: DQuat| v.to_array();
-    DMat2 => Ty::Mat2, |v: DMat2| v.to_cols_array();
-    DMat3 => Ty::Mat3, |v: DMat3| v.to_cols_array();
-    DMat4 => Ty::Mat4, |v: DMat4| v.to_cols_array();
-    DAffine2 => Ty::Affine2, |v: DAffine2| v.to_cols_array();
-    DAffine3 => Ty::Affine3, |v: DAffine3| v.to_cols_array();
-    DPose2 => Ty::Pose2, |v: DPose2| {
-        [v.rotation.re, v.rotation.im, v.translation.x, v.translation.y]
-    };
-    DPose3 => Ty::Pose3, |v: DPose3| {
-        let (q, t) = (v.rotation.to_array(), v.translation.to_array());
-        [q[0], q[1], q[2], q[3], t[0], t[1], t[2]]
-    };
 }
 
 macro_rules! out_from_ints {
@@ -382,24 +219,11 @@ macro_rules! out_from_ints {
     )*};
 }
 
-fn bits(mask: u32, n: usize) -> Vec<i64> {
-    (0..n).map(|i| i64::from((mask >> i) & 1)).collect()
-}
-
 out_from_ints! {
     bool => Ty::Bool, |v: bool| vec![i64::from(v)];
     i64 => Ty::I64, |v: i64| vec![v];
     i32 => Ty::I32, |v: i32| vec![i64::from(v)];
     u32 => Ty::U32, |v: u32| vec![i64::from(v)];
-    BVec2 => Ty::BVec2, |v: BVec2| bits(v.bitmask(), 2);
-    BVec3 => Ty::BVec3, |v: BVec3| bits(v.bitmask(), 3);
-    BVec4 => Ty::BVec4, |v: BVec4| bits(v.bitmask(), 4);
-    IVec2 => Ty::IVec2, |v: IVec2| v.to_array().iter().map(|c| i64::from(*c)).collect();
-    IVec3 => Ty::IVec3, |v: IVec3| v.to_array().iter().map(|c| i64::from(*c)).collect();
-    IVec4 => Ty::IVec4, |v: IVec4| v.to_array().iter().map(|c| i64::from(*c)).collect();
-    UVec2 => Ty::UVec2, |v: UVec2| v.to_array().iter().map(|c| i64::from(*c)).collect();
-    UVec3 => Ty::UVec3, |v: UVec3| v.to_array().iter().map(|c| i64::from(*c)).collect();
-    UVec4 => Ty::UVec4, |v: UVec4| v.to_array().iter().map(|c| i64::from(*c)).collect();
 }
 
 impl From<Value> for Out {
@@ -411,7 +235,7 @@ impl From<Value> for Out {
     }
 }
 
-/// `None` skips the case (e.g. `try_normalize` of a zero vector is a separate spec entry).
+/// `None` skips the case.
 impl<T: Into<Out>> From<Option<T>> for Out {
     fn from(v: Option<T>) -> Out {
         v.map_or_else(|| skip("oracle returned None"), Into::into)
@@ -453,19 +277,17 @@ mod tests {
     }
 
     #[test]
-    fn tuple_and_glam_conversions() {
-        let out: Out = (DVec3::new(1.0, 2.0, 3.0), 0.5).into();
+    fn tuple_conversions() {
+        let out: Out = (2.0, 0.5, 7_i64).into();
         let v = out.res.unwrap();
-        assert_eq!(v.ty, Ty::Tuple(vec![Ty::Vec3, Ty::Fixed]));
-        assert_eq!(
-            v.leaves,
-            vec![ONE_RAW, 2 * ONE_RAW, 3 * ONE_RAW, ONE_RAW / 2]
-        );
+        assert_eq!(v.ty, Ty::Tuple(vec![Ty::Fixed, Ty::Fixed, Ty::I64]));
+        assert_eq!(v.leaves, vec![2 * ONE_RAW, ONE_RAW / 2, 7]);
         assert!(!out.exact);
         let parts = v.elems();
-        assert_eq!(parts[0].dvec3(), DVec3::new(1.0, 2.0, 3.0));
-        assert_eq!(parts[1].f(), 0.5);
-        let m: Out = BVec3::new(true, false, true).into();
-        assert_eq!(m.res.unwrap().leaves, vec![1, 0, 1]);
+        assert_eq!(parts[0].f(), 2.0);
+        assert_eq!(parts[2].i64(), 7);
+        let m: Out = (true, Out::raw(3)).into();
+        assert!(m.exact);
+        assert_eq!(m.res.unwrap().leaves, vec![1, 3]);
     }
 }

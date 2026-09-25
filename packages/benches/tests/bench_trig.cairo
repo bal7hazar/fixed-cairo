@@ -4,7 +4,7 @@
 //! losing variants of `benches::alt::trig` are the `alt_*` rows.
 //!
 //! Note on the absolute numbers: they are ~2x the ones of the prototype of
-//! `docs/research/05-gas-benchmarks.md` section 4, whose bench harness fed the functions
+//! glam-cairo `docs/research/05-gas-benchmarks.md` section 4, whose bench harness fed the functions
 //! **constant** inputs (`let a: FMag = mk(10737418240);`, no black box); the same functions
 //! measured that way here cost 10 430 (`sin`), 20 710 (`sin_cos`), 12 750 (`atan2`) and 22 660
 //! (`acos`). Every row below goes through `bb`, as `AGENTS.md` requires.

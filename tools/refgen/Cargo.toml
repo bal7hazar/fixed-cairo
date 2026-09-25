@@ -3,7 +3,7 @@ name = "refgen"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Golden-vector generator: glam-rs (f64) is the test oracle of the glam-cairo port"
+description = "Golden-vector generator of fixed-cairo: f64 and exact integer oracles"
 license = "MIT"
 
 # Own workspace: this crate is not part of the scarb workspace and must not be picked up by a
@@ -11,12 +11,6 @@ license = "MIT"
 [workspace]
 
 [dependencies]
-# The oracle. Pinned exactly: the port mirrors this release.
-# `scalar-math`: the code path that is ported. `libm`: platform-independent transcendentals, so
-# the generated files are byte-identical on every host.
-glam = { version = "=0.33.8", default-features = false, features = ["libm", "scalar-math", "f64", "i32", "u32"] }
-glamx = { version = "=0.3.1", default-features = false, features = ["f64", "libm", "std"] }
-libm = "0.2"
 serde = { version = "1", features = ["derive"] }
 toml = "1.1"
 

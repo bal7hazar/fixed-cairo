@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compiled class size of the `consumer` contract fixtures (packages/consumer) against the Starknet
+"""Compiled class size of the `consumer` contract fixture (packages/consumer) against the Starknet
 limits, and the bytecode cost of the heaviest library items per call site.
 
 usage:
@@ -153,51 +153,10 @@ ITEMS = [
     ("Fixed exp", False, "a: Fixed", "Fixed", "a", "a.exp()"),
     ("Fixed ln", False, "a: Fixed", "Fixed", "a", "a.ln()"),
     ("Fixed powf", False, "a: Fixed, b: Fixed", "Fixed", "a", "a.powf(b)"),
-    ("Vec3 dot (dot3)", True, "u: Vec3, v: Vec3", "Fixed", "u.x", "u.dot(v)"),
-    ("Vec3 cross", True, "u: Vec3, v: Vec3", "Vec3", "u", "u.cross(v)"),
-    ("Vec3 normalize", True, "u: Vec3", "Vec3", "u", "u.normalize()"),
-    ("Rot2 from_angle", True, "a: Fixed", "Rot2", "Rot2 { re: a, im: a }", "Rot2Trait::from_angle(a)"),
-    ("Mat3 mul_mat3", True, "m: Mat3, n: Mat3", "Mat3", "m", "m.mul_mat3(n)"),
-    ("Mat3 inverse", False, "m: Mat3", "Mat3", "m", "m.inverse()"),
-    ("Mat3 from_quat", True, "q: Quat", "Mat3",
-     "Mat3Trait::from_cols(Vec3Trait::new(q.x, q.y, q.z), Vec3Trait::new(q.y, q.z, q.w), "
-     "Vec3Trait::new(q.z, q.w, q.x))", "Mat3Trait::from_quat(q)"),
-    ("Mat4 mul_mat4", True, "m: Mat4, n: Mat4", "Mat4", "m", "m.mul_mat4(n)"),
-    ("Mat4 inverse", False, "m: Mat4", "Mat4", "m", "m.inverse()"),
-    ("Quat mul_quat", True, "q: Quat, r: Quat", "Quat", "q", "q.mul_quat(r)"),
-    ("Quat mul_vec3", True, "q: Quat, v: Vec3", "Vec3", "v", "q.mul_vec3(v)"),
-    ("Quat normalize", True, "q: Quat", "Quat", "q", "q.normalize()"),
-    ("Quat from_scaled_axis", False, "v: Vec3", "Quat", "QuatTrait::from_xyzw(v.x, v.y, v.z, v.x)",
-     "QuatTrait::from_scaled_axis(v)"),
-    ("Quat slerp", False, "q: Quat, r: Quat, s: Fixed", "Quat", "q", "q.slerp(r, s)"),
-    ("Quat from_euler (YXZ)", False, "a: Fixed, b: Fixed, c: Fixed", "Quat",
-     "QuatTrait::from_xyzw(a, b, c, a)", "QuatEulerTrait::from_euler(EulerRot::YXZ, a, b, c)"),
-    ("Quat to_euler (YXZ)", False, "q: Quat", "(Fixed, Fixed, Fixed)", "(q.x, q.y, q.z)",
-     "q.to_euler(EulerRot::YXZ)"),
-    ("Pose2 inv_mul", True, "p: Pose2, r: Pose2", "Pose2", "p", "p.inv_mul(r)"),
-    ("Pose3 mul", True, "p: Pose3, r: Pose3", "Pose3", "p", "p * r"),
-    ("Pose3 inv_mul", True, "p: Pose3, r: Pose3", "Pose3", "p", "p.inv_mul(r)"),
-    ("Pose3 transform_point", True, "p: Pose3, v: Vec3", "Vec3", "v", "p.transform_point(v)"),
-    ("SdpMatrix3 from_rotated_diagonal", False, "q: Quat, d: Vec3", "SdpMatrix3",
-     "SdpMatrix3Trait::new(d.x, d.y, d.z, q.x, q.y, q.z)",
-     "SdpMatrix3Trait::from_rotated_diagonal(q, d)"),
-    ("SymmetricEigen3 new", False, "m: Mat3", "SymmetricEigen3",
-     "SymmetricEigen3 { eigenvalues: m.x_axis, eigenvectors: m }", "SymmetricEigen3Trait::new(m)"),
-    ("rh opengl perspective", True, "a: Fixed, b: Fixed, c: Fixed, d: Fixed", "Mat4",
-     "Mat4Trait::from_diagonal(Vec4Trait::new(a, b, c, d))", "opengl::perspective(a, b, c, d)"),
 ]
 
 PROBE_PRELUDE = """\
     use fixed::{ExpTrait, Fixed, FixedTrait, TrigTrait};
-    use glam::camera::rh::proj::opengl;
-    use glam::{
-        EulerRot, Mat3, Mat3Trait, Mat4, Mat4Trait, Quat, QuatEulerTrait, QuatTrait, Vec3,
-        Vec3Trait, Vec4Trait,
-    };
-    use glamx::{
-        Pose2, Pose2Trait, Pose3, Pose3Trait, Rot2, Rot2Trait, SdpMatrix3, SdpMatrix3Trait,
-        SymmetricEigen3, SymmetricEigen3Trait,
-    };
 """
 
 
@@ -224,7 +183,7 @@ def temp_package(work, strategy, items):
     src = work / "src"
     shutil.copytree(ROOT / "packages" / PACKAGE / "src", src)
     deps = "\n".join(
-        f'{p} = {{ path = "{(ROOT / "packages" / p).as_posix()}" }}' for p in ("fixed", "glam", "glamx")
+        f'{p} = {{ path = "{(ROOT / "packages" / p).as_posix()}" }}' for p in ("fixed",)
     )
     (work / "Scarb.toml").write_text(
         f'[package]\nname = "{PACKAGE}"\nversion = "0.1.0"\nedition = "2024_07"\n\n'

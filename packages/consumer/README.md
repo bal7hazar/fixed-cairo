@@ -1,18 +1,16 @@
 # consumer
 
-Unpublished. Starknet contract fixtures that link `fixed`, `glam` and `glamx` into deployable
-classes, so that the compiled class size of a realistic consumer is tracked against the network
-limits:
+Unpublished. A Starknet contract fixture that links `fixed` into a deployable class, so that the
+compiled class size of a consumer is tracked against the network limits:
 
 | contract | content |
 |---|---|
 | `Scalar` | one entry point per `fixed` family (`mul`, `div`, `sqrt`, `sin_cos`, `atan2`, `exp`, `ln`, `powf`) |
-| `Particles2d` | a 2D integrator step on `Vec2` / `Rot2` / `Pose2` (semi-implicit Euler, circle-circle contact, particles in storage) |
-| `Rigid3d` | what one rapier-style 3D step touches (`Vec3`, `Quat`, `Mat3`, `Pose3`, `SdpMatrix3` world inertia, bodies in storage) |
-| `KitchenSink` | everything above plus `Mat4` inverse, `slerp`, Euler conversions, a camera projection and `SymmetricEigen3` |
 
-Every input comes from calldata or storage (nothing is constant-folded). The shared simulation
-logic is in `src/sim.cairo`.
+Every input comes from calldata (nothing is constant-folded). The heavier fixtures that link
+`glam` / `glamx` (`Particles2d`, `Rigid3d`, `KitchenSink`) live in
+[`glam-cairo`](https://github.com/bal7hazar/glam-cairo) and
+[`glamx-cairo`](https://github.com/bal7hazar/glamx-cairo).
 
 Run from the repository root:
 
@@ -23,8 +21,6 @@ scripts/bytecode_size.py snapshot   # rewrite gas/bytecode.size
 scripts/bytecode_size.py attribution --strategy default --strategy avoid   # CASM felts per call site
 ```
 
-Keep the compiler's default `inlining-strategy` in a contract that uses these packages: `avoid` or
-a small numeric threshold shrinks the class by up to 27 % but costs +74 % to +177 % gas on the
-library (`docs/audits/R1-bytecode-size.md` section 4.2).
-
-Analysis and recommendations: `docs/audits/R1-bytecode-size.md`.
+Keep the compiler's default `inlining-strategy` in a contract that uses this package: `avoid` or
+a small numeric threshold shrinks the class but costs much more gas on the library (measured in
+`glam-cairo`, `docs/audits/R1-bytecode-size.md` section 4.2).
