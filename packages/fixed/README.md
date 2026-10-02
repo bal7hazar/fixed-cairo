@@ -5,7 +5,7 @@ rescale once per output (`wide`), and loop-free transcendental functions (`trig`
 Shared by the Cairo ports of glam, nalgebra and rapier. No dependencies.
 
 Design, rounding and overflow policy: [`docs/DESIGN.md`](../../docs/DESIGN.md).
-Compatible with Cairo 2.19.4.
+Compatible with Cairo 2.20.
 
 ## The scalar (`fixed::fixed`)
 

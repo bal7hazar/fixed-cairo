@@ -29,7 +29,7 @@ let (s, co) = c.sin_cos();
 ```
 
 API, rounding and overflow policy: [`packages/fixed`](packages/fixed) and
-[`docs/DESIGN.md`](docs/DESIGN.md). Compatible with Cairo 2.19.4.
+[`docs/DESIGN.md`](docs/DESIGN.md). Compatible with Cairo 2.20.
 
 ## Why another fixed-point scalar
 
