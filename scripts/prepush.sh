@@ -15,8 +15,10 @@
 #                ones; the golden vectors (tools/refgen, no lock) when cargo is present.
 # Left to CI (scripts/check.sh and .github/workflows/ci.yml; too long for a pre-push):
 #                the snforge test suites, the gas snapshots (scripts/bench.py check), `scarb doc`,
-#                the refgen unit tests, the consumer cost job, the generators that need numpy /
-#                mpmath (gen_trig.py, gen_exp.py); and the Cairo compile when the host is busy.
+#                the refgen unit tests, the consumer cost job, and the lint (with the test
+#                targets) of the packages that only depend on a touched one; the whole Cairo
+#                compile and lint when the host is busy (heavy lock). gen_trig.py / gen_exp.py
+#                run in neither CI nor scripts/check.sh: run them by hand (numpy / mpmath).
 #
 # The checks run on the working tree, so the script refuses when the tree is not exactly <sha>.
 #
@@ -106,28 +108,30 @@ fi
 pkgs=()
 for d in packages/*/; do [ -f "${d}Scarb.toml" ] && pkgs+=("$(basename "$d")"); done
 
-declare -A touched=()
+# `touched` is a space-separated set (bash 3.2 has no associative arrays).
+in_set() { case " $1 " in *" $2 "*) return 0 ;; esac; return 1; }
+touched=""
 if changed_has '^(Scarb\.toml|Scarb\.lock|\.tool-versions)$'; then
-  for p in "${pkgs[@]}"; do touched[$p]=1; done
+  touched="${pkgs[*]}"
 else
   while IFS= read -r f; do
     if [[ "$f" =~ ^packages/([^/]+)/(.*\.cairo|Scarb\.toml)$ ]]; then
       p=${BASH_REMATCH[1]}
-      [ -f "packages/$p/Scarb.toml" ] && touched[$p]=1
+      if [ -f "packages/$p/Scarb.toml" ] && ! in_set "$touched" "$p"; then touched="$touched $p"; fi
     fi
   done <<<"$changed"
 fi
 lint_pkgs=()
-for p in "${pkgs[@]}"; do [ -n "${touched[$p]:-}" ] && lint_pkgs+=("$p"); done
+for p in "${pkgs[@]}"; do if in_set "$touched" "$p"; then lint_pkgs+=("$p"); fi; done
 # Transitive closure over "depends on": q is added when its Scarb.toml names a package of the set.
 grew=1
 while [ "$grew" = 1 ]; do
   grew=0
   for q in "${pkgs[@]}"; do
-    [ -n "${touched[$q]:-}" ] && continue
-    for p in "${!touched[@]}"; do
+    if in_set "$touched" "$q"; then continue; fi
+    for p in $touched; do
       if grep -Eq "^${p}[[:space:]]*(\\.|=)" "packages/$q/Scarb.toml"; then
-        touched[$q]=1
+        touched="$touched $q"
         grew=1
         break
       fi
@@ -135,9 +139,9 @@ while [ "$grew" = 1 ]; do
   done
 done
 build_pkgs=()
-for p in "${pkgs[@]}"; do [ -n "${touched[$p]:-}" ] && build_pkgs+=("$p"); done
+for p in "${pkgs[@]}"; do if in_set "$touched" "$p"; then build_pkgs+=("$p"); fi; done
 size_check=0
-if [ -n "${touched[consumer]:-}" ] || changed_has '^(gas/bytecode\.size|scripts/bytecode_size\.py)$'; then
+if in_set "$touched" consumer || changed_has '^(gas/bytecode\.size|scripts/bytecode_size\.py)$'; then
   size_check=1
 fi
 
@@ -166,7 +170,7 @@ else
   ancestor_holds_lock() {
     local p=$PPID
     while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null; do
-      if ls -l "/proc/$p/fd" 2>/dev/null | grep -qF -- "$lock"; then return 0; fi
+      if ls -l "/proc/$p/fd" 2>/dev/null | grep -F -- "$lock" >/dev/null; then return 0; fi
       p=$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null) || return 1
     done
     return 1
@@ -201,7 +205,8 @@ else
     flock -w 90 -E 75 "$lock" bash -c '
       awk -v a="'"$s"'" -v b="$(date +%s.%N)" "BEGIN { printf \"%.1fs\", b - a }" >"$PREPUSH_MARKER"
       export HEAVY_BUILD_LOCK_HELD=1 PATH="$PREPUSH_REALDIR:$PATH"
-      heavy_group
+      export RAYON_NUM_THREADS="${RAYON_NUM_THREADS:-4}" CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
+      exec nice -n 10 bash -c "heavy_group"
     ' || rc=$?
     if [ "$rc" -eq 75 ] && [ ! -s "$marker" ]; then
       waited=$(awk -v a="$s" -v b="$(date +%s.%N)" 'BEGIN { printf "%d", b - a }')

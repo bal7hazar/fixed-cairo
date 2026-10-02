@@ -14,7 +14,7 @@ while read -r _local_ref local_sha _remote_ref _remote_sha; do
   [ "$local_sha" = "$zero" ] && continue # deleting a ref: nothing to check
   shas+=("$local_sha")
 done
-for sha in "${shas[@]}"; do
+for sha in ${shas[@]+"${shas[@]}"}; do
   "$root/scripts/prepush.sh" "$sha" </dev/null || {
     echo "pre-push: blocked: scripts/prepush.sh failed for $sha" >&2
     exit 1

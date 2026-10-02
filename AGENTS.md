@@ -53,8 +53,10 @@ compile of the touched packages and their dependents and the lint of the touched
 shared heavy-build lock: when it stays busy for 90 s the Cairo compile is left to CI and the script
 says so). Never push red, never `--no-verify`,
 never `git stash` to get a clean tree: commit. The full gate is CI (`scripts/check.sh`); the pre-push
-leaves to it the snforge suites, the gas snapshots, `scarb doc`, the refgen unit tests and the
-consumer cost job.
+leaves to it the snforge suites, the gas snapshots, `scarb doc`, the refgen unit tests, the consumer
+cost job and the lint (with the test targets) of the dependents of a touched package. `gen_trig.py`
+and `gen_exp.py` run in neither CI nor the gate: run them by hand when you change them (they need
+numpy and mpmath).
 
 ## Principles
 
