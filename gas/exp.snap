@@ -36,7 +36,7 @@ bench_exp::exp__negative: 20840 168 43 0 0
 bench_exp::exp__small: 20840 168 43 0 0
 bench_exp::exp__underflow: 20840 23 2 0 0
 bench_exp::exp_m1: 21680 175 45 0 0
-bench_exp::ln_1p: 21280 175 39 0 0
+bench_exp::ln_1p: 21160 175 39 0 0
 bench_exp::ln__below_one: 19520 158 37 0 0
 bench_exp::ln__large: 19520 160 37 0 0
 bench_exp::log: 42220 332 72 0 0

@@ -2,7 +2,7 @@
 bench_trig::acos__negative: 27390 226 58 0 0
 bench_trig::acos__small: 27390 215 56 0 0
 bench_trig::acos_clamped__outside: 28930 229 58 0 0
-bench_trig::alt_acos_atan2: 33710 247 54 0 0
+bench_trig::alt_acos_atan2: 33590 247 54 0 0
 bench_trig::alt_atan2_single_poly: 39790 297 68 0 0
 bench_trig::alt_atan_single_poly: 36120 197 48 0 0
 bench_trig::alt_atan_single_poly_reduced: 36120 248 60 0 0
