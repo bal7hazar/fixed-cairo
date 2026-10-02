@@ -44,6 +44,16 @@ are briefed and sequenced there.
 
 Toolchain versions live in `.tool-versions` only (asdf).
 
+## Before every push
+
+Run `scripts/prepush.sh` (the hook `.githooks/pre-push` does it; enable it once per clone with
+`git config core.hooksPath .githooks`). It checks the commit you push: formatting, the Python script
+self-tests and document checks, and, only when Cairo sources, manifests or the toolchain changed, the
+compile and lint of the touched packages and their dependents. Never push red, never `--no-verify`,
+never `git stash` to get a clean tree: commit. The full gate is CI (`scripts/check.sh`); the pre-push
+leaves to it the snforge suites, the gas snapshots, `scarb doc`, the refgen unit tests and the
+consumer cost job.
+
 ## Principles
 
 1. Correctness first, then gas. Never optimize untested code.

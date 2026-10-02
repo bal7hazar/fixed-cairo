@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Pre-push hook: runs scripts/prepush.sh on every commit being pushed. Enable it once per clone:
+#   git config core.hooksPath .githooks
+# Git passes the remote name and URL as arguments and one line per ref on stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# Never bypass it (--no-verify): fix what it reports.
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+shas=()
+# Read every line first: the checks below must not consume the remaining ones.
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ -n "${local_sha:-}" ] || continue
+  [ "$local_sha" = "$zero" ] && continue # deleting a ref: nothing to check
+  shas+=("$local_sha")
+done
+for sha in "${shas[@]}"; do
+  "$root/scripts/prepush.sh" "$sha" </dev/null || {
+    echo "pre-push: blocked: scripts/prepush.sh failed for $sha" >&2
+    exit 1
+  }
+done
