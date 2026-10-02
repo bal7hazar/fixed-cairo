@@ -199,7 +199,7 @@ else
     s=$(date +%s.%N)
     rc=0
     flock -w 90 -E 75 "$lock" bash -c '
-      echo "lock taken after $(awk -v a="'"$s"'" -v b="$(date +%s.%N)" "BEGIN { printf \"%.1f\", b - a }") s" >"$PREPUSH_MARKER"
+      awk -v a="'"$s"'" -v b="$(date +%s.%N)" "BEGIN { printf \"%.1fs\", b - a }" >"$PREPUSH_MARKER"
       export HEAVY_BUILD_LOCK_HELD=1 PATH="$PREPUSH_REALDIR:$PATH"
       heavy_group
     ' || rc=$?
@@ -211,7 +211,7 @@ else
       exit 1
     else
       lock_wait=$(cat "$marker")
-      echo "    $lock_wait (lock wait, not part of the step times above)"
+      echo "    lock wait: $lock_wait (not part of the step times above)"
     fi
   fi
 fi
