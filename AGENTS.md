@@ -58,6 +58,9 @@ cost job and the lint (with the test targets) of the dependents of a touched pac
 and `gen_exp.py` run in neither CI nor the gate: run them by hand when you change them (they need
 numpy and mpmath).
 
+CI runs a job on a pull request only when a path that concerns it changed (the `changes` job of
+`.github/workflows/ci.yml`; prose `.md` triggers nothing); pushes to `main` run every job.
+
 ## Principles
 
 1. Correctness first, then gas. Never optimize untested code.
