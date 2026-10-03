@@ -1373,6 +1373,23 @@ fn alt_norm3_via_squared__op() {
 }
 
 #[test]
+fn alt_norm3_squared_signed_narrow__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    let _c = bb(Fixed { raw: 0x16a09e667 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_norm3_squared_signed_narrow__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let c = bb(Fixed { raw: 0x16a09e667 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt_wide::norm3_squared_signed_narrow(a, b, c));
+}
+
+#[test]
 fn alt_is_unit3_narrowed__base() {
     let _a = bb(Fixed { raw: 0xfffffe00 });
     let _b = bb(Fixed { raw: 0 });

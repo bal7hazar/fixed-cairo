@@ -5,6 +5,7 @@
 //! upgrades. The bounded-int alternatives of the wide rescale (`triple_two_stage`,
 //! `triple_single_downcast`) live in `benches::alt::fixed` with the rest of the generated
 //! plumbing.
+use fixed::wide::{WideAdd, WideNarrow, wide_mul};
 use fixed::{Fixed, FixedTrait, ONE};
 
 const TWO_POW_64: NonZero<u128> = 0x10000000000000000;
@@ -135,4 +136,12 @@ pub fn normalize3_recip_mul(x: Fixed, y: Fixed, z: Fixed) -> (Fixed, Fixed, Fixe
 pub fn normalize3_div(x: Fixed, y: Fixed, z: Fixed) -> (Fixed, Fixed, Fixed) {
     let len = fixed::wide::norm3(x, y, z);
     (x / len, y / len, z / len)
+}
+
+/// `x^2 + y^2 + z^2` through the signed rescale of the accumulators (`W3::narrow`, i.e.
+/// `narrow32`): the formulation of `norm3_squared` up to 0.4.0. The library now narrows sums of
+/// squares without the sign bias (`narrow32_nonneg`); same bits.
+#[inline(always)]
+pub fn norm3_squared_signed_narrow(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
+    wide_mul(x, x).add(wide_mul(y, y)).add(wide_mul(z, z)).narrow()
 }
