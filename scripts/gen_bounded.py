@@ -1262,8 +1262,7 @@ _glo, _ = constrain0(_gd.rng)
 fn(
     "`a > b`: `constrain` of the exact difference `b - a` at 0 (a tie with `i64_diff`).",
     "gt_constrain_raw(a: i64, b: i64) -> bool",
-    f"    match bounded_int::constrain::<{tyr(_gd.rng)}, 0>({_gd}) {{\n"
-    "        Ok(_) => true,\n        Err(_) => false,\n    }",
+    f"    bounded_int::constrain::<{tyr(_gd.rng)}, 0>({_gd}).into_is_ok()",
 )
 
 ALT_WRAPPERS = [

@@ -1082,12 +1082,10 @@ fn mul_felt_downcast_raw(a: i64, b: i64) -> i64 {
 /// `a > b`: `constrain` of the exact difference `b - a` at 0 (a tie with `i64_diff`).
 #[inline(always)]
 fn gt_constrain_raw(a: i64, b: i64) -> bool {
-    match bounded_int::constrain::<
+    bounded_int::constrain::<
         BoundedInt<-0xffffffffffffffff, 0xffffffffffffffff>, 0,
-    >(bounded_int::sub(b, a)) {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    >(bounded_int::sub(b, a))
+        .into_is_ok()
 }
 /// Prototype rescale of `mul`.
 #[inline(always)]
