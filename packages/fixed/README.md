@@ -207,6 +207,10 @@ Sierra gas (`l2 gas`, what a transaction pays) and prover cost (steps, range che
 | `tanh` | 31 020 | 235 | 58 |
 | `sinhc` | 32 710 | 248 | 61 |
 | `coshc` | 34 340 | 259 | 60 |
+| `sinh_cosh` | 41 600 | 255 | 61 |
+| `asinh` | 29 190 | 226 | 53 |
+| `acosh` | 28 210 | 224 | 53 |
+| `atanh` | 34 350 | 253 | 56 |
 
 <!-- gas:end -->
 

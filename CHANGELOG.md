@@ -20,7 +20,7 @@ Pure addition: no numeric result of 0.4.0 changes.
   argument kept at up to 46 fractional bits, rounded to nearest, within 0.68 ULP (`atanh`
   0.57), exactly odd, monotone, `asinh(x) = x` / `atanh(x) = x` while the cubic term is below
   half an ULP; `asinh` covers the whole range (`MIN` included); panics `'Fixed: acosh domain'`
-  below 1 and `'Fixed: atanh domain'` outside `(-1, 1)`. `asinh` 29 190 gas, `atanh` 34 350.
+  below 1 and `'Fixed: atanh domain'` outside `(-1, 1)`. `asinh` 29 190 gas, `acosh` 28 210, `atanh` 34 350.
   Requested by `nalgebra-cairo` through simba.
 
 ## [0.4.0] - 2026-09-25
