@@ -10,7 +10,18 @@ request numbers refer to `glam-cairo`. The next release is cut from this reposit
 
 ## [Unreleased]
 
-Nothing yet.
+Pure addition: no numeric result of 0.4.0 changes.
+
+### Added
+- `ExpTrait::sinh_cosh` (simba 0.10's `ComplexField`): bit-identical to `(sinh, cosh)` for
+  every input, from one shared core; 41 600 gas against 57 640 for the two calls, 255 steps
+  against 453 at x = 10 (334 against 363 below 2, where `sinh` needs no exponential).
+- `ExpTrait::{asinh, acosh, atanh}` (Rust's `f64` names, also simba's): one logarithm of an
+  argument kept at up to 46 fractional bits, rounded to nearest, within 0.68 ULP (`atanh`
+  0.57), exactly odd, monotone, `asinh(x) = x` / `atanh(x) = x` while the cubic term is below
+  half an ULP; `asinh` covers the whole range (`MIN` included); panics `'Fixed: acosh domain'`
+  below 1 and `'Fixed: atanh domain'` outside `(-1, 1)`. `asinh` 29 190 gas, `atanh` 34 350.
+  Requested by `nalgebra-cairo` through simba.
 
 ## [0.4.0] - 2026-09-25
 
