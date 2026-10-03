@@ -951,6 +951,66 @@ fn alt_mul_bias_downcast__op() {
 }
 
 #[test]
+fn alt_mul_scale_first__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_mul_scale_first__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::mul_scale_first(a, b));
+}
+
+#[test]
+fn alt_mul_i128_check__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_mul_i128_check__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::mul_i128_check(a, b));
+}
+
+#[test]
+fn alt_mul_felt_downcast__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_mul_felt_downcast__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::mul_felt_downcast(a, b));
+}
+
+#[test]
+fn alt_gt_constrain__base() {
+    let _a = bb(Fixed { raw: 0x500000000 });
+    let _b = bb(Fixed { raw: -0x280000001 });
+    sink(bb(true));
+}
+
+#[test]
+fn alt_gt_constrain__op() {
+    let a = bb(Fixed { raw: 0x500000000 });
+    let b = bb(Fixed { raw: -0x280000001 });
+    let _r = bb(true);
+    sink(alt::gt_constrain(a, b));
+}
+
+#[test]
 fn alt_div_stable__base() {
     let _a = bb(Fixed { raw: 0x500000000 });
     let _b = bb(Fixed { raw: -0x280000001 });
