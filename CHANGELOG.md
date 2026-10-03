@@ -6,9 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning pol
 Releases 0.1.0 to 0.3.0 of `fixed` were cut from
 [`glam-cairo`](https://github.com/bal7hazar/glam-cairo) (tags `v0.1.0`..`v0.3.0` there, together
 with `glam` and `glamx`); the entries below are the `fixed` part of its changelog, and the pull
-request numbers refer to `glam-cairo`. The next release is cut from this repository.
+request numbers refer to `glam-cairo`. Releases from 0.4.0 on are cut from this repository.
 
 ## [Unreleased]
+
+## [0.5.0] - 2026-10-03
 
 Pure addition: no numeric result of 0.4.0 changes.
 

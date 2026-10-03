@@ -16,7 +16,7 @@ there.
 
 ```toml
 [dependencies]
-fixed = "0.3.0"
+fixed = "0.5.0"
 ```
 
 ```cairo
