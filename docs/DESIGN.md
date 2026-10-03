@@ -63,7 +63,7 @@ pub struct Fixed { pub raw: i64 }   // value = raw / 2^32
   1 ULP descents at segment junctions, and monotonicity is worth more than the 1 ULP gained; the
   logarithms round to nearest. The hyperbolic functions `sinh`, `cosh`, `tanh`, `sinhc`, `coshc`
   (0.4.0) round their final rescale to nearest and stay monotone (checked densely around every
-  internal switch point; floor would cost 1.98 instead of 1.47 ULP on `sinh`). (Consumers may round differently in their own kernels: the Jacobi
+  internal switch point; floor would cost 1.98 instead of 1.47 ULP on `sinh`). The inverse hyperbolic functions `asinh`, `acosh`, `atanh` (0.5.0) are logarithms: they round their final rescale to nearest like `ln`, and stay monotone (each branch rounds a non-decreasing accumulator; the generator checks every junction pair). (Consumers may round differently in their own kernels: the Jacobi
   rotations of `glamx::eigen3` round to nearest.) `sqrt` and `norm*` return the floor of the
   exact root. Rounding is part of the API: results are bit-exact and any change is a MINOR
   version bump.
@@ -113,7 +113,7 @@ named `*_fast`. No CORDIC, no Taylor recursion.
 
 Tiers: **A** arithmetic, comparisons, rounding, `sqrt`, fused kernels; **B** `sin`, `cos`,
 `sin_cos`, `tan`, `atan2`, `acos`, `asin`; **C** `exp`, `exp2`, `ln`, `log2`, `log10`, `ln_1p`,
-`log`, `powf`.
+`log`, `powf`, `sinh`, `cosh`, `sinh_cosh`, `tanh`, `sinhc`, `coshc`, `asinh`, `acosh`, `atanh`.
 
 ## 3. Semantics that differ from Rust's `f32` / `f64`
 

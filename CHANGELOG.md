@@ -10,6 +10,8 @@ request numbers refer to `glam-cairo`. The next release is cut from this reposit
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-03
+
 Pure addition: no numeric result of 0.4.0 changes.
 
 ### Added
