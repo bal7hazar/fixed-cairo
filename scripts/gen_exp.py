@@ -583,6 +583,87 @@ def coshc(x):
         return ONE
     return div(cosh(x), x)
 
+
+def sinh_cosh(x):
+    """`(sinh(x), cosh(x))` from one core: the same operations as the two functions, so the pair
+    is bit-identical to them (the Cairo test checks it on its own grid)."""
+    return sinh(x), cosh(x)
+
+# ----------------------------------------------------------------- inverse hyperbolic functions
+#
+# Every inverse is one logarithm of an argument computed almost exactly: `log2_core` reads the
+# whole 63-bit mantissa of its input, so the argument is passed at a larger scale `2^(32 + s)`
+# and `s` is removed from the accumulator (`log2(m * 2^s) = log2(m) + s`, an exact integer at the
+# scale `2^56`). The error is then the one of `ln` itself (one rounded rescale), and there is no
+# cancellation near 0.
+#
+# * `asinh(a) = ln(a + sqrt(a^2 + 1))`, `acosh(a) = ln(a + sqrt(a^2 - 1))`, `a = |x|`: below
+#   `2^15` the argument `m` is computed at the scale `2^46` (`t = a * 2^14`, `m = t + isqrt(t^2 +-
+#   2^92)`, exact up to the floor of the root); from `2^15` on at the scale `2^30` (`m / 4`, from
+#   `a / 4 + isqrt(a^2 +- 2^64) / 4`), which fits up to `|x| = 2^31` (`asinh(MIN)` included).
+# * `atanh(a) = ln(q) / 2` with `q = (1 + a) / (1 - a)`, one rounded division at the scale
+#   `2^45` (`q < 2^17`, i.e. `a < 1 - 2^-16`), or `2^30` beyond (`q < 2^33`).
+#
+# Monotone by construction inside each branch (the argument is non-decreasing in `a`, `log2_core`
+# and the rounded rescale are non-decreasing): the only possible descent is at the junction of
+# two branches, which `check_inverse` checks pair by pair.
+
+INV_SPLIT = 1 << 47  # |x| = 2^15: from it on the argument of asinh / acosh is m / 4
+INV_LIFT = 14  # below it, m at the scale 2^(32 + 14)
+ATANH_SPLIT = ONE - (1 << 16)  # a from it on: q at the scale 2^30 instead of 2^45
+ATANH_LIFT = 13  # q at the scale 2^(32 + 13) below the split
+K_LN_HALF = const(LN2 * K_LOG2 / 2)  # ln(2) / 2 * 2^40: atanh = ln(q) / 2 in one rescale
+
+
+def inv_acc(au, c):
+    """`log2(a + sqrt(a^2 + c)) * 2^56` for the magnitude `au` (raw, `c = +-1`)."""
+    if au < INV_SPLIT:
+        t = au << INV_LIFT
+        m = t + math.isqrt(t * t + c * (1 << (2 * (FRAC + INV_LIFT))))
+        return log2_core(m) - (INV_LIFT << LOG_ACC)
+    r = math.isqrt(au * au + c * (1 << (2 * FRAC)))
+    return log2_core(au // 4 + r // 4) + (2 << LOG_ACC)
+
+
+def asinh(x):
+    r = narrow64_round(inv_acc(abs(x), 1) * K_LN)
+    return -r if x < 0 else r
+
+
+def acosh(x):
+    if x < ONE:
+        raise ValueError("Fixed: acosh domain")
+    return narrow64_round(inv_acc(x, -1) * K_LN)
+
+
+def atanh(x):
+    if not -ONE < x < ONE:
+        raise ValueError("Fixed: atanh domain")
+    a = abs(x)
+    if a < ATANH_SPLIT:
+        acc = log2_core(div((ONE + a) << ATANH_LIFT, ONE - a)) - (ATANH_LIFT << LOG_ACC)
+    else:
+        acc = log2_core(div(ONE + a, 4 * (ONE - a))) + (2 << LOG_ACC)
+    r = narrow64_round(acc * K_LN_HALF)
+    return -r if x < 0 else r
+
+
+def last_fixed_point(fn):
+    """The largest raw `x` with `fn(x) = x` (the cubic term stays below half an ULP)."""
+    lo, hi = 1, 1 << 23
+    assert fn(lo) == lo and fn(hi) != hi
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if fn(mid) == mid:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+ASINH_ID_RAW = last_fixed_point(asinh)
+ATANH_ID_RAW = last_fixed_point(atanh)
+
 # ----------------------------------------------------------------- alternative variants
 
 P2_TABLE = [1 << (k + 32) for k in range(-32, 31)]  # alt: 2^k at Q32.32, k in [-32, 30]
@@ -650,6 +731,49 @@ def check_alt(single, cw, atanh):
         wa = max(wa, float(abs(alt_log2_atanh(raw_l, atanh) - ref)))
     assert ws < 8 and wc < 8 and wa < 8, f"alt variants: {ws:.2f} / {wc:.2f} / {wa:.2f} ULP"
     return ws, wc, wa
+
+
+# alt: the inverses near 0 as `x * P(x^2)`, one minimax segment on `|x| < 1/8` (`u <= 1/64`), the
+# candidate against the logarithm of the library (`benches::alt::exp::{asinh,atanh}_poly_small`).
+DEG_INV_SMALL = 4  # P(u) = 1 + u * g(u), g of degree 3
+INV_SMALL = ONE // 8
+
+
+def build_inv_small(f, g0):
+    """`f(sqrt(u)) / sqrt(u)` on `[0, 1/64]` at the scale `2^60`, constant term pinned to 1 (`g`
+    by `mpmath.chebyfit`, deterministic, like the polynomial of `sinhc`; `g(0) = g0`)."""
+    def g(u):
+        if u == 0:
+            return g0
+        r = mp.sqrt(u)
+        return (f(r) / r - 1) / u
+    c = mp.chebyfit(g, [0, mp.mpf(INV_SMALL) ** 2 / ONE / ONE], DEG_INV_SMALL)
+    return [int(mp.nint(v * (1 << EXP_ACC))) for v in c] + [1 << EXP_ACC]
+
+
+ASINH_SMALL_C = build_inv_small(mp.asinh, -mp.mpf(1) / 6)
+ATANH_SMALL_C = build_inv_small(mp.atanh, mp.mpf(1) / 3)
+
+
+def alt_inv_small(x, coeffs):
+    """alt: `x * P(x^2)` with a floor final rescale (the alt variants use the public API only)."""
+    a = abs(x)
+    r = narrow64(a * horner_w(coeffs, a * a) * 16)
+    return -r if x < 0 else r
+
+
+def check_alt_inverse():
+    """Swept like `check_alt`: the polynomial candidates must be as accurate as the library on
+    their segment for the gas comparison to mean something."""
+    rnd = random.Random(20261004)
+    xs = grid(-INV_SMALL + 1, INV_SMALL - 1, 4001) + [rnd.randrange(-INV_SMALL + 1, INV_SMALL)
+                                                      for _ in range(4000)]
+    out = []
+    for coeffs, f in ((ASINH_SMALL_C, mp.asinh), (ATANH_SMALL_C, mp.atanh)):
+        out.append(max(float(abs(alt_inv_small(x, coeffs) - f(mp.mpf(x) / ONE) * ONE))
+                       for x in xs))
+    assert all(e < 1.5 for e in out), f"alt inverse polynomials: {out}"
+    return out
 
 # ----------------------------------------------------------------- error sweeps
 
@@ -775,7 +899,57 @@ def sweep_hyp(points=20001):
     run("sinhc (-2 < x < 2)", xs_in(-HYP_POLY + 1, HYP_POLY), sinhc, sref, "ULP")
     run("sinhc (2 <= x < 12)", xs_in(HYP_POLY, 12 * ONE), sinhc, sref, "ULP")
     run("coshc (1 <= x < 12)", xs_in(ONE, 12 * ONE), coshc, lambda v: mp.cosh(v) / v, "ULP")
+    # The inverses: uniform near 0 / 1, log-uniform over the rest of the range, both signs.
+    dense = 5 * points
+    logs = sorted({int(mp.power(2, mp.mpf(63) * i / (dense - 1))) for i in range(dense)}
+                  | {rnd.randrange(1, 1 << 63) for _ in range(4000)})
+    logs = [x for x in logs if x <= I64_MAX]
+    run("asinh (abs(x) < 1)", xs_in(-ONE + 1, ONE), asinh, mp.asinh, "ULP")
+    run("asinh (whole range)", [s * x for x in logs for s in (1, -1)] + [I64_MIN], asinh,
+        mp.asinh, "ULP")
+    run("acosh (1 <= x < 2)", xs_in(ONE, 2 * ONE) + list(range(ONE, ONE + 2000)), acosh, mp.acosh,
+        "ULP")
+    run("acosh (x >= 2)", [x for x in logs if x >= 2 * ONE], acosh, mp.acosh, "ULP")
+    run("atanh (abs(x) < 1/2)", xs_in(-ONE // 2 + 1, ONE // 2), atanh, mp.atanh, "ULP")
+    near1 = [ONE - d for d in {max(1, int(mp.power(2, mp.mpf(31) * i / (points - 1))))
+                               for i in range(points)}] + list(range(ONE - 2000, ONE))
+    run("atanh (1/2 <= abs(x) < 1)", [s * x for x in xs_in(ONE // 2, ONE) + near1 for s in (1, -1)],
+        atanh, mp.atanh, "ULP")
     return out
+
+
+def check_inverse():
+    """The exact values, identities and symmetries of the inverses that the tests assert, and
+    their monotonicity: by construction inside each branch, so the junction pairs are checked
+    exactly, plus dense windows around every junction and at random points."""
+    assert asinh(0) == 0 and atanh(0) == 0 and acosh(ONE) == 0
+    for fn, last in ((asinh, ASINH_ID_RAW), (atanh, ATANH_ID_RAW)):
+        for x in list(range(1, 1 << 12)) + grid(1 << 12, last, 4001):
+            assert fn(x) == x and fn(-x) == -x, (fn.__name__, x)
+        assert fn(last + 1) != last + 1, fn.__name__
+    rnd = random.Random(20261003)
+    for x in [rnd.randrange(0, 1 << 63) for _ in range(3000)] + list(range(0, 5000, 7)):
+        assert asinh(-x) == -asinh(x), x
+        y = x % ONE
+        assert atanh(-y) == -atanh(y), y
+    assert asinh(I64_MIN) <= asinh(I64_MIN + 1)
+    # The junction pairs (the only places where a branch change could step down).
+    assert asinh(INV_SPLIT - 1) <= asinh(INV_SPLIT) and acosh(INV_SPLIT - 1) <= acosh(INV_SPLIT)
+    assert atanh(ATANH_SPLIT - 1) <= atanh(ATANH_SPLIT)
+    centers = [0, ONE, INV_SPLIT, I64_MAX - 2000] + [rnd.randrange(0, I64_MAX - 2000)
+                                                     for _ in range(40)]
+    for fn, cs in ((asinh, centers + [-ONE, -INV_SPLIT, I64_MIN + 2000]),
+                   (acosh, [ONE, 2 * ONE, INV_SPLIT, I64_MAX - 2000] + centers[4:])):
+        for c in cs:
+            xs = range(max(c - 2000, I64_MIN if fn is asinh else ONE), min(c + 2000, I64_MAX + 1))
+            vals = [fn(x) for x in xs]
+            assert vals == sorted(vals), (fn.__name__, c)
+    for c in [0, ONE // 2, ATANH_SPLIT, ONE - 2000, -ATANH_SPLIT] + [
+            rnd.randrange(-ONE + 2000, ONE - 2000) for _ in range(40)]:
+        vals = [atanh(x) for x in range(max(c - 2000, -ONE + 1), min(c + 2000, ONE))]
+        assert vals == sorted(vals), ("atanh", c)
+    # Finite and increasing up to the last representable input on both sides.
+    assert atanh(ONE - 2) < atanh(ONE - 1) and atanh(-ONE + 1) == -atanh(ONE - 1)
 
 
 def check_hyp():
@@ -1027,6 +1201,29 @@ def emit_hyp(errors):
     a(f"const TANH_SHIFT_Q: i64 = {hexi(TANH_SHIFT << QB)};")
     a(f"/// `2^-{TANH_SHIFT}` in raw units.")
     a(f"const TANH_C_LOW: i64 = {hexi(ONE >> TANH_SHIFT)};")
+    a(f"/// `2^{INV_SPLIT.bit_length() - 1 - FRAC}` in raw units: from it on `asinh` and `acosh` take the logarithm of")
+    a(f"/// `m / 4` (Q32.32) instead of `m * 2^{INV_LIFT}`, `m = |x| + sqrt(x^2 +- 1)`.")
+    a(f"const INV_SPLIT: u64 = {hexi(INV_SPLIT)};")
+    a(f"/// `2^{INV_LIFT}`: lifts `|x|` to the scale `2^{FRAC + INV_LIFT}` below the split.")
+    a(f"const INV_LIFT_K: i64 = {hexi(1 << INV_LIFT)};")
+    a(f"/// `+-1` at the scale `2^{2 * (FRAC + INV_LIFT)}` of `t^2` (`t = |x| * 2^{INV_LIFT}`), and at the Q64.64")
+    a("/// scale above the split: the `+-1` under the root of `asinh` / `acosh`.")
+    a(f"const INV_ONE_LOW: felt252 = {hexi(1 << (2 * (FRAC + INV_LIFT)))};")
+    a(f"const INV_MINUS_ONE_LOW: felt252 = {hexi(-(1 << (2 * (FRAC + INV_LIFT))))};")
+    a(f"const INV_ONE_HIGH: felt252 = {hexi(1 << (2 * FRAC))};")
+    a(f"const INV_MINUS_ONE_HIGH: felt252 = {hexi(-(1 << (2 * FRAC)))};")
+    a(f"/// `{INV_LIFT}` and `-2` at the scale of the log accumulator (`2^{LOG_ACC}`): the scale of the")
+    a("/// argument, removed from its logarithm.")
+    a(f"const INV_SHIFT_LOW: i64 = {hexi(INV_LIFT << LOG_ACC)};")
+    a(f"const INV_SHIFT_HIGH: i64 = {hexi(2 << LOG_ACC)};")
+    a(f"/// `1 - 2^-16` in raw units: from it on `atanh` takes the logarithm of `q / 4` instead of")
+    a(f"/// `q * 2^{ATANH_LIFT}`, `q = (1 + |x|) / (1 - |x|)`.")
+    a(f"const ATANH_SPLIT_RAW: i64 = {hexi(ATANH_SPLIT)};")
+    a(f"/// `2^{ATANH_LIFT}`, and `{ATANH_LIFT}` at the scale of the log accumulator.")
+    a(f"const ATANH_LIFT_K: i64 = {hexi(1 << ATANH_LIFT)};")
+    a(f"const ATANH_SHIFT_LOW: i64 = {hexi(ATANH_LIFT << LOG_ACC)};")
+    a(f"/// `ln(2) / 2 * 2^{96 - LOG_ACC}`, rounded to nearest: `atanh = ln(q) / 2` in one rescale.")
+    a(f"const K_LN_HALF: Fixed = Fixed {{ raw: {hexi(K_LN_HALF)} }};")
     a("")
     a(f"/// `sinh(x) / x` in `u = x^2` (Q64.64) on `[0, 4]`, degree {DEG_SINHC}, at the scale")
     a(f"/// `2^{EXP_ACC}`. Constant term pinned to 1; all the coefficients are non-negative, so it is")
@@ -1045,6 +1242,22 @@ def emit_hyp(errors):
         name, _, rng = k.partition(" (")
         rng = rng[:-1] if rng.endswith(")") else rng
         a(f"/// | `{name}` | {rng} | {fmt_err(v, unit)} |")
+    return "\n".join(out)
+
+def emit_alt_inverse():
+    out = []
+    a = out.append
+    a(f"/// `{INV_SMALL / ONE}` in raw units: the polynomial candidates hold below it.")
+    a(f"const INV_SMALL_RAW: i64 = {hexi(INV_SMALL)};")
+    for name, coeffs, f in (("asinh_small_poly", ASINH_SMALL_C, "asinh"),
+                            ("atanh_small_poly", ATANH_SMALL_C, "atanh")):
+        a("")
+        a(f"/// `{f}(x) / x` in `u = x^2` (Q64.64) on `[0, 1/64]`, degree {DEG_INV_SMALL}, at the scale")
+        a(f"/// `2^{EXP_ACC}`, constant term pinned to 1.")
+        a("#[inline(always)]")
+        a(f"fn {name}(u: W1) -> Fixed {{")
+        out.extend(horner_body_wide(coeffs, "u"))
+        a("}")
     return "\n".join(out)
 
 # ----------------------------------------------------------------- test tables
@@ -1071,6 +1284,15 @@ TANH_CASES = [0, 1, -1, 2, 12345, ONE // 2, ONE, -ONE, 3 * ONE, TANH_SPLIT - 1, 
               20 * ONE, I64_MAX, I64_MIN, 123456789]
 COSHC_CASES = [3, -3, 12345, ONE // 2, ONE, -ONE, 2 * ONE, 5 * ONE, -5 * ONE, 20 * ONE,
                COSH_MAX_RAW - 1]
+
+ASINH_CASES = [0, 1, -1, 12345, ASINH_ID_RAW, ASINH_ID_RAW + 1, -ASINH_ID_RAW - 1, ONE // 2,
+               -ONE // 2, ONE, -ONE, 3 * ONE, 1000 * ONE, INV_SPLIT - 1, INV_SPLIT, -INV_SPLIT,
+               1 << 60, I64_MAX, I64_MIN, 123456789, -987654321]
+ACOSH_CASES = [ONE, ONE + 1, ONE + 12345, ONE + ONE // 2, 2 * ONE, 10 * ONE, 1000 * ONE,
+               INV_SPLIT - 1, INV_SPLIT, 1 << 60, I64_MAX]
+ATANH_CASES = [0, 1, -1, 12345, ATANH_ID_RAW, ATANH_ID_RAW + 1, -ATANH_ID_RAW - 1, ONE // 2,
+               -ONE // 2, 3 * ONE // 4, ATANH_SPLIT - 1, ATANH_SPLIT, -ATANH_SPLIT, ONE - 12345,
+               ONE - 1, -ONE + 1, 123456789, -987654321]
 
 
 def print_tables():
@@ -1105,6 +1327,17 @@ def print_tables():
         print(f"    ({hexi(raw)}, {hexi(coshc(raw))}),")
     print(f"// thresholds: SINH_MAX_RAW {hexi(SINH_MAX_RAW)}, COSH_MAX_RAW {hexi(COSH_MAX_RAW)}, "
           f"TANH_SAT_RAW {hexi(TANH_SAT_RAW)}")
+    print("// asinh (x, expected)")
+    for raw in ASINH_CASES:
+        print(f"    ({hexi(raw)}, {hexi(asinh(raw))}),")
+    print("// acosh (x, expected)")
+    for raw in ACOSH_CASES:
+        print(f"    ({hexi(raw)}, {hexi(acosh(raw))}),")
+    print("// atanh (x, expected)")
+    for raw in ATANH_CASES:
+        print(f"    ({hexi(raw)}, {hexi(atanh(raw))}),")
+    print(f"// thresholds: ASINH_ID_RAW {ASINH_ID_RAW}, ATANH_ID_RAW {ATANH_ID_RAW}, "
+          f"INV_SPLIT {hexi(INV_SPLIT)}, ATANH_SPLIT {hexi(ATANH_SPLIT)}")
 
 
 # Maximum error tolerated per row. The brief budgets 4 ULP (absolute) for exp2 / exp below 2^16
@@ -1121,6 +1354,10 @@ BUDGET = {
     "sinh (-2 < x < 2)": 0.65, "sinh (x >= 2, result < 2^16)": 1.8, "sinh (result >= 2^16)": 1e-5,
     "cosh (result < 2^16)": 1.8, "cosh (result >= 2^16)": 1e-5, "tanh": 1.5,
     "sinhc (-2 < x < 2)": 0.65, "sinhc (2 <= x < 12)": 1.35, "coshc": 1.6,
+    # The inverses target the order of ln (<= ~2 ULP); the budgets lock the measured figures in.
+    "asinh (abs(x) < 1)": 0.8, "asinh (whole range)": 0.8,
+    "acosh (1 <= x < 2)": 0.8, "acosh (x >= 2)": 0.8,
+    "atanh (abs(x) < 1/2)": 0.7, "atanh (1/2 <= abs(x) < 1)": 0.7,
 }
 
 
@@ -1134,6 +1371,7 @@ def main():
     args = ap.parse_args()
     check_identities()
     check_hyp()
+    check_inverse()
     if args.cmd == "tables":
         print_tables()
         return
@@ -1149,13 +1387,17 @@ def main():
         alt = build_alt()
         print("alt (exp2 single poly / exp Cody-Waite / log2 atanh):",
               ", ".join(f"{e:.2f}" for e in check_alt(*alt)))
+        print("alt (asinh / atanh polynomial on |x| < 1/8):",
+              ", ".join(f"{e:.2f}" for e in check_alt_inverse()))
         return
     alt = build_alt()
     check_alt(*alt)
+    check_alt_inverse()
     write = args.cmd == "emit"
     ok = splice(LIB, "exp", emit_lib(errors), write)
     ok &= splice(ALT, "exp", emit_alt(*alt), write)
     ok &= splice(LIB, "hyperbolic", emit_hyp(hyp_errors), write)
+    ok &= splice(ALT, "inverse", emit_alt_inverse(), write)
     if args.cmd == "check" and not ok:
         sys.exit("the generated blocks are stale: run `scripts/gen_exp.py emit`")
 
