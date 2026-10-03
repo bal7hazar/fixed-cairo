@@ -15,7 +15,13 @@
 //! The hyperbolic functions (`sinh`, `cosh`, `tanh`, `sinhc`, `coshc`) follow the same scheme:
 //! mirror tables, exact identities and edges, every panic path, and dense grids for the exact
 //! symmetries and the monotonicity around the junctions of the implementation (the module keeps
-//! its six fuzz properties, the budget of `docs/briefs/COMMON.md`).
+//! its six fuzz properties, the budget of `docs/briefs/COMMON.md`). `sinh_cosh` is compared bit
+//! for bit with `(sinh, cosh)` on a dense grid, every junction and the overflow boundary.
+//!
+//! The inverses (`asinh`, `acosh`, `atanh`) have their mirror tables, exact values and
+//! identities, their junction windows and coarse sweeps for the exact symmetries and the
+//! monotonicity, every panic path, and seeded round trips through the forward functions (a fixed
+//! generator, not a fuzzer: the module is at its six fuzz properties).
 use fixed::exp::ExpTrait;
 use fixed::fixed::{E, EPSILON, LN_2, MAX, MIN};
 use fixed::{Fixed, FixedTrait, HALF, ONE, TWO, ZERO};
@@ -691,4 +697,272 @@ fn test_coshc_tiny_panics() {
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_coshc_tiny_negative_panics() {
     f(-1).coshc();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_sinh_cosh_overflow_panics() {
+    f(SINH_MAX_RAW).sinh_cosh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_sinh_cosh_min_panics() {
+    MIN.sinh_cosh();
+}
+
+/// `sinh_cosh(x) == (sinh(x), cosh(x))` and its odd / even halves, for one input.
+fn check_sinh_cosh(raw: i64) {
+    let x = f(raw);
+    let (s, c) = x.sinh_cosh();
+    assert_eq!(s, x.sinh(), "sinh_cosh({}).0", raw);
+    assert_eq!(c, x.cosh(), "sinh_cosh({}).1", raw);
+}
+
+/// The contract of `sinh_cosh`: bit-identical to the two functions. Checked on a dense grid of
+/// the whole domain (both signs, a step of ~0.029 that is no multiple of a segment of the
+/// exponential table), on windows of 17 inputs around every junction of the implementation
+/// (zero, the end of `sinh(x) = x`, the polynomial / exponential seam at 2, the `E / 2` switch at
+/// 21) and at the overflow boundary.
+#[test]
+fn test_sinh_cosh_bit_identical() {
+    let mut x: i64 = -SINH_MAX_RAW + 1;
+    while x < SINH_MAX_RAW {
+        check_sinh_cosh(x);
+        x += 0x7654321;
+    }
+    let junctions = [
+        0_i64, SINH_ID_RAW, 2 * ONE_RAW, 21 * ONE_RAW, SINH_MAX_RAW - 9, -SINH_ID_RAW, -2 * ONE_RAW,
+        -21 * ONE_RAW, -SINH_MAX_RAW + 9,
+    ];
+    for j in junctions.span() {
+        let mut d: i64 = -8;
+        while d <= 8 {
+            check_sinh_cosh(*j + d);
+            d += 1;
+        }
+    }
+    for case in SINH.span() {
+        let (x, _, _, _) = *case;
+        check_sinh_cosh(x);
+    }
+}
+
+// ------------------------------------------------------------------ inverse hyperbolic functions
+
+/// The generated thresholds of the inverses: the largest inputs with `asinh(x) = x` and
+/// `atanh(x) = x`, the switch of the argument of `asinh` / `acosh` to `m / 4` (`2^15`) and of
+/// the quotient of `atanh` to `q / 4` (`1 - 2^-16`).
+const ASINH_ID_RAW: i64 = 3807872;
+const ATANH_ID_RAW: i64 = 3023358;
+const INV_SPLIT_RAW: i64 = 0x800000000000;
+const ATANH_SPLIT_RAW: i64 = 0xffff0000;
+
+/// `(x, asinh(x))`, raw values (`scripts/gen_exp.py tables`).
+const ASINH: [(i64, i64); 21] = [
+    (0x0, 0x0), (0x1, 0x1), (-0x1, -0x1), (0x3039, 0x3039), (0x3a1a80, 0x3a1a80),
+    (0x3a1a81, 0x3a1a80), (-0x3a1a81, -0x3a1a80), (0x80000000, 0x7b30b2bb),
+    (-0x80000000, -0x7b30b2bb), (0x100000000, 0xe1a1b30c), (-0x100000000, -0xe1a1b30c),
+    (0x300000000, 0x1d185b508), (0x3e800000000, 0x799d4c28e), (0x7fffffffffff, 0xb17217f7e),
+    (0x800000000000, 0xb17217f7e), (-0x800000000000, -0xb17217f7e),
+    (0x1000000000000000, 0x1419ecb713), (0x7fffffffffffffff, 0x162e42fefa),
+    (-0x8000000000000000, -0x162e42fefa), (0x75bcd15, 0x75b8ab2), (-0x3ade68b1, -0x3a5ca741),
+];
+
+/// `(x, acosh(x))`, raw values.
+const ACOSH: [(i64, i64); 11] = [
+    (0x100000000, 0x0), (0x100000001, 0x16a0a), (0x100003039, 0x9d2167), (0x180000000, 0xf6616576),
+    (0x200000000, 0x15124271a), (0xa00000000, 0x2fe43da3a), (0x3e800000000, 0x799d4ba2a),
+    (0x7fffffffffff, 0xb17217f7c), (0x800000000000, 0xb17217f7c),
+    (0x1000000000000000, 0x1419ecb713), (0x7fffffffffffffff, 0x162e42fefa),
+];
+
+/// `(x, atanh(x))`, raw values.
+const ATANH: [(i64, i64); 18] = [
+    (0x0, 0x0), (0x1, 0x1), (-0x1, -0x1), (0x3039, 0x3039), (0x2e21fe, 0x2e21fe),
+    (0x2e21ff, 0x2e2200), (-0x2e21ff, -0x2e2200), (0x80000000, 0x8c9f53d5),
+    (-0x80000000, -0x8c9f53d5), (0xc0000000, 0xf9139572), (0xfffeffff, 0x5e4490bba),
+    (0xffff0000, 0x5e4498bba), (-0xffff0000, -0x5e4498bba), (0xffffcfc7, 0x6b9f6f5bf),
+    (0xffffffff, 0xb6fda8b79), (-0xffffffff, -0xb6fda8b79), (0x75bcd15, 0x75c51f8),
+    (-0x3ade68b1, -0x3bf0cf3c),
+];
+
+#[test]
+fn test_inverse_hyperbolic_tables() {
+    for case in ASINH.span() {
+        let (x, r) = *case;
+        assert_eq!(f(x).asinh(), f(r), "asinh({})", x);
+    }
+    for case in ACOSH.span() {
+        let (x, r) = *case;
+        assert_eq!(f(x).acosh(), f(r), "acosh({})", x);
+    }
+    for case in ATANH.span() {
+        let (x, r) = *case;
+        assert_eq!(f(x).atanh(), f(r), "atanh({})", x);
+    }
+}
+
+#[test]
+fn test_inverse_hyperbolic_identities_and_edges() {
+    assert_eq!(ZERO.asinh(), ZERO);
+    assert_eq!(ZERO.atanh(), ZERO);
+    assert_eq!(ONE.acosh(), ZERO);
+    // asinh(x) = x and atanh(x) = x while the cubic term stays below half an ULP, both signs,
+    // and not one ULP further.
+    assert_eq!(EPSILON.asinh(), EPSILON);
+    assert_eq!(EPSILON.atanh(), EPSILON);
+    assert_eq!(f(ASINH_ID_RAW).asinh(), f(ASINH_ID_RAW));
+    assert_eq!(f(-ASINH_ID_RAW).asinh(), f(-ASINH_ID_RAW));
+    assert_eq!(f(ASINH_ID_RAW + 1).asinh(), f(ASINH_ID_RAW));
+    assert_eq!(f(ATANH_ID_RAW).atanh(), f(ATANH_ID_RAW));
+    assert_eq!(f(-ATANH_ID_RAW).atanh(), f(-ATANH_ID_RAW));
+    assert_eq!(f(ATANH_ID_RAW + 1).atanh(), f(ATANH_ID_RAW + 2));
+    // The whole range of asinh, MIN included (it has no opposite: -asinh(MAX)).
+    assert_eq!(MIN.asinh(), -MAX.asinh());
+    assert_eq!(MAX.acosh(), MAX.asinh());
+    // atanh stays finite and increasing up to the last representable input.
+    let last = f(ONE_RAW - 1).atanh();
+    assert!(last > f(ONE_RAW - 2).atanh(), "atanh increasing at 1 - 2^-32");
+    assert_eq!(f(-ONE_RAW + 1).atanh(), -last);
+    // acosh starts steeply: sqrt(2 * 2^-32) = 2^-15.5 for the first input above 1.
+    assert_eq!(f(ONE_RAW + 1).acosh(), f(0x16a0a));
+    // The inverses agree with the logarithm: asinh(x) - ln(2x) = 1 / (4 x^2) ~ 0 at 2^20.
+    let x = f(ONE_RAW * 0x100000);
+    assert!(diff(x.asinh(), (x + x).ln()) <= 1, "asinh = ln(2x) at 2^20");
+    assert!(diff(x.acosh(), (x + x).ln()) <= 1, "acosh = ln(2x) at 2^20");
+    assert!(diff(HALF.atanh(), f(3 * ONE_RAW).ln() * HALF) <= 2, "atanh(1/2) = ln(3) / 2");
+}
+
+/// Exact symmetries and monotonicity: windows of 13 inputs around the junctions (the switch of
+/// `asinh` / `acosh` to `m / 4` at `2^15`, the switch of `atanh` to `q / 4` at `1 - 2^-16`, zero,
+/// the ends of the identities, the start of `acosh` at 1 and the end of `atanh` at 1), then coarse
+/// sweeps of each domain. The generator checks windows of 4 000 inputs around each junction.
+#[test]
+fn test_inverse_hyperbolic_symmetry_and_monotonicity() {
+    let seams = [
+        0_i64, ASINH_ID_RAW, ATANH_ID_RAW, HALF.raw, ONE_RAW, ATANH_SPLIT_RAW - 6, ONE_RAW - 13,
+        INV_SPLIT_RAW - 6, 0x7ffffffffffffff2,
+    ];
+    for seam in seams.span() {
+        let mut d: i64 = 0;
+        let mut prev_s = f(*seam - 1).asinh();
+        let mut prev_t = if *seam - 1 < ONE_RAW {
+            f(*seam - 1).atanh()
+        } else {
+            ZERO
+        };
+        let mut prev_c = if *seam - 1 >= ONE_RAW {
+            f(*seam - 1).acosh()
+        } else {
+            ZERO
+        };
+        while d <= 12 {
+            let x = f(*seam + d);
+            let s = x.asinh();
+            assert_eq!((-x).asinh(), -s);
+            assert!(s >= prev_s, "asinh at {} + {}", seam, d);
+            prev_s = s;
+            if x.raw < ONE_RAW {
+                let t = x.atanh();
+                assert_eq!((-x).atanh(), -t);
+                assert!(t >= prev_t, "atanh at {} + {}", seam, d);
+                prev_t = t;
+            } else {
+                let c = x.acosh();
+                assert!(c >= prev_c, "acosh at {} + {}", seam, d);
+                prev_c = c;
+            }
+            d += 1;
+        }
+    }
+    // asinh and acosh over [1, 2^31) by a factor of ~1.06 per step, atanh over [0, 1) by a step
+    // of ~0.0071, and asinh over [0, 1) on the same grid.
+    let mut x = ONE;
+    let (mut prev_s, mut prev_c) = (ZERO, ZERO);
+    while x.raw < 0x7800000000000000 {
+        let (s, c) = (x.asinh(), x.acosh());
+        assert!(s >= prev_s && c >= prev_c && s >= c, "asinh / acosh at {}", x.raw);
+        assert_eq!((-x).asinh(), -s);
+        prev_s = s;
+        prev_c = c;
+        x = x + f(x.raw / 16 + 0x12345);
+    }
+    let mut x = f(0x123456);
+    let (mut prev_t, mut prev_s) = (ZERO, ZERO);
+    while x.raw < ONE_RAW {
+        let (t, s) = (x.atanh(), x.asinh());
+        assert!(t >= prev_t && s >= prev_s && t >= x && s <= x, "atanh / asinh at {}", x.raw);
+        assert_eq!((-x).atanh(), -t);
+        prev_t = t;
+        prev_s = s;
+        x = x + f(0x1d4c0b7);
+    }
+}
+
+/// The next state of the Lehmer generator `48271 * s mod (2^31 - 1)`.
+fn next(s: u64) -> u64 {
+    (s * 48271) % 0x7fffffff
+}
+
+/// Round trips through the forward functions on seeded pseudo-random inputs (a Lehmer generator,
+/// seed 407, 62-bit draws). The tolerances come from the measured bounds: `asinh(sinh(y))` for
+/// `|y| < 20`: 0.68 ULP plus the 1.47 ULP of `sinh` divided by `cosh(y) >= 1`; `tanh(atanh(x))`:
+/// 0.57 ULP times a derivative <= 1, plus 1.26 ULP; `acosh(cosh(y))` for `1/2 <= y < 10.5`: the
+/// 1.48 ULP of `cosh` divided by `sinh(y) >= 0.52`, plus 0.68 ULP.
+#[test]
+fn test_inverse_hyperbolic_round_trips() {
+    let mut s: u64 = 407;
+    let mut i: u32 = 0;
+    while i < 48 {
+        s = next(s);
+        let hi = s;
+        s = next(s);
+        let r: u64 = hi * 0x80000000 + s;
+        let r20: i64 = (r % (40 * 0x100000000)).try_into().unwrap();
+        let y = f(r20 - 20 * ONE_RAW);
+        assert!(diff(y.sinh().asinh(), y) <= 3, "asinh(sinh({}))", y.raw);
+        let r1: i64 = (r % (2 * 0x100000000 - 1)).try_into().unwrap();
+        let x = f(r1 - ONE_RAW + 1);
+        assert!(diff(x.atanh().tanh(), x) <= 2, "tanh(atanh({}))", x.raw);
+        let yc = f(FixedTrait::abs(y).raw / 2 + HALF.raw);
+        assert!(diff(yc.cosh().acosh(), yc) <= 4, "acosh(cosh({}))", yc.raw);
+        i += 1;
+    }
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: acosh domain')]
+fn test_acosh_below_one_panics() {
+    f(ONE_RAW - 1).acosh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: acosh domain')]
+fn test_acosh_min_panics() {
+    MIN.acosh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: atanh domain')]
+fn test_atanh_one_panics() {
+    ONE.atanh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: atanh domain')]
+fn test_atanh_minus_one_panics() {
+    (-ONE).atanh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: atanh domain')]
+fn test_atanh_max_panics() {
+    MAX.atanh();
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: atanh domain')]
+fn test_atanh_min_panics() {
+    MIN.atanh();
 }

@@ -1,5 +1,6 @@
-//! Loop-free exponentials, logarithms, powers and hyperbolic functions (exp, exp2, exp_m1, ln,
-//! log2, log10, ln_1p, log, powf, sinh, cosh, tanh, sinhc, coshc).
+//! Loop-free exponentials, logarithms, powers, hyperbolic functions and their inverses (exp,
+//! exp2, exp_m1, ln, log2, log10, ln_1p, log, powf, sinh, cosh, sinh_cosh, tanh, sinhc, coshc,
+//! asinh, acosh, atanh).
 //!
 //! Every function is straight-line code, with no loop and no bitwise operation:
 //!
@@ -25,7 +26,14 @@
 //!   sqrt(u)`: no exponential, no cancellation, `sinh(x) = x` for `|x| <= 2^-10.1`. `sinhc` is
 //!   `S` there and `sinh(x) / x` beyond. `tanh = (T - c) / (T + c)` with `T = e^(2|x|) * c` (`c =
 //!   1`, or `2^-16` from `|x| = 5.5` on so that `T` fits), one division. Every odd or even
-//!   function is computed on `|x|`: the symmetries are exact.
+//!   function is computed on `|x|`: the symmetries are exact. `sinh_cosh` runs the operations
+//!   of `sinh` and `cosh` on one shared core, so its pair is bit-identical to theirs.
+//! * `asinh` / `acosh`: `ln(m)`, `m = |x| + sqrt(x^2 +- 1)`, and `atanh = ln((1 + |x|) / (1 -
+//!   |x|)) / 2`, each with one `log2_core` on an argument passed at a larger scale (`log2_core`
+//!   reads 63 bits of mantissa): `m * 2^14` from the integer root of an exact `i128` (below
+//!   `|x| = 2^15`; `m / 4` above), the quotient at `2^13` from one rounded division (`/ 4` from
+//!   `1 - 2^-16` on). The scale is an exact integer of the accumulator: the error is the one of
+//!   `ln`, there is no cancellation near 0 (`asinh(x) = x` up to `|x| = 2^-10.1`).
 //!
 //! Polynomials run on the Q96.96 accumulators of `fixed::wide` (one rescale per Horner step)
 //! with 24 to 28 extra fractional bits, so the error is dominated by the final rescale.
@@ -39,7 +47,9 @@
 //! start of the next), so every function of this module is monotone. The hyperbolic functions
 //! round their final rescale to nearest: they stay monotone by construction (the core rounds an
 //! increasing function of a non-decreasing `E`, the polynomial has non-negative coefficients),
-//! which the generator checks around every junction.
+//! which the generator checks around every junction. So do their inverses, like the logarithms
+//! they are: each branch rounds a non-decreasing accumulator, and the generator checks every
+//! junction pair.
 //!
 //! The coefficients, the table, the search tree, the thresholds and the measured errors come
 //! from [`scripts/gen_exp.py`](../../../../scripts/gen_exp.py), which also mirrors every
@@ -949,6 +959,29 @@ const Q_ONE: i64 = 0x100000000000000;
 const TANH_SHIFT_Q: i64 = 0x1000000000000000;
 /// `2^-16` in raw units.
 const TANH_C_LOW: i64 = 0x10000;
+/// `2^15` in raw units: from it on `asinh` and `acosh` take the logarithm of
+/// `m / 4` (Q32.32) instead of `m * 2^14`, `m = |x| + sqrt(x^2 +- 1)`.
+const INV_SPLIT: u64 = 0x800000000000;
+/// `2^14`: lifts `|x|` to the scale `2^46` below the split.
+const INV_LIFT_K: i64 = 0x4000;
+/// `+-1` at the scale `2^92` of `t^2` (`t = |x| * 2^14`), and at the Q64.64
+/// scale above the split: the `+-1` under the root of `asinh` / `acosh`.
+const INV_ONE_LOW: felt252 = 0x100000000000000000000000;
+const INV_MINUS_ONE_LOW: felt252 = -0x100000000000000000000000;
+const INV_ONE_HIGH: felt252 = 0x10000000000000000;
+const INV_MINUS_ONE_HIGH: felt252 = -0x10000000000000000;
+/// `14` and `-2` at the scale of the log accumulator (`2^56`): the scale of the
+/// argument, removed from its logarithm.
+const INV_SHIFT_LOW: i64 = 0xe00000000000000;
+const INV_SHIFT_HIGH: i64 = 0x200000000000000;
+/// `1 - 2^-16` in raw units: from it on `atanh` takes the logarithm of `q / 4` instead of
+/// `q * 2^13`, `q = (1 + |x|) / (1 - |x|)`.
+const ATANH_SPLIT_RAW: i64 = 0xffff0000;
+/// `2^13`, and `13` at the scale of the log accumulator.
+const ATANH_LIFT_K: i64 = 0x2000;
+const ATANH_SHIFT_LOW: i64 = 0xd00000000000000;
+/// `ln(2) / 2 * 2^40`, rounded to nearest: `atanh = ln(q) / 2` in one rescale.
+const K_LN_HALF: Fixed = Fixed { raw: 0x58b90bfbe9 };
 
 /// `sinh(x) / x` in `u = x^2` (Q64.64) on `[0, 4]`, degree 6, at the scale
 /// `2^60`. Constant term pinned to 1; all the coefficients are non-negative, so it is
@@ -978,6 +1011,12 @@ fn sinhc_poly(u: W1) -> Fixed {
 /// | `sinhc` | -2 < x < 2 | 0.52 |
 /// | `sinhc` | 2 <= x < 12 | 1.10 |
 /// | `coshc` | 1 <= x < 12 | 1.31 |
+/// | `asinh` | abs(x) < 1 | 0.65 |
+/// | `asinh` | whole range | 0.68 |
+/// | `acosh` | 1 <= x < 2 | 0.63 |
+/// | `acosh` | x >= 2 | 0.68 |
+/// | `atanh` | abs(x) < 1/2 | 0.57 |
+/// | `atanh` | 1/2 <= abs(x) < 1 | 0.56 |
 // GENERATED-END hyperbolic
 
 pub trait ExpTrait {
@@ -1105,6 +1144,18 @@ pub trait ExpTrait {
     ///   relative above; `cosh(0) = 1` exactly. Even bit for bit and non-decreasing on
     ///   `self >= 0`.
     fn cosh(self: Fixed) -> Fixed;
+    /// Computes the hyperbolic sine and cosine of `self` together: `(sinh(self), cosh(self))`
+    /// from one shared exponential.
+    ///
+    /// Mirrors `simba::scalar::ComplexField::sinh_cosh`.
+    /// #### Panics
+    /// * `'Fixed: overflow'` if `|self| >= 22.1807`, as [`ExpTrait::sinh`] and
+    ///   [`ExpTrait::cosh`].
+    /// #### Deviations
+    /// * None: bit-identical to `(self.sinh(), self.cosh())` for every input (the same
+    ///   operations on one shared core; below `|self| = 2` the sine is the polynomial of
+    ///   `sinh`, so only the cosine needs the exponential).
+    fn sinh_cosh(self: Fixed) -> (Fixed, Fixed);
     /// Computes the hyperbolic tangent of `self`.
     ///
     /// Mirrors `f32::tanh`.
@@ -1140,6 +1191,42 @@ pub trait ExpTrait {
     ///   within `1.48 / |self| + 0.5` ULP below 1, where the quotient amplifies the error of
     ///   `cosh`.
     fn coshc(self: Fixed) -> Fixed;
+    /// Computes the inverse hyperbolic sine of `self`.
+    ///
+    /// Mirrors `f32::asinh`.
+    /// #### Panics
+    /// * Never (`asinh(MIN)` is about `-22.18`).
+    /// #### Deviations
+    /// * `ln(|self| + sqrt(self^2 + 1))` with the argument kept at 46 fractional bits (or as
+    ///   `m / 4` from `|self| = 2^15` on), then the logarithm of `ln`, rounded to nearest: within
+    ///   0.68 ULP over the whole range. `asinh(x) = x` exactly for `|x| <= 2^-10.1` (raw
+    ///   3 807 872), where the cubic term is below half an ULP. Odd bit for bit (`asinh(MIN)`,
+    ///   which has no opposite, is `-asinh(MAX)`) and non-decreasing.
+    fn asinh(self: Fixed) -> Fixed;
+    /// Computes the inverse hyperbolic cosine of `self`.
+    ///
+    /// Mirrors `f32::acosh`.
+    /// #### Panics
+    /// * `'Fixed: acosh domain'` if `self < 1` (`f32::acosh` returns NaN).
+    /// #### Deviations
+    /// * `ln(self + sqrt(self^2 - 1))`, the argument computed as for [`ExpTrait::asinh`]:
+    ///   within 0.68 ULP over the whole domain (the root of the exact `self^2 - 1` keeps the
+    ///   steep start near 1 exact to the last bit: `acosh(1 + 2^-32) = 2^-15.5`, rounded).
+    ///   `acosh(1) = 0` exactly and the function is non-decreasing.
+    fn acosh(self: Fixed) -> Fixed;
+    /// Computes the inverse hyperbolic tangent of `self`.
+    ///
+    /// Mirrors `f32::atanh`.
+    /// #### Panics
+    /// * `'Fixed: atanh domain'` if `|self| >= 1` (`f32::atanh` returns infinity at `+-1` and
+    ///   NaN beyond).
+    /// #### Deviations
+    /// * `ln((1 + |self|) / (1 - |self|)) / 2` with the quotient rounded to nearest at 45
+    ///   fractional bits (32 from `|self| = 1 - 2^-16` on), then one rescale by `ln(2) / 2`,
+    ///   rounded to nearest: within 0.57 ULP over the whole domain. `atanh(x) = x` exactly for
+    ///   `|x| <= 2^-10.5` (raw 3 023 358). Odd bit for bit and non-decreasing; finite up to the
+    ///   last representable input (`atanh(1 - 2^-32) = 11.4369`).
+    fn atanh(self: Fixed) -> Fixed;
 }
 
 pub impl ExpImpl of ExpTrait {
@@ -1229,14 +1316,25 @@ pub impl ExpImpl of ExpTrait {
     fn cosh(self: Fixed) -> Fixed {
         assert(self.raw < COSH_MAX_RAW && self.raw > -COSH_MAX_RAW, 'Fixed: overflow');
         let (e, r, big) = hyp_core(FixedTrait::abs(self));
-        let c = if big {
-            let (g, _) = DivRem::div_rem(r + 2, FOUR_NZ);
-            e + g
+        Fixed { raw: cosh_from_core(e, r, big) }
+    }
+
+    fn sinh_cosh(self: Fixed) -> (Fixed, Fixed) {
+        // SINH_MAX_RAW == COSH_MAX_RAW (checked by the generator): one check for both.
+        assert(self.raw < SINH_MAX_RAW && self.raw > -SINH_MAX_RAW, 'Fixed: overflow');
+        let a = FixedTrait::abs(self);
+        let (e, r, big) = hyp_core(a);
+        let s = if a.raw < HYP_POLY_RAW {
+            sinh_poly(a)
         } else {
-            let (c, _) = DivRem::div_rem(e + r + 1, TWO_NZ);
-            c
+            sinh_from_core(e, r, big)
         };
-        Fixed { raw: c.try_into().unwrap() }
+        let c = Fixed { raw: cosh_from_core(e, r, big) };
+        if self.raw < 0 {
+            (Fixed { raw: -s }, c)
+        } else {
+            (Fixed { raw: s }, c)
+        }
     }
 
     fn tanh(self: Fixed) -> Fixed {
@@ -1280,6 +1378,42 @@ pub impl ExpImpl of ExpTrait {
             return ONE;
         }
         Self::cosh(self) / self
+    }
+
+    fn asinh(self: Fixed) -> Fixed {
+        let r = rescale(inv_core(self, bounded::abs_diff(self.raw, 0), true), K_LN);
+        if self.raw < 0 {
+            -r
+        } else {
+            r
+        }
+    }
+
+    fn acosh(self: Fixed) -> Fixed {
+        assert(self.raw >= ONE.raw, 'Fixed: acosh domain');
+        // self >= 1: the conversion cannot fail.
+        rescale(inv_core(self, self.raw.try_into().unwrap(), false), K_LN)
+    }
+
+    fn atanh(self: Fixed) -> Fixed {
+        assert(self.raw < ONE.raw && self.raw > -ONE.raw, 'Fixed: atanh domain');
+        let a = FixedTrait::abs(self).raw;
+        let n = ONE.raw + a;
+        let d = ONE.raw - a;
+        // q = (1 + a) / (1 - a) in [1, 2^33): at the scale 2^45 while q < 2^17, else at 2^30
+        // (q / 4 in raw units); both fit below 2^63.
+        let (num, den, shift) = if a < ATANH_SPLIT_RAW {
+            (n * ATANH_LIFT_K, d, -ATANH_SHIFT_LOW)
+        } else {
+            (n, d + d + d + d, INV_SHIFT_HIGH)
+        };
+        let q = Fixed { raw: num } / Fixed { raw: den };
+        let r = rescale(log2_core(q) + shift, K_LN_HALF);
+        if self.raw < 0 {
+            -r
+        } else {
+            r
+        }
     }
 }
 
@@ -1377,6 +1511,12 @@ fn hyp_core(a: Fixed) -> (u64, u64, bool) {
 #[inline(always)]
 fn sinh_core(a: Fixed) -> i64 {
     let (e, r, big) = hyp_core(a);
+    sinh_from_core(e, r, big)
+}
+
+/// `round(sinh(a))` raw from the output `(E, R, big)` of `hyp_core`, `2 <= a`.
+#[inline(always)]
+fn sinh_from_core(e: u64, r: u64, big: bool) -> i64 {
     let s = if big {
         let (g, _) = DivRem::div_rem(r + 2, FOUR_NZ);
         e - g
@@ -1385,4 +1525,51 @@ fn sinh_core(a: Fixed) -> i64 {
         s
     };
     s.try_into().unwrap()
+}
+
+/// `round(cosh(a))` raw from the output `(E, R, big)` of `hyp_core`.
+#[inline(always)]
+fn cosh_from_core(e: u64, r: u64, big: bool) -> i64 {
+    let c = if big {
+        let (g, _) = DivRem::div_rem(r + 2, FOUR_NZ);
+        e + g
+    } else {
+        let (c, _) = DivRem::div_rem(e + r + 1, TWO_NZ);
+        c
+    };
+    c.try_into().unwrap()
+}
+
+/// `log2(m) * 2^56`, unrounded, with `m = au + sqrt(au^2 + 1)` (`plus`) or `au + sqrt(au^2 -
+/// 1)`, `au = |x|` raw: the accumulator of `asinh` and `acosh`. Below `2^15` the argument is
+/// `t + isqrt(t^2 +- 2^92)` with `t = au * 2^14`, i.e. `m` at the scale `2^46` (below `2^63`);
+/// from `2^15` on it is `au / 4 + isqrt(x^2 +- 2^64) / 4`, i.e. `m / 4` in raw units (it fits up
+/// to `au = 2^63`). The scale is then removed exactly from the logarithm. Every square and sum is
+/// exact in a felt (below `2^127`), only the root and the quarters floor.
+#[inline(always)]
+fn inv_core(x: Fixed, au: u64, plus: bool) -> i64 {
+    let (arg, shift) = if au < INV_SPLIT {
+        // au < 2^47: t < 2^61, t^2 + 2^92 < 2^123, and t + root < 2^63.
+        let a: i64 = au.try_into().unwrap();
+        let t = Fixed { raw: a * INV_LIFT_K };
+        let c = if plus {
+            INV_ONE_LOW
+        } else {
+            INV_MINUS_ONE_LOW
+        };
+        let root = bounded::norm_u64_le3(upcast(wide_mul(t, t).v) + c);
+        (t.raw + root.try_into().unwrap(), -INV_SHIFT_LOW)
+    } else {
+        // x^2 <= 2^126: the sum fits a u128, and the quarters sum below 2^62.
+        let c = if plus {
+            INV_ONE_HIGH
+        } else {
+            INV_MINUS_ONE_HIGH
+        };
+        let root = bounded::norm_u64_le3(upcast(wide_mul(x, x).v) + c);
+        let (h, _) = DivRem::div_rem(au, FOUR_NZ);
+        let (g, _) = DivRem::div_rem(root, FOUR_NZ);
+        ((h + g).try_into().unwrap(), INV_SHIFT_HIGH)
+    };
+    log2_core(Fixed { raw: arg }) + shift
 }

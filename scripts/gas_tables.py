@@ -101,6 +101,10 @@ FIXED = [
         ("`tanh`", "exp::tanh__small"),
         ("`sinhc`", "exp::sinhc__large"),
         ("`coshc`", "exp::coshc"),
+        ("`sinh_cosh`", "exp::sinh_cosh__mid"),
+        ("`asinh`", "exp::asinh__small"),
+        ("`acosh`", "exp::acosh__small"),
+        ("`atanh`", "exp::atanh__small"),
     ]),
 ]
 
