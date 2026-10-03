@@ -10,7 +10,11 @@ bench_fixed::alt_div_nearest_cmp_tie: 5200 45 10 0 0
 bench_fixed::alt_div_stable: 6430 44 8 0 0
 bench_fixed::alt_div_trunc: 3620 32 6 0 0
 bench_fixed::alt_div_trunc_flat: 4640 42 6 0 0
+bench_fixed::alt_gt_constrain: 870 8 1 0 0
 bench_fixed::alt_mul_bias_downcast: 2050 17 5 0 0
+bench_fixed::alt_mul_felt_downcast: 1950 16 5 0 0
+bench_fixed::alt_mul_i128_check: 1780 15 4 0 0
+bench_fixed::alt_mul_scale_first: 1680 14 4 0 0
 bench_fixed::alt_mul_stable: 3690 31 7 0 0
 bench_fixed::alt_mul_stable_i128: 3990 34 7 0 0
 bench_fixed::alt_powi_loop_2: 15410 138 20 0 0
