@@ -3012,7 +3012,7 @@ pub fn recip_nearest_div(p: Divisor, x: i64) -> i64 {
 }
 /// `floor(f / 2^32)` of a NON-NEGATIVE Q64.64 sum held in a felt252 (`0 <= f << P`, e.g. a sum
 /// of squares): the result fits iff `f * 2^33 < 2^128`, and the quotient by `2^65` is already an
-/// `i64` (no bias, two steps fewer than `narrow32`). A negative `f` wraps to a felt above `2^128`
+/// `i64` (no bias, one step fewer than `narrow32`). A negative `f` wraps to a felt above `2^128`
 /// and panics with `Fixed: overflow`: never a wrong result.
 #[inline(always)]
 pub fn narrow32_nonneg(f: felt252) -> i64 {

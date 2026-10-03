@@ -478,6 +478,35 @@ impl H82 of DivRemHelper<BoundedInt<0x80000000, 0x800000007fffffff>, UnitInt<0x1
 impl H83 of MulHelper<BoundedInt<0x0, 0x80000000>, UnitInt<0x100000000>> {
     type Result = BoundedInt<0x0, 0x8000000000000000>;
 }
+impl H84 of SubHelper<BoundedInt<0x0, 0xffffffffffffffff>, UnitInt<0x8000000000000000>> {
+    type Result = BoundedInt<-0x8000000000000000, 0x7fffffffffffffff>;
+}
+impl H85 of AddHelper<i128, UnitInt<0x80000000000000000000000000000000>> {
+    type Result = BoundedInt<0x0, 0xffffffffffffffffffffffffffffffff>;
+}
+impl H86 of DivRemHelper<
+    BoundedInt<0x0, 0xffffffffffffffffffffffffffffffff>, UnitInt<0x10000000000000000>,
+> {
+    type DivT = BoundedInt<0x0, 0xffffffffffffffff>;
+    type RemT = BoundedInt<0x0, 0xffffffffffffffff>;
+}
+impl H87 of AddHelper<
+    BoundedInt<-0x800000000000000000000000, 0x7fffffffffffffffffffffff>,
+    UnitInt<0x800000000000000000000000>,
+> {
+    type Result = BoundedInt<0x0, 0xffffffffffffffffffffffff>;
+}
+impl H88 of DivRemHelper<BoundedInt<0x0, 0xffffffffffffffffffffffff>, UnitInt<0x100000000>> {
+    type DivT = BoundedInt<0x0, 0xffffffffffffffff>;
+    type RemT = BoundedInt<0x0, 0xffffffff>;
+}
+impl H89 of SubHelper<i64, i64> {
+    type Result = BoundedInt<-0xffffffffffffffff, 0xffffffffffffffff>;
+}
+impl H90 of ConstrainHelper<BoundedInt<-0xffffffffffffffff, 0xffffffffffffffff>, 0> {
+    type LowT = BoundedInt<-0xffffffffffffffff, -0x1>;
+    type HighT = BoundedInt<0x0, 0xffffffffffffffff>;
+}
 /// Unwraps `o` or panics with `Fixed: overflow` (out-of-line `panic_with_const_felt252`).
 #[inline(always)]
 fn or_overflow<T>(o: Option<T>) -> T {
@@ -1015,10 +1044,70 @@ fn sqrt_constrain_raw(x: i64) -> i64 {
         },
     }
 }
+/// `floor(a * b / 2^32)`: `narrow32` with the scale before the bias, `(p * 2^32 + 2^127)`
+/// (same operation count: a tie).
+#[inline(always)]
+fn mul_scale_first_raw(a: i64, b: i64) -> i64 {
+    let p: felt252 = upcast(bounded_int::mul(a, b));
+    let u: u128 = or_overflow((p * 0x100000000 + 0x80000000000000000000000000000000).try_into());
+    let (q, _r) = bounded_int::div_rem::<_, UnitInt<0x10000000000000000>>(u, 0x10000000000000000);
+    upcast(bounded_int::sub::<_, UnitInt<0x8000000000000000>>(q, 0x8000000000000000))
+}
+/// `floor(a * b / 2^32)`: unbiased range check `p * 2^32` into `i128`, then the `+2^127` bias
+/// that `div_rem` needs (one step more than `narrow32`).
+#[inline(always)]
+fn mul_i128_check_raw(a: i64, b: i64) -> i64 {
+    let p: felt252 = upcast(bounded_int::mul(a, b));
+    let g: i128 = or_overflow((p * 0x100000000).try_into());
+    let u = bounded_int::add::<
+        _, UnitInt<0x80000000000000000000000000000000>,
+    >(g, 0x80000000000000000000000000000000);
+    let (q, _r) = bounded_int::div_rem::<_, UnitInt<0x10000000000000000>>(u, 0x10000000000000000);
+    upcast(bounded_int::sub::<_, UnitInt<0x8000000000000000>>(q, 0x8000000000000000))
+}
+/// `floor(a * b / 2^32)`: `felt252` downcast of the product into `[-2^95, 2^95)`, bias, `div_rem`
+/// by 2^32 (two steps more than `narrow32`).
+#[inline(always)]
+fn mul_felt_downcast_raw(a: i64, b: i64) -> i64 {
+    let p: felt252 = upcast(bounded_int::mul(a, b));
+    let x: BoundedInt<-0x800000000000000000000000, 0x7fffffffffffffffffffffff> = or_overflow(
+        downcast(p),
+    );
+    let u = bounded_int::add::<
+        _, UnitInt<0x800000000000000000000000>,
+    >(x, 0x800000000000000000000000);
+    let (q, _r) = bounded_int::div_rem::<_, UnitInt<0x100000000>>(u, 0x100000000);
+    upcast(bounded_int::sub::<_, UnitInt<0x8000000000000000>>(q, 0x8000000000000000))
+}
+/// `a > b`: `constrain` of the exact difference `b - a` at 0 (a tie with `i64_diff`).
+#[inline(always)]
+fn gt_constrain_raw(a: i64, b: i64) -> bool {
+    match bounded_int::constrain::<
+        BoundedInt<-0xffffffffffffffff, 0xffffffffffffffff>, 0,
+    >(bounded_int::sub(b, a)) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
 /// Prototype rescale of `mul`.
 #[inline(always)]
 pub fn mul_bias_downcast(a: Fixed, b: Fixed) -> Fixed {
     Fixed { raw: mul_bias_downcast_raw(a.raw, b.raw) }
+}
+/// `mul`, scale before bias.
+#[inline(always)]
+pub fn mul_scale_first(a: Fixed, b: Fixed) -> Fixed {
+    Fixed { raw: mul_scale_first_raw(a.raw, b.raw) }
+}
+/// `mul`, `i128` range check.
+#[inline(always)]
+pub fn mul_i128_check(a: Fixed, b: Fixed) -> Fixed {
+    Fixed { raw: mul_i128_check_raw(a.raw, b.raw) }
+}
+/// `mul`, `felt252` downcast.
+#[inline(always)]
+pub fn mul_felt_downcast(a: Fixed, b: Fixed) -> Fixed {
+    Fixed { raw: mul_felt_downcast_raw(a.raw, b.raw) }
 }
 /// Floor-rounded `div`.
 #[inline(always)]
@@ -1079,4 +1168,9 @@ pub fn triple_single_downcast(a: Fixed, b: Fixed, c: Fixed, d: Fixed, e: Fixed) 
 #[inline(always)]
 pub fn triple_two_stage(a: Fixed, b: Fixed, c: Fixed, d: Fixed, e: Fixed) -> Fixed {
     Fixed { raw: triple_two_stage_raw(a.raw, b.raw, c.raw, d.raw, e.raw) }
+}
+/// `a > b` with `constrain`.
+#[inline(always)]
+pub fn gt_constrain(a: Fixed, b: Fixed) -> bool {
+    gt_constrain_raw(a.raw, b.raw)
 }
