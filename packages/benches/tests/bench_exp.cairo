@@ -4,7 +4,10 @@
 //! variants of `benches::alt::exp` are the `alt_*` rows; `alt_normalize_*` isolate the exponent
 //! search of `log2` (the library uses the `tree` one). The hyperbolic functions have a row per
 //! branch: the polynomial below 2 (`__small`), the exponential core (`__mid`), its `e^x / 2` form
-//! from 21 on (`__large`), the two scales and the saturation of `tanh`.
+//! from 21 on (`__large`), the two scales and the saturation of `tanh`. `sinh_cosh` has the same
+//! inputs as its two-call counterpart `alt_sinh_cosh_two_calls` (0.5, 1.5, -1.7, 10, 21.5); the
+//! inverses have a row per branch (`asinh` / `acosh` below and above `2^15`, `atanh` below and
+//! above `1 - 2^-16`) and at 1/20, the input of the polynomial candidates `alt_*_poly_small`.
 use benches::alt::exp as alt;
 use benches::harness::{bb, sink};
 use fixed::Fixed;
@@ -787,4 +790,433 @@ fn alt_tanh_recip__op() {
     let a = bb(Fixed { raw: 0x80000000 });
     let _r = bb(Fixed { raw: 1 });
     sink(alt::tanh_recip(a));
+}
+
+#[test]
+fn sinh_cosh__half__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh_cosh__half__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh_cosh());
+}
+
+#[test]
+fn sinh_cosh__small__base() {
+    let _a = bb(Fixed { raw: 0x180000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh_cosh__small__op() {
+    let a = bb(Fixed { raw: 0x180000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh_cosh());
+}
+
+#[test]
+fn sinh_cosh__negative__base() {
+    let _a = bb(Fixed { raw: -0x1b3333333 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh_cosh__negative__op() {
+    let a = bb(Fixed { raw: -0x1b3333333 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh_cosh());
+}
+
+#[test]
+fn sinh_cosh__mid__base() {
+    let _a = bb(Fixed { raw: 0xa00000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh_cosh__mid__op() {
+    let a = bb(Fixed { raw: 0xa00000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh_cosh());
+}
+
+#[test]
+fn sinh_cosh__large__base() {
+    let _a = bb(Fixed { raw: 0x1580000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn sinh_cosh__large__op() {
+    let a = bb(Fixed { raw: 0x1580000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.sinh_cosh());
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__half__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__half__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_cosh_two_calls(a));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__small__base() {
+    let _a = bb(Fixed { raw: 0x180000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__small__op() {
+    let a = bb(Fixed { raw: 0x180000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_cosh_two_calls(a));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__negative__base() {
+    let _a = bb(Fixed { raw: -0x1b3333333 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__negative__op() {
+    let a = bb(Fixed { raw: -0x1b3333333 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_cosh_two_calls(a));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__mid__base() {
+    let _a = bb(Fixed { raw: 0xa00000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__mid__op() {
+    let a = bb(Fixed { raw: 0xa00000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_cosh_two_calls(a));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__large__base() {
+    let _a = bb(Fixed { raw: 0x1580000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_sinh_cosh_two_calls__large__op() {
+    let a = bb(Fixed { raw: 0x1580000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::sinh_cosh_two_calls(a));
+}
+
+#[test]
+fn asinh__tiny__base() {
+    let _a = bb(Fixed { raw: 0x3039 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__tiny__op() {
+    let a = bb(Fixed { raw: 0x3039 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn asinh__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn asinh__negative__base() {
+    let _a = bb(Fixed { raw: -0x1b3333333 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__negative__op() {
+    let a = bb(Fixed { raw: -0x1b3333333 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn asinh__mid__base() {
+    let _a = bb(Fixed { raw: 0xa00000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__mid__op() {
+    let a = bb(Fixed { raw: 0xa00000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn asinh__large__base() {
+    let _a = bb(Fixed { raw: 0x10000000000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__large__op() {
+    let a = bb(Fixed { raw: 0x10000000000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn asinh__min__base() {
+    let _a = bb(Fixed { raw: -0x8000000000000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__min__op() {
+    let a = bb(Fixed { raw: -0x8000000000000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn acosh__near_one__base() {
+    let _a = bb(Fixed { raw: 0x100001000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acosh__near_one__op() {
+    let a = bb(Fixed { raw: 0x100001000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.acosh());
+}
+
+#[test]
+fn acosh__small__base() {
+    let _a = bb(Fixed { raw: 0x180000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acosh__small__op() {
+    let a = bb(Fixed { raw: 0x180000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.acosh());
+}
+
+#[test]
+fn acosh__mid__base() {
+    let _a = bb(Fixed { raw: 0xa00000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acosh__mid__op() {
+    let a = bb(Fixed { raw: 0xa00000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.acosh());
+}
+
+#[test]
+fn acosh__large__base() {
+    let _a = bb(Fixed { raw: 0x10000000000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn acosh__large__op() {
+    let a = bb(Fixed { raw: 0x10000000000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.acosh());
+}
+
+#[test]
+fn atanh__tiny__base() {
+    let _a = bb(Fixed { raw: 0x3039 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn atanh__tiny__op() {
+    let a = bb(Fixed { raw: 0x3039 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.atanh());
+}
+
+#[test]
+fn atanh__small__base() {
+    let _a = bb(Fixed { raw: 0x40000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn atanh__small__op() {
+    let a = bb(Fixed { raw: 0x40000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.atanh());
+}
+
+#[test]
+fn atanh__negative__base() {
+    let _a = bb(Fixed { raw: -0xc0000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn atanh__negative__op() {
+    let a = bb(Fixed { raw: -0xc0000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.atanh());
+}
+
+#[test]
+fn atanh__near_one__base() {
+    let _a = bb(Fixed { raw: 0xfffff000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn atanh__near_one__op() {
+    let a = bb(Fixed { raw: 0xfffff000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.atanh());
+}
+
+#[test]
+fn alt_asinh_naive__small__base() {
+    let _a = bb(Fixed { raw: 0x80000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_asinh_naive__small__op() {
+    let a = bb(Fixed { raw: 0x80000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::asinh_naive(a));
+}
+
+#[test]
+fn alt_asinh_naive__mid__base() {
+    let _a = bb(Fixed { raw: 0xa00000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_asinh_naive__mid__op() {
+    let a = bb(Fixed { raw: 0xa00000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::asinh_naive(a));
+}
+
+#[test]
+fn alt_acosh_naive__small__base() {
+    let _a = bb(Fixed { raw: 0x180000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_acosh_naive__small__op() {
+    let a = bb(Fixed { raw: 0x180000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::acosh_naive(a));
+}
+
+#[test]
+fn alt_atanh_two_ln__small__base() {
+    let _a = bb(Fixed { raw: 0x40000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_atanh_two_ln__small__op() {
+    let a = bb(Fixed { raw: 0x40000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::atanh_two_ln(a));
+}
+
+#[test]
+fn alt_atanh_div__small__base() {
+    let _a = bb(Fixed { raw: 0x40000000 });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_atanh_div__small__op() {
+    let a = bb(Fixed { raw: 0x40000000 });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::atanh_div(a));
+}
+
+#[test]
+fn alt_asinh_poly_small__small__base() {
+    let _a = bb(Fixed { raw: 0xccccccc });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_asinh_poly_small__small__op() {
+    let a = bb(Fixed { raw: 0xccccccc });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::asinh_poly_small(a));
+}
+
+#[test]
+fn alt_atanh_poly_small__small__base() {
+    let _a = bb(Fixed { raw: 0xccccccc });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn alt_atanh_poly_small__small__op() {
+    let a = bb(Fixed { raw: 0xccccccc });
+    let _r = bb(Fixed { raw: 1 });
+    sink(alt::atanh_poly_small(a));
+}
+
+#[test]
+fn asinh__twentieth__base() {
+    let _a = bb(Fixed { raw: 0xccccccc });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn asinh__twentieth__op() {
+    let a = bb(Fixed { raw: 0xccccccc });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.asinh());
+}
+
+#[test]
+fn atanh__twentieth__base() {
+    let _a = bb(Fixed { raw: 0xccccccc });
+    sink(bb(Fixed { raw: 1 }));
+}
+
+#[test]
+fn atanh__twentieth__op() {
+    let a = bb(Fixed { raw: 0xccccccc });
+    let _r = bb(Fixed { raw: 1 });
+    sink(a.atanh());
 }
