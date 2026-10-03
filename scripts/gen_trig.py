@@ -12,6 +12,18 @@ arithmetic, operation by operation (`mul_add` = `floor(a * b + c)` at the Q32.32
 Cairo code, so the ULP figures quoted in the doc comments are the ones the library returns, and
 the hand-picked test tables of `packages/fixed/tests/test_trig.cairo` are generated from it.
 
+Environment (pinned in `scripts/requirements.txt`):
+
+  python3 -m venv /tmp/fixed-venv && /tmp/fixed-venv/bin/pip install -r scripts/requirements.txt
+  /tmp/fixed-venv/bin/python scripts/gen_trig.py check
+
+The fits go through numpy (`numpy.linalg.solve`), whose last bits depend on the BLAS of the
+platform, not only on the numpy version: no numpy release reproduces the committed coefficients
+bit for bit. `reconcile` therefore keeps a committed polynomial whenever the fresh fit agrees
+with it to within `2^-48` of the polynomial value (platform noise), and replaces it otherwise (a
+deliberate change of the fit). The mirror always runs on the coefficients of the Cairo code, so
+every figure and every test table stays bit-exact. Same rule as `scripts/gen_exp.py`.
+
 usage:
   scripts/gen_trig.py emit     rewrite the generated blocks of the two Cairo files
   scripts/gen_trig.py check    exit 1 if those blocks are not up to date
@@ -25,6 +37,7 @@ import random
 import re
 import sys
 from decimal import ROUND_FLOOR, Decimal, getcontext
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -223,6 +236,38 @@ def scale_coeffs(coeffs):
         # accumulator, whose magnitude stays below the sum of the coefficients.
         assert abs(c) < 1 << 61, f"coefficient {c} leaves no headroom in the Fixed range"
     return out
+
+
+def committed(path, name):
+    """The coefficients of the Horner function `name` as committed in `path`, or None."""
+    found = re.search(rf"fn {name}\(\w+: \w+\) -> Fixed \{{(.*?)\n\}}", path.read_text(), re.S)
+    if not found:
+        return None
+    return [int(v, 16) for v in re.findall(r"raw: (-?0x[0-9a-f]+)", found.group(1))]
+
+
+def poly_noise(a, b, x_max, points=257):
+    """Largest difference of the values of the polynomials `a` and `b` (highest degree first,
+    scaled integers) on `[0, x_max]`, in units of the scaled raw, computed exactly."""
+    xs = [Fraction(x_max) * i / (points - 1) for i in range(points)]
+
+    def value(coeffs, x):
+        acc = Fraction(0)
+        for c in coeffs:
+            acc = acc * x + c
+        return acc
+
+    return max(abs(value(a, x) - value(b, x)) for x in xs)
+
+
+def reconcile(fitted, path, name, x_max):
+    """The committed coefficients of `name` if the fresh fit only differs from them by platform
+    noise (at most `2^-48` of the value of the polynomial, i.e. `SC >> 48` raw units, on
+    `[0, x_max]`), the fresh fit otherwise. See the module docstring."""
+    old = committed(path, name)
+    if old is None or len(old) != len(fitted) or old == fitted:
+        return fitted
+    return old if poly_noise(fitted, old, x_max) <= SC >> 48 else fitted
 
 # ----------------------------------------------------------------- the mirror
 
@@ -438,6 +483,10 @@ def build():
     cos_c[-1] += ROUND_BIAS
     for c in atan_c:
         c[-1] += ROUND_BIAS
+    sin_c = reconcile(sin_c, LIB, "sin_poly", umax)
+    cos_c = reconcile(cos_c, LIB, "cos_poly", umax)
+    acos_c = reconcile(acos_c, LIB, "acos_poly", 1.0)
+    atan_c = [reconcile(c, LIB, f"atan_seg{i}", seg) for i, c in enumerate(atan_c)]
     return Mirror(sin_c, cos_c, acos_c, atan_c)
 
 
@@ -514,6 +563,9 @@ def build_alt():
     cos_q = scale_coeffs(fit_shifted(g_cos, 0.0, umax, DEG_COS_Q, 1.0))
     wmax = math.tan(math.pi / 8)
     atan1 = scale_coeffs(fit_shifted(g_atan1, 0.0, wmax * wmax, DEG_ATAN1, 1.0))
+    sin_q = reconcile(sin_q, ALT, "sin_poly_q", umax)
+    cos_q = reconcile(cos_q, ALT, "cos_poly_q", umax)
+    atan1 = reconcile(atan1, ALT, "atan_poly_single", wmax * wmax)
     sin_lut = [int(round(math.sin(i * LUT_STEP / ONE) * ONE)) for i in range(LUT_LEN)]
     cos_lut = [int(round(math.cos(i * LUT_STEP / ONE) * ONE)) for i in range(LUT_LEN)]
     check_alt(sin_q, cos_q, atan1, sin_lut, cos_lut)
