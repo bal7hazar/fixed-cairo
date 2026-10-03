@@ -211,6 +211,6 @@ Doc template (every public item):
 
 Pre-1.0. PATCH: fixes/perf with identical API **and identical numeric results**. MINOR: any API
 change or any change of a numeric result (downstream determinism depends on bit-exact outputs).
-Releases 0.1.0 to 0.3.0 were cut from `glam-cairo`; the next one is cut from this repository.
+Releases 0.1.0 to 0.3.0 were cut from `glam-cairo`; releases from 0.4.0 on are cut from this repository.
 Consumers depend on the registry version (`fixed = "0.5.0"`). Compiler bumps are dedicated pull
 requests that regenerate every snapshot.
