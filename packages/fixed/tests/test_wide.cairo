@@ -20,6 +20,18 @@ const I64_MIN: i64 = -0x8000000000000000;
 const I64_MAX: i64 = 0x7fffffffffffffff;
 const ONE_I128: i128 = 0x100000000;
 
+// Components whose sums of squares straddle 2^95, the overflow boundary of the sums of squares
+// (`norm*_squared`, `distance*_squared`: raw result `floor(sum / 2^32)` fits iff sum < 2^95).
+// 2^95 - 1 is no sum of two or three squares (it is 3 mod 4 and 7 mod 8): SQ2_A^2 + SQ2_B^2 =
+// 2^95 - 13 297 644 is a two-square sum less than 2^32 below it, still `MAX` after the rescale.
+const P47: i64 = 0x800000000000; // P47^2 + P47^2 = 2^95
+const SQ2_A: i64 = 0xb504f333f9de;
+const SQ2_B: i64 = 0xbec3ac;
+const SQ4_A: i64 = 0xb504f333f9de; // SQ4_A^2 + SQ4_B^2 + SQ4_C^2 + SQ4_D^2 = 2^95 - 1
+const SQ4_B: i64 = 0xbec3a5;
+const SQ4_C: i64 = 0x30f1;
+const SQ4_D: i64 = 0x15df;
+
 fn f(raw: i64) -> Fixed {
     FixedTrait::from_raw(raw)
 }
@@ -103,6 +115,30 @@ fn test_wide_narrow_boundaries() {
     assert_eq!(top.narrow(), MAX);
     assert_eq!(wide_from(MIN).narrow(), MIN);
     assert_eq!(wide_from(MIN).add(wide_mul(f(1), f(1))).narrow(), MIN);
+}
+
+#[test]
+fn test_sum_of_squares_narrow_boundaries() {
+    // Top: the largest sums below 2^95 narrow to MAX.
+    assert_eq!(norm2_squared(f(SQ2_A), f(-SQ2_B)), MAX);
+    assert_eq!(norm3_squared(f(-SQ2_A), ZERO, f(SQ2_B)), MAX);
+    assert_eq!(norm4_squared(f(SQ4_A), f(-SQ4_B), f(SQ4_C), f(-SQ4_D)), MAX);
+    let o = -0x4000000000000000; // the differences, not the points, are near 2^47.5
+    assert_eq!(distance2_squared(f(o + SQ2_A), f(o), f(o), f(o + SQ2_B)), MAX);
+    assert_eq!(distance3_squared(f(o), f(SQ2_B), f(o), f(o + SQ2_A), ZERO, f(o)), MAX);
+    assert_eq!(
+        distance4_squared(f(o + SQ4_A), f(o), f(SQ4_C), ZERO, f(o), f(o + SQ4_B), ZERO, f(SQ4_D)),
+        MAX,
+    );
+    // Bottom: the sums cannot be negative; 0, (2^16 - 1)^2 and 2^32 narrow to 0, 0 and 1 ULP.
+    assert_eq!(norm2_squared(ZERO, ZERO), ZERO);
+    assert_eq!(norm3_squared(ZERO, f(-0xffff), ZERO).raw, 0);
+    assert_eq!(norm4_squared(f(0x10000), ZERO, ZERO, ZERO).raw, 1);
+    assert_eq!(distance2_squared(MIN, MIN, MIN, MIN), ZERO);
+    assert_eq!(distance3_squared(f(1), ZERO, ZERO, ZERO, ZERO, ZERO).raw, 0);
+    assert_eq!(
+        distance4_squared(MAX, ZERO, ZERO, ZERO, f(I64_MAX - 0x10000), ZERO, ZERO, ZERO).raw, 1,
+    );
 }
 
 #[test]
@@ -649,6 +685,78 @@ fn test_distance3_squared_overflow_panics() {
 #[should_panic(expected: 'Fixed: overflow')]
 fn test_distance4_squared_overflow_panics() {
     let _ = distance4_squared(MIN, MIN, MIN, MIN, MAX, MAX, MAX, MAX);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_norm2_squared_sum_2_pow_95_panics() {
+    let _ = norm2_squared(f(P47), f(-P47));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_norm2_squared_sum_2_pow_95_plus_2_panics() {
+    let _ = norm2_squared(f(P47 + 1), f(P47 - 1));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_norm3_squared_sum_2_pow_95_panics() {
+    let _ = norm3_squared(f(-P47), ZERO, f(P47));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_norm3_squared_sum_2_pow_95_plus_1_panics() {
+    let _ = norm3_squared(f(P47), f(P47), f(-1));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_norm4_squared_sum_2_pow_95_panics() {
+    let _ = norm4_squared(ZERO, f(P47), ZERO, f(P47));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_norm4_squared_sum_2_pow_95_plus_1_panics() {
+    let _ = norm4_squared(f(-P47), f(1), f(-P47), ZERO);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance2_squared_sum_2_pow_95_panics() {
+    let _ = distance2_squared(f(P47), ZERO, ZERO, f(P47));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance2_squared_sum_2_pow_95_plus_2_panics() {
+    let _ = distance2_squared(f(-P47 - 1), f(P47), ZERO, f(1));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance3_squared_sum_2_pow_95_panics() {
+    let _ = distance3_squared(f(P47), ZERO, f(-P47), ZERO, ZERO, ZERO);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance3_squared_sum_2_pow_95_plus_1_panics() {
+    let _ = distance3_squared(f(P47), f(1), ZERO, ZERO, ZERO, f(P47));
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance4_squared_sum_2_pow_95_panics() {
+    let _ = distance4_squared(ZERO, f(P47), ZERO, ZERO, f(P47), ZERO, ZERO, ZERO);
+}
+
+#[test]
+#[should_panic(expected: 'Fixed: overflow')]
+fn test_distance4_squared_sum_2_pow_95_plus_1_panics() {
+    let _ = distance4_squared(f(P47), ZERO, f(1), ZERO, ZERO, f(-P47), ZERO, ZERO);
 }
 
 #[test]

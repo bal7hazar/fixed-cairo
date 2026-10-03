@@ -2212,6 +2212,10 @@ pub impl H636 of MulHelper<
             -0x8000000000000000000000000000000000000000, 0x8000000000000000000000000000000000000000,
         >;
 }
+pub impl H637 of DivRemHelper<u128, UnitInt<0x20000000000000000>> {
+    type DivT = BoundedInt<0x0, 0x7fffffffffffffff>;
+    type RemT = BoundedInt<0x0, 0x1ffffffffffffffff>;
+}
 /// Unwraps `o` or panics with `Fixed: overflow` (out-of-line `panic_with_const_felt252`).
 #[inline(always)]
 pub fn or_overflow<T>(o: Option<T>) -> T {
@@ -3005,4 +3009,14 @@ pub fn recip_nearest_div(p: Divisor, x: i64) -> i64 {
             }
         },
     }
+}
+/// `floor(f / 2^32)` of a NON-NEGATIVE Q64.64 sum held in a felt252 (`0 <= f << P`, e.g. a sum
+/// of squares): the result fits iff `f * 2^33 < 2^128`, and the quotient by `2^65` is already an
+/// `i64` (no bias, two steps fewer than `narrow32`). A negative `f` wraps to a felt above `2^128`
+/// and panics with `Fixed: overflow`: never a wrong result.
+#[inline(always)]
+pub fn narrow32_nonneg(f: felt252) -> i64 {
+    let u: u128 = or_overflow((f * 0x200000000).try_into());
+    let (q, _r) = bounded_int::div_rem::<_, UnitInt<0x20000000000000000>>(u, 0x20000000000000000);
+    upcast(q)
 }

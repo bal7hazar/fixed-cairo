@@ -204,7 +204,7 @@ pub fn det3(
 ///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn norm2_squared(x: Fixed, y: Fixed) -> Fixed {
-    wide_mul(x, x).add(wide_mul(y, y)).narrow()
+    Fixed { raw: bounded::narrow32_nonneg(upcast(wide_mul(x, x).add(wide_mul(y, y)).v)) }
 }
 
 /// Computes `x * x + y * y + z * z` with a single rescale.
@@ -217,7 +217,7 @@ pub fn norm2_squared(x: Fixed, y: Fixed) -> Fixed {
 ///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn norm3_squared(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
-    wide_mul(x, x).add(wide_mul(y, y)).add(wide_mul(z, z)).narrow()
+    Fixed { raw: bounded::narrow32_nonneg(upcast(sum_squares3(x, y, z).v)) }
 }
 
 /// Computes `x * x + y * y + z * z + w * w` with a single rescale.
@@ -230,7 +230,7 @@ pub fn norm3_squared(x: Fixed, y: Fixed, z: Fixed) -> Fixed {
 ///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn norm4_squared(x: Fixed, y: Fixed, z: Fixed, w: Fixed) -> Fixed {
-    wide_mul(x, x).add(wide_mul(y, y)).add(wide_mul(z, z)).add(wide_mul(w, w)).narrow()
+    Fixed { raw: bounded::narrow32_nonneg(upcast(sum_squares4(x, y, z, w).v)) }
 }
 
 /// Returns whether `floor(x^2 + y^2)` differs from `1` by at most
@@ -395,7 +395,7 @@ pub fn distance4(
 ///   docs/DESIGN.md section 3, "overflow".
 #[inline(always)]
 pub fn distance2_squared(ax: Fixed, ay: Fixed, bx: Fixed, by: Fixed) -> Fixed {
-    Fixed { raw: bounded::narrow32(bounded::dist_sq2(ax.raw, bx.raw, ay.raw, by.raw)) }
+    Fixed { raw: bounded::narrow32_nonneg(bounded::dist_sq2(ax.raw, bx.raw, ay.raw, by.raw)) }
 }
 
 /// Computes the squared distance between the points `a` and `b` (see [`distance2_squared`]).
@@ -411,7 +411,9 @@ pub fn distance3_squared(
     ax: Fixed, ay: Fixed, az: Fixed, bx: Fixed, by: Fixed, bz: Fixed,
 ) -> Fixed {
     Fixed {
-        raw: bounded::narrow32(bounded::dist_sq3(ax.raw, bx.raw, ay.raw, by.raw, az.raw, bz.raw)),
+        raw: bounded::narrow32_nonneg(
+            bounded::dist_sq3(ax.raw, bx.raw, ay.raw, by.raw, az.raw, bz.raw),
+        ),
     }
 }
 
@@ -428,7 +430,7 @@ pub fn distance4_squared(
     ax: Fixed, ay: Fixed, az: Fixed, aw: Fixed, bx: Fixed, by: Fixed, bz: Fixed, bw: Fixed,
 ) -> Fixed {
     Fixed {
-        raw: bounded::narrow32(
+        raw: bounded::narrow32_nonneg(
             bounded::dist_sq4(ax.raw, bx.raw, ay.raw, by.raw, az.raw, bz.raw, aw.raw, bw.raw),
         ),
     }
