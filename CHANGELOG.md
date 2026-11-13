@@ -10,6 +10,14 @@ request numbers refer to `glam-cairo`. Releases from 0.4.0 on are cut from this 
 
 ## [Unreleased]
 
+### Changed
+- perf(wide): `norm{2,3,4}_squared` and `distance{2,3,4}_squared` narrow their non-negative sum
+  without the sign bias (internal `narrow32_nonneg`): 1 step / 100 gas less each,
+  `distance4_squared` 9 steps / 900 gas less (`gas/wide.snap`). Results and panics unchanged.
+  `narrow32` itself is at the floor of the libfuncs; its measured alternatives are in
+  `benches::alt::fixed` (`alt_mul_scale_first`, `alt_mul_i128_check`, `alt_mul_felt_downcast`)
+  with `alt_gt_constrain` (#15).
+
 ## [0.5.0] - 2026-10-03
 
 Pure addition: no numeric result of 0.4.0 changes.
